@@ -1,6 +1,6 @@
 # Colorboard — Rust-Only Agent Implementation Plan
 
-**Revision:** 2.0 — 2026-10-20  
+**Revision:** 5.0 — 2026-10-20  
 **Status:** Requirements ratified; implementation not yet validated on a live Plasma session  
 **Project name:** Colorboard (working name; identifiers are placeholders until finalized)  
 **Initial target:** KDE Plasma 6 on **Wayland only**  
