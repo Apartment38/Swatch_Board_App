@@ -1,9 +1,9 @@
 # Colorboard — Agent Implementation Plan
 
-**Status:** Requirements confirmed, 2026-10-20; architecture refinements incorporated (revision 1.1).  
+**Status:** Requirements confirmed, 2026-10-20; external plugin contract and KWin QML fallback clarified (revision 1.2).  
 **Working name:** Colorboard (renameable without changing interfaces).  
 **Initial platform:** KDE Plasma 6 **Wayland only**.  
-**Languages:** Rust for the resident picker and its transient UI; Python/PySide6 for the main board; a **minimal C++ KWin component is explicitly permitted if necessary** to satisfy the picker requirements.  
+**Languages:** Rust for the resident picker and its transient UI; Python/PySide6 for the main board; a **packaged KWin QML/JavaScript effect may be used without C++** where its supported APIs meet the mandatory picker requirements, with a **minimal C++ KWin component permitted only if necessary**. Theme plugins are external data packages by default, independent of the host language.  
 **Architecture decision:** Keep Rust + Python for implementation. An all-Rust editor remains a future option, not a current work item; revisit editor-toolkit choice only at the Phase 1 → Phase 2 gate without delaying or rewriting the Rust picker.
 
 ## 1. Product and non-negotiable requirements
@@ -23,6 +23,7 @@ Build two independently runnable applications that share colors, palettes, confi
 - Failure to meet the magnifier or focus requirements **blocks release and all later phases**, rather than downgrading them into optional features.
 - Target KDE Plasma 6 Wayland, not X11 or other compositors, for the first release.
 - Favor low **idle proportional/private memory** and near-zero idle CPU; measure PSS/USS rather than using RSS alone.
+- **Externally installable theme plugins are a core requirement:** installing a compatible plugin must never require modifying, rebuilding, or reinstalling Colorboard, the Rust picker, or the Python editor. Common plugins must be authorable entirely as declarative data, assets, and Jinja2 templates; code hooks are optional.
 
 ## 2. Confirmed interaction contract
 
@@ -83,8 +84,12 @@ The linked KDE source directory is correct:
 - <https://github.com/KDE/kdeplasma-addons/blob/master/applets/colorpicker/grabwidget.cpp>
 - <https://github.com/KDE/kdeplasma-addons/blob/master/applets/colorpicker/qml/main.qml>
 - <https://github.com/KDE/kwin/blob/master/src/plugins/colorpicker/colorpicker.cpp>
+- <https://develop.kde.org/docs/plasma/kwineffect/> (declarative KWin QML effects)
+- <https://api.kde.org/org-kde-kwin-qmlmodule.html> (published KWin QML types)
 
 The applet's `GrabWidget::pick()` calls KWin's D-Bus method `org.kde.kwin.ColorPicker.pick` at `/ColorPicker`. KWin performs the interactive selection and returns a `QColor` (serialized as a D-Bus structure containing a packed RGBA integer). **That public operation returns one color, not a live pixel neighborhood**. It is useful as a behavioral reference or validation oracle but **does not independently implement the required magnifier**.
+
+KWin declarative QML/JavaScript effects can be packaged and installed independently of a C++ binary; KWin hosts them and they may be used alongside an application written in Rust. **However, the documented KWin QML effect API does not expose a general-purpose live framebuffer pixel-read operation.** Treat QML effects as a potential compositor-hosted overlay/input integration, **not** an assumed substitute for obtaining underlying pixel data. Any Rust + QML + portal composition must prove source-frame transport, positioning, non-recursive sampling, exact color return, and focus behavior on real KWin before adoption.
 
 The referenced KDE applet contains GPL-licensed code. Do not copy or adapt that implementation without verifying and complying with its license requirements; reference its behavior or independently implement the features when appropriate.
 
@@ -100,7 +105,8 @@ Recommended layout:
          |
          +---- launch/IPC ---> [ colorboard-picker : Rust ]
          |                      Wayland overlay + capture + magnifier
-         |                      (optional tiny KWin C++ integration)
+         |                      (optional packaged KWin QML effect;
+         |                       tiny KWin C++ integration only if required)
          |
          +---- launch/IPC ---> [ colorboard-history : Rust ]
          |                      centered, transient history popup
@@ -137,18 +143,20 @@ Check actual crate versions and API signatures when coding, rather than copying 
 
 The ScreenCast portal's capture permissions and monitor selection are controlled by KDE. If supported, use a user-approved restore token to avoid repeating source selection; never assume persistence or silently bypass consent. Portal prompts are allowed to receive focus. Capture resources must be released after each pick.
 
-**Conditional native path (exception, not the default):** If the primary path cannot simultaneously provide live under-pointer pixels, no recursive overlay contamination, precise mouse click handling, and keyboard-focus preservation on KWin, build the **smallest practical KWin-native component** in C++ (or a supported KWin effect mechanism). First document the failed capability/behavior checks and inspect the installed KWin extension APIs. Do not introduce the extension merely for convenience or because the portal requires normal user consent.
+**Second path — packaged KWin QML/JavaScript effect (no C++ required if sufficient):** If the primary portal/overlay path does not meet all mandatory behavior, evaluate a separately installable Plasma 6 declarative `KWin/Effect` package (`metadata.json`, `contents/ui/main.qml`). It can run alongside a Rust application without compiling a native KWin plugin. Determine which parts it can provide: compositor-hosted overlay, pointer input and focus behavior, and a supported way for Rust to initiate/cancel sessions and receive results. Document and test the **actual** activation/IPC interface; do not invent an incoming QML D-Bus API. The published QML effects API does **not** document arbitrary pixel-read access, so any required screen data must still come from a verified source, potentially Rust's authorized PipeWire capture. Do not call the QML effect path a successful magnifier unless source pixels, input and coordinates are correct end-to-end.
 
-**Strict component boundary:** The C++ component may perform **only compositor-dependent capture, magnifier rendering, pointer selection, and result/cancel delivery**. Expose a narrow, documented, versioned IPC interface to the Rust picker with color/result, cancellation, and error values. It must not implement or own tray menus, shortcut registration, clipboard formatting, SQLite, configuration persistence, board startup, Python plugins, or theme logic. The Rust process remains the orchestration and product API boundary; the picker can select the portal backend or native backend behind the same Rust interface.
+**Last-resort native path — minimal C++ KWin integration:** If neither Rust/portal nor Rust plus a supported KWin declarative effect can satisfy live sampling, non-recursive magnification, click interception, and preserved keyboard focus, permit the **smallest practical KWin-native C++ component**, after documenting what exact capability is missing in the previous approaches. Portal permission prompts are not by themselves a reason to bypass user consent or introduce native code.
 
-Native KWin C++ effect APIs have no stable cross-release ABI guarantee. If the exception is needed, detect installed KWin version and extension compatibility at build/install/startup; fail clearly on mismatch, and provide a documented rebuild/package strategy when KWin updates. Never depend on private compositor internals outside this component or silently load an incompatible plugin. No stage may mark success based solely on a capture demonstration that violates the specified UX.
+**Strict compositor-component boundary:** Either the QML effect or C++ component may perform **only compositor-dependent overlay, sampling/capture (if actually supported), pointer selection, and result/cancel delivery**. Expose a narrow, documented, versioned contract to Rust and keep the tray, shortcut management, clipboard, SQLite, configuration, main app and theme plugins out of KWin. The Rust picker is the orchestrator; all backends must satisfy the same end-to-end acceptance suite.
+
+Packaged declarative effects avoid the native KWin C++ ABI problem but still require API compatibility and user installation/enabling. Native C++ KWin effects have no stable cross-release ABI guarantee. If C++ is truly needed, detect KWin version/ABI compatibility at build/install/startup and fail clearly on mismatch; document the rebuild/package strategy. Never mark success based only on a visual demonstration that fails exact pixel selection or focus preservation.
 
 ### Wayland-specific event rules
 
 - Picker: request **no keyboard focus** for its visual surface. Test that pointer events arrive and that the original app retains keyboard focus. Do not promise Escape support if doing so would require keyboard capture; right-click cancellation is required.
 - History popup: may request ordinary keyboard focus to support Escape and close-on-focus-loss. On Wayland, do not assume direct positioning of a regular XDG toplevel; use an appropriately centered layer surface or another compositor-supported solution, and verify click-away dismissal.
 - Do not use `pynput`, `xdotool`, X11 screen-scraping, or unsafe system-wide event interception as a Wayland workaround.
-- If a core behavior requires compositor integration, use the explicitly approved narrow C++ exception instead of weakening requirements.
+- If a core behavior requires compositor integration, evaluate the packaged declarative KWin QML effect before the approved narrow C++ exception. Neither fallback may weaken magnification, input, color fidelity, or focus requirements.
 
 ## 5. Shared data and integration contracts
 
@@ -211,7 +219,7 @@ Work required:
 3. Implement screen capture, pointer sampling, correctly scaled per-monitor coordinates, and magnifier drawing.
 4. Implement left-click confirmation/right-click cancellation while maintaining keyboard focus on the previously active application.
 5. Resolve overlay recursion, cursor contamination, and mixed DPI/rotation handling.
-6. If the portal/layer-shell route cannot meet ALL requirements, implement the permitted minimal compositor-native component; do not substitute a weaker picker.
+6. If the portal/layer-shell route cannot meet ALL requirements, evaluate the packaged declarative KWin QML/JavaScript effect and its Rust integration; use the permitted minimal C++ component only when a missing compositor-native capability requires it. Do not substitute a weaker picker.
 7. Shut down frames, effects, and overlay upon pick completion/cancellation.
 8. Add unit tests for pixels/format conversion/coordinate mapping and real-session manual tests.
 
@@ -251,7 +259,7 @@ Work required:
 - Transient settings UI for popup count/rows/columns, magnifier radius/zoom, output format, history cap, both hotkeys, auto-copy.
 - GlobalShortcuts portal shortcut session and KDE-supported configuration UI. Verify permissions, collisions, updates, startup restoration, and revocation.
 - Autostart or systemd user unit (one chosen startup mechanism; no duplicate launches).
-- Package helper binaries, desktop metadata, icons, version checks for any KWin extension.
+- Package helper binaries, desktop metadata, icons, and any separately installable KWin QML effect; add version/ABI checks if the last-resort C++ KWin extension is required.
 - Benchmark idle USS/PSS/CPU and active picker resource usage; document test platform.
 
 **Phase 1 release gate:** All picking, magnification, focus, history, tray, popup, shortcut, config, startup, and clipboard requirements function together. No Python implementation may begin before this gate.
@@ -314,12 +322,41 @@ Define and version declarative JSON schemas in `schemas/`: `theme-plugin-manifes
 
 **Python plugin code is an escape hatch**, used only for application-specific import/parsing, sophisticated validation, unusual preview geometry/interactions, or export helpers that cannot be described declaratively. Define a narrow, documented adapter interface for these behaviors; plugins must not own the application's event loop or arbitrary cross-tab UI. New theme targets should be possible using only manifest + role/scene data + templates when their requirements fit the generic renderer.
 
-#### Theme plugins and export contract
+#### External theme-plugin installation, discovery, and export contract (MANDATORY)
 
-- Use **trusted Python plugins** initially, discovered through an explicit manifest/entry-point API. The supported v1 authoring contract is **declarative data + Jinja2 templates, with optional Python hooks**. Do not embed Lua in v1; reconsider additional scripting engines only when concrete plugins require them.
+**A new compatible theme target must be installable by copying a plugin package into a documented plugin directory, without recompiling, rebuilding, modifying, or reinstalling any Colorboard executable or source tree.** The Board must discover and load it at runtime. The core renderer must not contain hardcoded application identities, theme roles, UI layouts, or per-plugin source imports for Ghostty/Zed/KDE or later targets. Bundled plugins must use **the exact same public plugin format and loader** as third-party plugins.
+
+**Install paths and discovery** (implement with XDG directory conventions):
+
+- User plugins: `${XDG_DATA_HOME:-~/.local/share}/colorboard/plugins/<plugin-id>/`.
+- System plugins: `${XDG_DATA_DIRS}` entries, e.g. `/usr/local/share/colorboard/plugins/<plugin-id>/` or `/usr/share/colorboard/plugins/<plugin-id>/`.
+- Built-in plugins: shipped as ordinary packages in an installed application data directory, discovered using the same loader (development repo may include fixture/source copies).
+- The plugin manager shows discovered/enabled/disabled/incompatible plugins, validation errors, API-version compatibility, and installation source. Provide a **Reload Plugins** action that scans plugin directories without recompilation or reinstall. Newly installed declarative plugins should appear immediately after reloading; ensure a safe transition when a selected plugin is replaced or removed.
+
+**Language-neutral plugin bundle format (versioned)** — directory example:
+
+```text
+plugins/example-terminal/
+├── manifest.json          # unique ID, plugin API version, target/version metadata
+├── roles.json             # semantic color roles, defaults, constraints
+├── scenes.json            # declarative preview elements and UI transitions
+├── templates/
+│   └── theme.j2           # Jinja2 output template(s)
+├── assets/                # optional icons, fonts, sample text or mock images
+├── fixtures/              # expected generated output for golden tests
+└── hooks.py               # OPTIONAL trusted Python behavior, never required for ordinary themes
+```
+
+- A **data-only plugin** must support role editing, clickable/interactive preview states, palette assignment, drag-and-drop, theme validation through declarative rules, and output-file export using templates; it must **not** require compiled code or a Python module.
+- Define a versioned plugin ABI/API at the **data-contract** level. Validate the manifest and referenced scene/role/template files against published JSON Schemas, reject malformed or incompatible plugins gracefully, and provide clear user-facing diagnostics. Use deterministic plugin-ID conflict resolution (or reject duplicate IDs with an actionable error); never silently shadow user data.
+- Optional Python hooks are loaded only for explicitly trusted and enabled plugins, through a constrained documented adapter interface, and **execute with the user's permissions**. Never auto-install dependencies or auto-execute downloaded code. A declarative plugin should not run executable code beyond normal template rendering.
+- The declarative manifest, roles, scenes, and templates must be **portable across future Python, Rust, or C++ host implementations**; keep language-specific hooks isolated so changing the implementation language does not invalidate data-only plugins. Jinja2 is the authoritative v1 template dialect; alternative hosts must implement a tested compatible subset or retain a separate exporter bridge. Do not claim byte-for-byte full Jinja2 parity in another engine without tests.
+- Plugin installation is independent of the Rust picker; opening the picker must not initialize the plugin subsystem. The Theme Board only initializes the chosen plugin's preview/assets, and should list unused plugins using manifest metadata without importing code or instantiating scenes.
+
+Use **trusted Python hooks** initially only when required. The supported v1 default authoring contract is **declarative data + Jinja2 templates, with optional Python hooks**. Do not embed Lua in v1; reconsider additional scripting engines only for validated requirements.
 - Export pipeline: load plugin metadata → resolve palette links and overrides → normalize and validate semantic roles → format target-native color values → render Jinja2 template(s) with strict undefined-variable handling → validate the rendered output where practical → write requested export file(s). Keep validation and escaping separate from templates.
 - Use a per-plugin **role adapter**, not direct Qt widget color values, as the input to exports. A plugin must declare supported application/config schema versions, output paths/extensions, template assets, and test fixtures. Do not infer arbitrary filesystem destinations from untrusted template values.
-- Use reproducible golden-file export tests and data-driven scene tests (select/click/transition/drop). Add screenshot-based regression tests for representative mock states where feasible. Importers are optional if the target cannot be reliably round-tripped; do not claim lossless import/export otherwise.
+- Use reproducible golden-file export tests and data-driven scene tests (select/click/transition/drop), including an **external fixture plugin** installed after the Board is built, discovered via Reload Plugins, previewed, edited, and exported without source edits or recompilation. Add screenshot-based regression tests for representative mock states where feasible. Importers are optional if the target cannot be reliably round-tripped; do not claim lossless import/export otherwise.
 - Load only the selected plugin's optional Python modules/assets and preview state on demand. Do not preinitialize all plugins or load them in Rust/tray. Plugins are treated as **trusted executable code**; never automatically execute third-party downloaded plugins.
 
 Implement plugins **in order**:
@@ -330,7 +367,7 @@ Implement plugins **in order**:
 
 Use Jinja2 for text templates, but separate role validation and escaping/format conversion from template presentation. Golden-file tests must cover each export target; retain unknown imported keys when round-tripping where feasible. Never apply generated themes to the live desktop automatically.
 
-**Phase 5 gate:** Ghostty's preview is rendered through the common data-driven system; at least one hidden state opens through a declarative click transition; inspector, drag/drop, override/link, saved project, and exported text all agree. Zed and KDE may follow as independent deliverables without modifying the generic editor for ordinary new roles or scenes.
+**Phase 5 gate:** A newly created **external test plugin** can be installed into the user plugin directory, discovered with Reload Plugins, shown in the target selector, previewed, edited, and exported **without modifying/rebuilding/reinstalling Colorboard**. Ghostty's preview is rendered through the common data-driven system; at least one hidden state opens through a declarative click transition; inspector, drag/drop, override/link, saved project, and exported text all agree. Zed and KDE may follow as independent deliverables without modifying the generic editor for ordinary new roles or scenes.
 
 ### Phase 6 — Release hardening
 
@@ -338,7 +375,7 @@ Use Jinja2 for text templates, but separate role validation and escaping/format 
 - Real KDE Wayland integration tests, monitor disconnects, portal revocation, sleep/resume, shortcut conflicts, KWin updates.
 - Packaging for Arch/Fedora/openSUSE as applicable; document C++ KWin extension version coupling if used.
 - Performance regression checks for idle resident process and transient memory cleanup.
-- User guide, theme author guide, D-Bus API guide, installation and troubleshooting.
+- User guide, **external plugin installation/author guide and versioned plugin schema**, D-Bus API guide, installation and troubleshooting.
 
 ## 7. Repository layout
 
@@ -355,7 +392,8 @@ colorboard/
 │       ├── config/
 │       ├── ipc/
 │       └── storage/
-├── kwin/                     # only if the required native component is necessary
+├── kwin/                     # optional packaged QML effect and/or last-resort native component
+│   └── effect-qml/           # KWin/Effect package with metadata.json + contents/ui/main.qml
 ├── board/
 │   ├── pyproject.toml
 │   └── colorboard/
@@ -369,10 +407,12 @@ colorboard/
 │           ├── api.py
 │           ├── renderer/     # shared QGraphicsScene + reusable nodes
 │           ├── schemas/      # validated data objects / loaders
-│           └── plugins/
-│               ├── ghostty/
-│               ├── zed/
-│               └── kde/
+│           └── loader.py       # external manifest validation, discovery, reload
+├── plugins/                 # distributable example/bundled plugin source packages
+│   ├── ghostty/
+│   ├── zed/
+│   ├── kde/
+│   └── example-terminal/
 ├── schemas/
 │   ├── theme-plugin-manifest.schema.json
 │   ├── theme-roles.schema.json
@@ -401,8 +441,8 @@ colorboard/
 - Use Rustfmt/Clippy and cargo tests, Ruff/pytest/type checking for Python, and automated export golden tests.
 - Define one canonical color representation, a versioned IPC/schema contract across Rust and Python, and stable semantic role IDs for theme targets.
 - Keep Rust as the **single schema migration owner**; test the one-shot migration CLI from both Rust and standalone Python start paths.
-- Keep theme UI previews **data-driven by default**. Avoid custom per-plugin Qt interfaces and keep Python plugin hooks narrowly scoped.
-- The optional KWin C++ component must never become an application backend for anything except native screen picking/magnification. Version-detect it and keep the Rust-facing contract stable.
+- Make **external, installable, data-only theme plugins** first-class. Test install/validate/discover/reload/preview/export of a new fixture plugin without modifying or rebuilding the Board. Avoid custom per-plugin Qt interfaces; keep optional Python hooks narrowly scoped.
+- For missing Wayland functionality, test a packaged KWin QML/JS effect with Rust orchestration before introducing native C++. The public scripted API does not promise direct pixel reads. If absolutely necessary, isolate a minimal version-checked C++ KWin effect behind the same Rust-facing contract.
 - Keep the Python editor strictly on demand, with no resident Python process or interpreter loaded in the Rust tray service.
 - Avoid constant polling or repeated frame capture while idle.
 - Keep dependencies pinned by lockfiles; record verified Plasma/KWin/Qt/PipeWire versions during testing.
@@ -414,13 +454,13 @@ colorboard/
 | Decision | Selected approach | Rationale / revisit rule |
 |---|---|---|
 | Main language split | Rust picker/tray + Python/PySide6 Board | Qt's mature editing primitives speed up WYSIWYG construction; the editor is not resident, so Python does not contribute to idle tray memory. Reassess all-Rust only at the Phase 1 → 2 gate if warranted. |
-| Theme preview authoring | Declarative scenes/roles, shared Qt renderer, optional Python hooks | Avoid duplicating scene and interaction logic across Ghostty/Zed/KDE plugins. |
+| Theme preview authoring | **Externally installable, versioned declarative plugins** with a shared Qt renderer; optional trusted Python hooks | A new theme target must work by placing a plugin folder in an XDG plugin path and clicking Reload Plugins, without rebuilding/reinstalling Colorboard. Data-only bundles remain portable to Rust/C++ implementations. |
 | Schema evolution | Rust migrations only; one-shot CLI usable by standalone Board | Prevent two languages from competing to mutate the same SQLite schema. |
-| KWin component | Optional, minimal, isolated C++ exception | Native compositor APIs may be required for mandatory magnification/focus; limit version coupling and maintenance exposure. |
+| KWin component | Rust portal/Wayland first; packaged KWin QML/JS effect second; minimal C++ effect only as last resort | QML effects are compatible with a Rust application but do not document arbitrary framebuffer pixel reads. Require end-to-end demonstration before selecting a backend. |
 | Python lifetime | Fully transient; exits on close | Keep resident memory and startup overhead isolated to Rust. |
 
 Any change to these decisions requires recording the technical reason and updating the acceptance/integration tests. Decisions must **not** weaken the mandatory live magnifier or focus requirements.
 
 ## 10. Immediate copy/paste agent kickoff instruction
 
-> Implement **Phase 1A** of `docs/implementation-plan.md` (or this plan if not yet committed). Target KDE Plasma 6 Wayland. The deliverable is a **working Rust live pixel magnifier and picker**, not an architecture-only proof-of-concept. Live capture, cursor-following magnification, exact center pixel selection, left-click confirmation, right-click cancellation, and preservation of the previously active application's keyboard focus are mandatory. Investigate and implement the XDG ScreenCast/PipeWire + Wayland overlay approach. If that approach cannot meet all constraints, implement the expressly permitted minimal KWin-native C++ component without replacing the Rust program. Add coordinate/pixel tests and validate the actual desktop UX on a KDE Wayland session. Do not begin tray, Python, or theme-generator work. Report what was implemented, precise test results, any version-dependent interfaces, and remaining Phase 1A blockers. Do not mark Phase 1A complete until the live magnifier meets every acceptance criterion.
+> Implement **Phase 1A** of `docs/implementation-plan.md` (or this plan if not yet committed). Target KDE Plasma 6 Wayland. The deliverable is a **working Rust live pixel magnifier and picker**, not an architecture-only proof-of-concept. Live capture, cursor-following magnification, exact center pixel selection, left-click confirmation, right-click cancellation, and preservation of the previously active application's keyboard focus are mandatory. Investigate and implement the XDG ScreenCast/PipeWire + Wayland overlay approach. If that approach cannot meet all constraints, evaluate an independently installable KWin QML/JavaScript effect working with Rust; do not assume the QML API reads framebuffer pixels. Only if neither approach meets the requirements, implement the expressly permitted minimal KWin-native C++ component without replacing the Rust program. Add coordinate/pixel tests and validate the actual desktop UX on a KDE Wayland session. Do not begin tray, Python, or theme-generator work. Report what was implemented, precise test results, any version-dependent interfaces, and remaining Phase 1A blockers. Do not mark Phase 1A complete until the live magnifier meets every acceptance criterion.
