@@ -1,0 +1,356 @@
+# Colorboard — Agent Implementation Plan
+
+**Status:** Requirements confirmed, 2026-10-20.  
+**Working name:** Colorboard (renameable without changing interfaces).  
+**Initial platform:** KDE Plasma 6 **Wayland only**.  
+**Languages:** Rust for the resident picker and its transient UI; Python/PySide6 for the main board; a **minimal C++ KWin component is explicitly permitted if necessary** to satisfy the picker requirements.
+
+## 1. Product and non-negotiable requirements
+
+Build two independently runnable applications that share colors, palettes, configuration conventions, and an IPC contract:
+
+1. **Color Picker:** a low-memory Rust system-tray application that picks pixels anywhere on the desktop through a **live, pixel-accurate magnifying glass**, maintains color history, provides a centered history popup, and exposes keyboard shortcuts.
+2. **Colorboard:** an on-demand Python/PySide6 GUI with three tabs, built **one at a time**: Color Mixer, Palette Editor, Theme Generator.
+
+### Hard constraints
+
+- The live magnifier is **required for Phase 1 completion**. Do not replace it with KDE's single-pixel `org.kde.kwin.ColorPicker.pick` operation or a frozen screenshot.
+- The underlying desktop view in the magnifier must update while the pointer moves and while desktop contents change.
+- Starting the picker must not raise the Colorboard GUI or steal keyboard focus from the previously active application. KDE-managed permission dialogs are the sole permitted exception.
+- The picker may intercept pointer input to confirm or cancel selection, but must not inadvertently send the selection click through to the application beneath it.
+- No permanent screen-capture session or Python interpreter may run in the idle tray process.
+- Failure to meet the magnifier or focus requirements **blocks release and all later phases**, rather than downgrading them into optional features.
+- Target KDE Plasma 6 Wayland, not X11 or other compositors, for the first release.
+- Favor low **idle proportional/private memory** and near-zero idle CPU; measure PSS/USS rather than using RSS alone.
+
+## 2. Confirmed interaction contract
+
+### Tray
+
+- Pipette tray icon with a small indicator dot matching the latest chosen color; neutral indicator before the first selection.
+- **Left click:** begin picking immediately.
+- **Right click:** show menu, in this order:
+  1. Pick Color
+  2. Show Palette
+  3. Open Board
+  4. Configure
+  5. Quit
+- Dynamic icon must work against dark/light Plasma panels, at typical tray icon sizes and fractional scaling.
+- The tray process remains active when the popup, picker, or Python application closes.
+
+### Picking
+
+- Triggerable from tray, global shortcut, and Python application through IPC.
+- Show a **live** magnifier following the pointer, with configurable sample radius and zoom.
+- Clearly outline the **exact physical source pixel** that a confirmation would select. Prefer nearest-neighbor enlargement and a grid at sufficient zoom.
+- Left click confirms, right click cancels; add keyboard cancel only where it does not violate keyboard focus preservation.
+- On success, append history, update tray dot, copy according to the configured format, and publish a notification through IPC.
+- On cancel, save nothing and restore the ordinary desktop state.
+- Preserve keyboard focus on the previously active app during selection. A KDE portal permission prompt may temporarily receive focus.
+- Cover all monitors and handle different scales, offsets, and rotation without sampling the cursor or magnifier overlay itself.
+
+### Centered history popup
+
+- Frameless popup centered on the **currently active/pointer monitor** (define and test one unambiguous selection policy).
+- Scrollable grid of recent colors; click copies to clipboard.
+- Configurable display limit, visible rows, and columns, independently of history retention.
+- Close on Escape, click-away, or a second activation, without stopping the tray service.
+- The popup **may take keyboard focus**, unlike the active screen picker.
+- Display a copied-state acknowledgment and a readable label/tooltip for each swatch.
+
+### Proposed defaults (configuration, not hardcoded logic)
+
+| Setting | Default |
+|---|---|
+| Retained color history | 100 captures |
+| History-popup display limit | 24 |
+| Grid | 4 columns × 3 visible rows |
+| Magnifier radius | 7 source pixels (15×15 sample grid) |
+| Magnification | 10× nearest-neighbor |
+| Clipboard format | Uppercase `#RRGGBB` |
+| Automatically copy on pick | Enabled |
+| Pick shortcut | Suggested `Meta+Shift+C`, subject to conflict/portal approval |
+| Popup shortcut | Suggested `Meta+Shift+H`, subject to conflict/portal approval |
+
+Settings UI must permit changing all settings named in the user's requirements, including both global hotkeys.
+
+## 3. Source references and crucial finding
+
+The linked KDE source directory is correct:
+
+- <https://github.com/KDE/kdeplasma-addons/tree/master/applets/colorpicker>
+- <https://github.com/KDE/kdeplasma-addons/blob/master/applets/colorpicker/grabwidget.cpp>
+- <https://github.com/KDE/kdeplasma-addons/blob/master/applets/colorpicker/qml/main.qml>
+- <https://github.com/KDE/kwin/blob/master/src/plugins/colorpicker/colorpicker.cpp>
+
+The applet's `GrabWidget::pick()` calls KWin's D-Bus method `org.kde.kwin.ColorPicker.pick` at `/ColorPicker`. KWin performs the interactive selection and returns a `QColor` (serialized as a D-Bus structure containing a packed RGBA integer). **That public operation returns one color, not a live pixel neighborhood**. It is useful as a behavioral reference or validation oracle but **does not independently implement the required magnifier**.
+
+The referenced KDE applet contains GPL-licensed code. Do not copy or adapt that implementation without verifying and complying with its license requirements; reference its behavior or independently implement the features when appropriate.
+
+## 4. Architecture and process boundaries
+
+Recommended layout:
+
+```text
+[ KDE Plasma tray ]
+         |
+[ colorboard-tray : Rust ]  <--- always resident
+  ksni + zbus + config + SQLite + clipboard ownership
+         |
+         +---- launch/IPC ---> [ colorboard-picker : Rust ]
+         |                      Wayland overlay + capture + magnifier
+         |                      (optional tiny KWin C++ integration)
+         |
+         +---- launch/IPC ---> [ colorboard-history : Rust ]
+         |                      centered, transient history popup
+         |
+         +---- launch ------> [ Colorboard : Python / PySide6 ]
+                                Mixer | Palettes | Theme Generator
+```
+
+The precise Rust GUI toolkit for transient windows should be selected based on verified Plasma Wayland behavior and measured memory usage. Do not instantiate a large general GUI runtime in `colorboard-tray`. `ksni` implements StatusNotifierItem without requiring a resident GTK/Qt UI process.
+
+### Initial Rust dependencies to evaluate
+
+- `ksni`: StatusNotifierItem and dynamic icon pixmaps.
+- `zbus`: session D-Bus API and event signals.
+- `ashpd`: XDG Desktop Portal calls for GlobalShortcuts and ScreenCast.
+- `wayland-client`, `wayland-protocols-wlr`, or suitable Smithay client toolkit: Wayland surfaces and pointer handling.
+- PipeWire bindings or `pipewire-rs` with an explicitly versioned capture/format pipeline.
+- `rusqlite`: SQLite storage; WAL and migrations.
+- `serde`, `toml`: typed configuration.
+
+Check actual crate versions and API signatures when coding, rather than copying unverified older examples.
+
+### Capture/overlay implementation strategy
+
+**Primary path:** Request monitor capture via XDG ScreenCast portal, consume PipeWire streams, and render a non-keyboard-activating Wayland magnifier/selection surface using KDE-supported layer-shell behavior. Request **hidden cursor** in captured frames if advertised, track pointer through the overlay's supported input routing, map logical coordinates to physical pixels, and explicitly test whether the overlay appears recursively in screen capture.
+
+The ScreenCast portal's capture permissions and monitor selection are controlled by KDE. If supported, use a user-approved restore token to avoid repeating source selection; never assume persistence or silently bypass consent. Portal prompts are allowed to receive focus. Capture resources must be released after each pick.
+
+**Conditional native path:** If the primary path cannot simultaneously provide live under-pointer pixels, no recursive overlay contamination, precise mouse click handling, and keyboard-focus preservation on KWin, build the **smallest practical KWin-native component** in C++ (or a supported KWin effect mechanism). Keep its responsibility narrow: compositor-side sampling/magnifier/selection and returning the chosen color via D-Bus; leave the tray, storage, shortcuts, and main application in Rust/Python.
+
+Native KWin C++ effect APIs have no stable cross-release ABI guarantee. Plan for installed-KWin version matching, packaging/build checks, and rebuilds where necessary. Never rely on a stale plugin silently loading. Do not embed compositor-private logic into other modules. No stage may mark success based solely on a capture demonstration that violates the specified UX.
+
+### Wayland-specific event rules
+
+- Picker: request **no keyboard focus** for its visual surface. Test that pointer events arrive and that the original app retains keyboard focus. Do not promise Escape support if doing so would require keyboard capture; right-click cancellation is required.
+- History popup: may request ordinary keyboard focus to support Escape and close-on-focus-loss. On Wayland, do not assume direct positioning of a regular XDG toplevel; use an appropriately centered layer surface or another compositor-supported solution, and verify click-away dismissal.
+- Do not use `pynput`, `xdotool`, X11 screen-scraping, or unsafe system-wide event interception as a Wayland workaround.
+- If a core behavior requires compositor integration, use the explicitly approved narrow C++ exception instead of weakening requirements.
+
+## 5. Shared data and integration contracts
+
+### Storage
+
+Use standard XDG paths:
+
+- `${XDG_CONFIG_HOME:-~/.config}/colorboard/config.toml`
+- `${XDG_DATA_HOME:-~/.local/share}/colorboard/library.sqlite3`
+- `${XDG_DATA_HOME:-~/.local/share}/colorboard/themes/`
+
+Do not literally embed `~` as a path; resolve the correct home/XDG location. SQLite is the authoritative datastore shared by both applications. Use WAL mode, `busy_timeout`, foreign keys, schema migrations, and transactions. Preserve backups before destructive migrations.
+
+Canonical captured color: RGBA **8-bit sRGB** values, including alpha (normally opaque for screen samples). Store typed components or an unambiguous `#RRGGBBAA`; keep display/copy format independent of storage. Timestamps in UTC and unique IDs. Do not confuse color conversion with changing the original captured sample.
+
+Recommended initial tables: `color_history`, `settings_meta`, `schema_migrations`; expand later for `palettes`, `palette_swatches`, and `theme_projects`. Every genuine successful pick may be stored, even if identical to a prior capture, unless a later explicit user choice changes duplicate policy. Copying an existing swatch must **not** add a new pick or reorder history by default.
+
+### Clipboard
+
+Implement `#RRGGBB`, `#RRGGBBAA`, `rgb()`, `rgba()`, HSL, HSV, and approximate CMYK formatters. Mark CMYK as an approximate device-independent transform unless profiles are supported. Additional formatter plugins are optional. Ensure the copied text remains usable after the transient picker process quits; the persistent tray service may own the clipboard selection.
+
+### Session D-Bus (versioned contract)
+
+Reserve a stable application identifier and document it. Initial conceptual operations:
+
+- `PickColor() -> started/error`
+- `ShowHistory() -> started/error`
+- `OpenBoard() -> started/error`
+- `GetHistory(limit) -> entries`
+- `GetLastColor() -> color/none`
+- `ReloadConfiguration()`
+
+Signals:
+
+- `ColorPicked(id, rgba, timestamp)`
+- `ColorPickCancelled()`
+- `HistoryChanged()`
+- `ConfigurationChanged()`
+
+Define the exact D-Bus names, signatures, ownership, errors, busy-state behavior, and lifecycle in `docs/ipc.md` **before** adding Python consumers. Emit completed/canceled events so the Python app can restore itself after a picker invocation. Only one picker session may run at a time. Concurrent requests must return a documented busy result or reuse the current session without spawning duplicates.
+
+## 6. Development stages and blocking gates
+
+### Phase 1A — Core Rust live picker (FIRST TASK, BLOCKING)
+
+Deliver a runnable Rust command that activates live picking under a real KDE Plasma 6 Wayland session and returns the chosen color. Implement **the real magnifier**, not a diagram, stub, or frozen screenshot.
+
+Work required:
+
+1. Inspect the verified KDE applet and KWin effect sources.
+2. Establish the actual target compositor/portal capabilities and capture path as part of implementing the feature.
+3. Implement screen capture, pointer sampling, correctly scaled per-monitor coordinates, and magnifier drawing.
+4. Implement left-click confirmation/right-click cancellation while maintaining keyboard focus on the previously active application.
+5. Resolve overlay recursion, cursor contamination, and mixed DPI/rotation handling.
+6. If the portal/layer-shell route cannot meet ALL requirements, implement the permitted minimal compositor-native component; do not substitute a weaker picker.
+7. Shut down frames, effects, and overlay upon pick completion/cancellation.
+8. Add unit tests for pixels/format conversion/coordinate mapping and real-session manual tests.
+
+**Acceptance:** live 15×15 grid (configurable), crisp 10× sample zoom (configurable), center-pixel accuracy on checkerboard images, animated-content updates, correct multi-monitor/fractional-scale sampling, no unexpected focus changes, no click-through, clean cancellation, clean resource teardown. Test 100%, 125%, 150%, 200% scaling where hardware/config permits. **Do not move on until this works.**
+
+### Phase 1B — Rust tray service
+
+- Persistent single-instance `ksni` tray item; pipette icon plus dynamic last-color dot, including high-DPI sizes.
+- Left-click pick; context menu exactly as confirmed.
+- D-Bus control endpoint, busy-state control, transient picker invocation, and robust error handling.
+- No Python or screen capture resources loaded while idle.
+
+**Acceptance:** tray is responsive and icon/menu behavior is correct while other applications have focus.
+
+### Phase 1C — History and clipboard
+
+- Typed config and SQLite schema/migrations/WAL.
+- Capture on successful selection, default retain 100.
+- Output formatter registry and automatic clipboard copy in selected format.
+- New-color notification to UI and tray icon update.
+- Safe handling of stale or corrupt configuration/history.
+
+**Acceptance:** history persists restarts; copied values match selected pixels; copied data remains available after transient picker exits.
+
+### Phase 1D — Scrollable history popup
+
+- Transient Rust window, centered on selected output, frameless, focusable.
+- Scrollable grid with independent display/retention limits and configurable rows/columns.
+- Clicking a swatch copies it, without recording a fresh pick.
+- Escape, click-away, and repeated shortcut close the popup.
+- Resource teardown when closed.
+
+**Acceptance:** actual KDE Wayland positioning, dismissal and clipboard behavior work with multi-monitor layouts.
+
+### Phase 1E — Configure, shortcuts, deployment, performance
+
+- Transient settings UI for popup count/rows/columns, magnifier radius/zoom, output format, history cap, both hotkeys, auto-copy.
+- GlobalShortcuts portal shortcut session and KDE-supported configuration UI. Verify permissions, collisions, updates, startup restoration, and revocation.
+- Autostart or systemd user unit (one chosen startup mechanism; no duplicate launches).
+- Package helper binaries, desktop metadata, icons, version checks for any KWin extension.
+- Benchmark idle USS/PSS/CPU and active picker resource usage; document test platform.
+
+**Phase 1 release gate:** All picking, magnification, focus, history, tray, popup, shortcut, config, startup, and clipboard requirements function together. No Python implementation may begin before this gate.
+
+### Phase 2 — Python/PySide6 app shell
+
+- Separate Python process, launched by Open Board or independently.
+- Three tabs: **Color Mixer, Palette Editor, Theme Generator**.
+- Scrollable history swatch strip visible across all tabs.
+- SQLite-backed shared history and D-Bus event subscription.
+- `Pick Color` action from the board; configurable auto-hide during a pick, restore on success OR cancellation, and handle picker failures without leaving the board hidden.
+- Shared active palette state and navigation; tabs may be empty placeholders in this phase.
+- Main process must exit fully on close; Rust tray remains.
+
+### Phase 3 — Color Mixer tab (first functional tab)
+
+- Interactive color editor with HEX, RGB(A), HSV/HSL, and displayed CMYK formats.
+- Current-color swatch and scrollable historical swatches.
+- Mix multiple colors with adjustable weights and defined interpolation space (sRGB / perceptual OKLCH as appropriate).
+- Copy in selected format; send selected colors to the active palette; undo/redo.
+- Test color round trips, clipping, alpha behavior, and clipboard outputs.
+
+**Gate:** independently functional mixer and active-palette handoff.
+
+### Phase 4 — Palette Editor tab (second functional tab)
+
+- Generate configurable harmonious, contrasting, or random palettes: complementary, split-complementary, analogous, triadic, tetradic, monochromatic, contrast-targeted, fully random.
+- User-selected swatch count, base colors, OKLCH lightness/chroma ranges, optional contrast target, optional random seed.
+- Coolors-inspired wide swatch row; per-swatch color editing; locking, adding, deleting, reordering, regenerating unlocked swatches, drag/drop from history.
+- Save/bookmark generated palettes; separate generated history from saved palette library; rename, duplicate, reopen, delete; undo/redo.
+- Preserve locked swatches exactly on regenerate; explicitly handle sRGB gamut clipping.
+- Make selected saved/generated palette available to Theme Generator.
+
+**Gate:** save, reopen, regenerate, and handoff work with no data loss.
+
+### Phase 5 — Theme Generator tab (third functional tab)
+
+- Select theme target plugin and active source palette.
+- Render a **mock UI**, not the target application's real process, with selectable semantic elements; preview menus/dialogs/alternate states when clicked.
+- Display a role/element list with swatches, chooser, direct editable value (default HEX).
+- Apply colors from active palette; drag history colors onto roles or preview elements; support explicit per-role overrides, role locks, undo/redo.
+- Clearly distinguish linked palette roles from detached overrides; changes should propagate predictably.
+- Save/reopen theme projects and validate exports.
+
+**Plugin architecture:** trusted Python plugins initially, discovered through an explicit manifest/entry-point API. Each plugin declares role definitions, supported application/schema versions, mock preview states and transitions, importer (where practical), validator, and Jinja2 export template(s). Keep preview rendering data-driven where possible. No Lua requirement in v1: supporting two interpreters adds unnecessary integration complexity. Do not execute unknown downloaded plugins automatically.
+
+Implement plugins **in order**:
+
+1. **Ghostty**: terminal background/foreground, ANSI 0–15, cursor, selection; native theme/config text export.
+2. **Zed**: editor/tabs/sidebar/panels, syntax roles, dialogs, terminal colors; versioned JSON theme export.
+3. **KDE `.colors`**: window/view/button/selection/tooltip/disabled/inactive color sets; representative native-looking widget mockup; INI-compatible export.
+
+Use Jinja2 for text templates, but separate role validation and escaping/format conversion from template presentation. Golden-file tests must cover each export target; retain unknown imported keys when round-tripping where feasible. Never apply generated themes to the live desktop automatically.
+
+### Phase 6 — Release hardening
+
+- Accessibility and keyboard navigation, exceptions documented for non-focusable picker.
+- Real KDE Wayland integration tests, monitor disconnects, portal revocation, sleep/resume, shortcut conflicts, KWin updates.
+- Packaging for Arch/Fedora/openSUSE as applicable; document C++ KWin extension version coupling if used.
+- Performance regression checks for idle resident process and transient memory cleanup.
+- User guide, theme author guide, D-Bus API guide, installation and troubleshooting.
+
+## 7. Repository layout
+
+```text
+colorboard/
+├── Cargo.toml
+├── rust/
+│   ├── tray/
+│   ├── picker/
+│   ├── history-popup/
+│   └── common/
+│       ├── colors/
+│       ├── config/
+│       ├── ipc/
+│       └── storage/
+├── kwin/                     # only if the required native component is necessary
+├── board/
+│   ├── pyproject.toml
+│   └── colorboard/
+│       ├── app.py
+│       ├── ipc/
+│       ├── storage/
+│       ├── widgets/
+│       ├── mixer/
+│       ├── palettes/
+│       └── themes/
+│           ├── api.py
+│           └── plugins/
+│               ├── ghostty/
+│               ├── zed/
+│               └── kde/
+├── schemas/
+├── assets/
+├── packaging/
+├── tests/
+└── docs/
+    ├── architecture.md
+    ├── requirements.md
+    ├── ipc.md
+    ├── decisions.md
+    ├── roadmap.md
+    └── testing.md
+```
+
+## 8. Engineering and agent operating rules
+
+- Work **only on the current phase**. Do not start the Python UI while the Rust picker gate is incomplete.
+- A successful build or unit test does not prove KDE/Wayland integration. Mark untested behavior explicitly; do not claim desktop validation when no graphical KDE session was used.
+- Before adding a new framework, document why the standard Rust/Qt stack cannot meet the requirement.
+- Keep the exact user behavior above in acceptance tests, not merely in prose.
+- Use Rustfmt/Clippy and cargo tests, Ruff/pytest/type checking for Python, and automated export golden tests.
+- Include a single source of truth for semantic colors and a versioned serialized schema across languages.
+- Avoid constant polling or repeated frame capture while idle.
+- Keep dependencies pinned by lockfiles; record verified Plasma/KWin/Qt/PipeWire versions during testing.
+- Do not invent platform APIs. Consult the current API docs and annotate any private interfaces and their compatibility limits.
+- Report changes, validation, blockers, and the next task at each phase handoff.
+
+## 9. Immediate copy/paste agent kickoff instruction
+
+> Implement **Phase 1A** of `docs/implementation-plan.md` (or this plan if not yet committed). Target KDE Plasma 6 Wayland. The deliverable is a **working Rust live pixel magnifier and picker**, not an architecture-only proof-of-concept. Live capture, cursor-following magnification, exact center pixel selection, left-click confirmation, right-click cancellation, and preservation of the previously active application's keyboard focus are mandatory. Investigate and implement the XDG ScreenCast/PipeWire + Wayland overlay approach. If that approach cannot meet all constraints, implement the expressly permitted minimal KWin-native C++ component without replacing the Rust program. Add coordinate/pixel tests and validate the actual desktop UX on a KDE Wayland session. Do not begin tray, Python, or theme-generator work. Report what was implemented, precise test results, any version-dependent interfaces, and remaining Phase 1A blockers. Do not mark Phase 1A complete until the live magnifier meets every acceptance criterion.
