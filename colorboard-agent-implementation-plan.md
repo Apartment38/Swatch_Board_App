@@ -1,9 +1,10 @@
 # Colorboard — Agent Implementation Plan
 
-**Status:** Requirements confirmed, 2026-10-20.  
+**Status:** Requirements confirmed, 2026-10-20; architecture refinements incorporated (revision 1.1).  
 **Working name:** Colorboard (renameable without changing interfaces).  
 **Initial platform:** KDE Plasma 6 **Wayland only**.  
-**Languages:** Rust for the resident picker and its transient UI; Python/PySide6 for the main board; a **minimal C++ KWin component is explicitly permitted if necessary** to satisfy the picker requirements.
+**Languages:** Rust for the resident picker and its transient UI; Python/PySide6 for the main board; a **minimal C++ KWin component is explicitly permitted if necessary** to satisfy the picker requirements.  
+**Architecture decision:** Keep Rust + Python for implementation. An all-Rust editor remains a future option, not a current work item; revisit editor-toolkit choice only at the Phase 1 → Phase 2 gate without delaying or rewriting the Rust picker.
 
 ## 1. Product and non-negotiable requirements
 
@@ -108,6 +109,14 @@ Recommended layout:
                                 Mixer | Palettes | Theme Generator
 ```
 
+### Process isolation and idle-memory policy
+
+- **Rust is the only always-running application runtime.** `colorboard-tray` owns the tray, event-driven IPC, shortcuts, history coordination, and clipboard; no Python interpreter, PySide6 initialization, plugin loader, or hidden Theme Board process runs at login.
+- Picker, history popup, and settings UI are Rust transient processes/components started only when requested and released when dismissed. Screen capture and rendering resources do not persist after a pick.
+- `colorboard` (Python/PySide6) launches only via **Open Board** or direct invocation; closing its last main window exits the Python process rather than hiding it to the tray. The tray remains independent and functional even if the board is absent or crashes.
+- Allow **one Theme Board instance**: `Open Board` activates an existing instance or starts one, instead of accumulating Python processes. Never require the Python process for color picking.
+- Prefer event-driven D-Bus signals to polling for live history and status updates. Measure idle memory with USS/PSS and the Theme Board completely stopped; measure active-editor memory separately.
+
 The precise Rust GUI toolkit for transient windows should be selected based on verified Plasma Wayland behavior and measured memory usage. Do not instantiate a large general GUI runtime in `colorboard-tray`. `ksni` implements StatusNotifierItem without requiring a resident GTK/Qt UI process.
 
 ### Initial Rust dependencies to evaluate
@@ -128,9 +137,11 @@ Check actual crate versions and API signatures when coding, rather than copying 
 
 The ScreenCast portal's capture permissions and monitor selection are controlled by KDE. If supported, use a user-approved restore token to avoid repeating source selection; never assume persistence or silently bypass consent. Portal prompts are allowed to receive focus. Capture resources must be released after each pick.
 
-**Conditional native path:** If the primary path cannot simultaneously provide live under-pointer pixels, no recursive overlay contamination, precise mouse click handling, and keyboard-focus preservation on KWin, build the **smallest practical KWin-native component** in C++ (or a supported KWin effect mechanism). Keep its responsibility narrow: compositor-side sampling/magnifier/selection and returning the chosen color via D-Bus; leave the tray, storage, shortcuts, and main application in Rust/Python.
+**Conditional native path (exception, not the default):** If the primary path cannot simultaneously provide live under-pointer pixels, no recursive overlay contamination, precise mouse click handling, and keyboard-focus preservation on KWin, build the **smallest practical KWin-native component** in C++ (or a supported KWin effect mechanism). First document the failed capability/behavior checks and inspect the installed KWin extension APIs. Do not introduce the extension merely for convenience or because the portal requires normal user consent.
 
-Native KWin C++ effect APIs have no stable cross-release ABI guarantee. Plan for installed-KWin version matching, packaging/build checks, and rebuilds where necessary. Never rely on a stale plugin silently loading. Do not embed compositor-private logic into other modules. No stage may mark success based solely on a capture demonstration that violates the specified UX.
+**Strict component boundary:** The C++ component may perform **only compositor-dependent capture, magnifier rendering, pointer selection, and result/cancel delivery**. Expose a narrow, documented, versioned IPC interface to the Rust picker with color/result, cancellation, and error values. It must not implement or own tray menus, shortcut registration, clipboard formatting, SQLite, configuration persistence, board startup, Python plugins, or theme logic. The Rust process remains the orchestration and product API boundary; the picker can select the portal backend or native backend behind the same Rust interface.
+
+Native KWin C++ effect APIs have no stable cross-release ABI guarantee. If the exception is needed, detect installed KWin version and extension compatibility at build/install/startup; fail clearly on mismatch, and provide a documented rebuild/package strategy when KWin updates. Never depend on private compositor internals outside this component or silently load an incompatible plugin. No stage may mark success based solely on a capture demonstration that violates the specified UX.
 
 ### Wayland-specific event rules
 
@@ -149,11 +160,19 @@ Use standard XDG paths:
 - `${XDG_DATA_HOME:-~/.local/share}/colorboard/library.sqlite3`
 - `${XDG_DATA_HOME:-~/.local/share}/colorboard/themes/`
 
-Do not literally embed `~` as a path; resolve the correct home/XDG location. SQLite is the authoritative datastore shared by both applications. Use WAL mode, `busy_timeout`, foreign keys, schema migrations, and transactions. Preserve backups before destructive migrations.
+Do not literally embed `~` as a path; resolve the correct home/XDG location. SQLite is the authoritative datastore shared by both applications. Use WAL mode, `busy_timeout`, foreign keys, short transactions, and transactional changes wherever supported. Preserve backups before destructive migrations.
+
+**Single migration owner:** Rust is the **only** implementation permitted to create or migrate the shared SQLite schema. Put schema definitions, ordered migrations, and compatibility checks in `rust/common/storage/` and expose a small **one-shot `colorboard-db migrate` / `colorboard-db check` CLI** using that same Rust code. The CLI does not run in the background.
+
+- The tray runs the Rust migration/check path at startup before accessing history. The standalone Python Board invokes the packaged `colorboard-db migrate` CLI on startup (e.g., through a bounded `QProcess`) before it opens the database. This supports launching the Board without a running tray service.
+- After migration, **both** Rust and Python may read and write their documented tables in SQLite; *neither* may perform schema changes from Python. Document table ownership, columns, constraints, and schema version compatibility in `schemas/` and `docs/storage.md`.
+- When a future Palette Editor or Theme Generator needs new tables, implement the migration in Rust **as part of that Python feature's phase**, then update Python queries/models and add cross-language integration tests. Do not create tables via SQLAlchemy or Python-side ad hoc DDL.
+- On a newer, incompatible schema, unsupported downgrade, unavailable migration utility, or migration failure, show a clear error and leave data unmodified; never let the Python application silently reinitialize or overwrite the database.
+- Acquire write locks only for short commits, handle `SQLITE_BUSY` explicitly, and publish D-Bus change signals after successful commits. Both applications can receive signals but must also refresh from the database when started or reconnected.
 
 Canonical captured color: RGBA **8-bit sRGB** values, including alpha (normally opaque for screen samples). Store typed components or an unambiguous `#RRGGBBAA`; keep display/copy format independent of storage. Timestamps in UTC and unique IDs. Do not confuse color conversion with changing the original captured sample.
 
-Recommended initial tables: `color_history`, `settings_meta`, `schema_migrations`; expand later for `palettes`, `palette_swatches`, and `theme_projects`. Every genuine successful pick may be stored, even if identical to a prior capture, unless a later explicit user choice changes duplicate policy. Copying an existing swatch must **not** add a new pick or reorder history by default.
+Recommended initial tables: `color_history`, `settings_meta`, `schema_migrations`; add `palettes`, `palette_swatches`, and `theme_projects` via **new Rust migrations during their respective later phases**. Every genuine successful pick may be stored, even if identical to a prior capture, unless a later explicit user choice changes duplicate policy. Copying an existing swatch must **not** add a new pick or reorder history by default.
 
 ### Clipboard
 
@@ -209,7 +228,7 @@ Work required:
 
 ### Phase 1C — History and clipboard
 
-- Typed config and SQLite schema/migrations/WAL.
+- Typed config and the **Rust-owned** SQLite schema/migrations/WAL; include and test the standalone `colorboard-db migrate/check` command for subsequent use by the Python Board.
 - Capture on successful selection, default retain 100.
 - Output formatter registry and automatic clipboard copy in selected format.
 - New-color notification to UI and tray icon update.
@@ -242,7 +261,8 @@ Work required:
 - Separate Python process, launched by Open Board or independently.
 - Three tabs: **Color Mixer, Palette Editor, Theme Generator**.
 - Scrollable history swatch strip visible across all tabs.
-- SQLite-backed shared history and D-Bus event subscription.
+- Invoke `colorboard-db migrate/check` before opening the shared SQLite database, including when the tray is not running; never perform Python-side DDL.
+- SQLite-backed shared history and D-Bus event subscription, with startup/reconnection refresh and short write transactions.
 - `Pick Color` action from the board; configurable auto-hide during a pick, restore on success OR cancellation, and handle picker failures without leaving the board hidden.
 - Shared active palette state and navigation; tabs may be empty placeholders in this phase.
 - Main process must exit fully on close; Rust tray remains.
@@ -259,6 +279,7 @@ Work required:
 
 ### Phase 4 — Palette Editor tab (second functional tab)
 
+- First add any required palette/project tables through **Rust storage migrations**; verify Python can create, read, and update rows while the Rust tray holds its ordinary connection.
 - Generate configurable harmonious, contrasting, or random palettes: complementary, split-complementary, analogous, triadic, tetradic, monochromatic, contrast-targeted, fully random.
 - User-selected swatch count, base colors, OKLCH lightness/chroma ranges, optional contrast target, optional random seed.
 - Coolors-inspired wide swatch row; per-swatch color editing; locking, adding, deleting, reordering, regenerating unlocked swatches, drag/drop from history.
@@ -270,22 +291,46 @@ Work required:
 
 ### Phase 5 — Theme Generator tab (third functional tab)
 
-- Select theme target plugin and active source palette.
+- Before writing UI or Python models, add any theme-project tables via **Rust-owned migrations** and validate the cross-language schema version.
+- Select a theme target plugin and active source palette.
 - Render a **mock UI**, not the target application's real process, with selectable semantic elements; preview menus/dialogs/alternate states when clicked.
 - Display a role/element list with swatches, chooser, direct editable value (default HEX).
 - Apply colors from active palette; drag history colors onto roles or preview elements; support explicit per-role overrides, role locks, undo/redo.
 - Clearly distinguish linked palette roles from detached overrides; changes should propagate predictably.
 - Save/reopen theme projects and validate exports.
 
-**Plugin architecture:** trusted Python plugins initially, discovered through an explicit manifest/entry-point API. Each plugin declares role definitions, supported application/schema versions, mock preview states and transitions, importer (where practical), validator, and Jinja2 export template(s). Keep preview rendering data-driven where possible. No Lua requirement in v1: supporting two interpreters adds unnecessary integration complexity. Do not execute unknown downloaded plugins automatically.
+#### Primary design: shared, declarative WYSIWYG renderer
+
+**Do not have every plugin create its own Qt window, scene, event handlers, or drag/drop implementation.** Build **one** `QGraphicsView` / `QGraphicsScene` preview renderer and reusable scene-item library in the Board. Plugins principally supply *data* describing an application's interface and theme mappings. The generic renderer handles:
+
+- Draw ordering, geometry, clipping, text/shape/icon primitives, scaling, hit testing, selection highlights, and common widgets (tabs, panels, rows, menus, dialogs, editor text, terminal text).
+- Mapping visible and nested elements to **stable semantic role IDs** (e.g., `editor.background`, `terminal.foreground`), separate from which colors are assigned to those roles.
+- Clicking/selecting a preview element and synchronizing the inspector's role selection; editing through the inspector immediately updates all bound elements.
+- **Declarative scene states and transitions** (e.g., `editor` → `open_settings_menu`; sidebar expanded/collapsed; tab switched) so users can reveal normally hidden elements without launching the real application.
+- Drag/drop from history or palette onto compatible preview targets, keyboard/accessibility fallbacks, undo/redo, and consistent per-role overrides.
+- Using swatches from the source palette through explicit role-to-palette references; locked/overridden roles are represented in **saved theme-project data**, not hard-coded into a preview implementation.
+
+Define and version declarative JSON schemas in `schemas/`: `theme-plugin-manifest`, `theme-roles`, `preview-scenes`, and `theme-project`. Suggested shape: manifest (plugin ID, format/schema versions, compatible app versions, declared assets/templates) + roles (IDs, labels, color types, defaults, validation) + scenes (scene IDs, nodes, bounds, role bindings, click actions, transition targets). Include deterministic rendering order and validation of references/IDs.
+
+**Python plugin code is an escape hatch**, used only for application-specific import/parsing, sophisticated validation, unusual preview geometry/interactions, or export helpers that cannot be described declaratively. Define a narrow, documented adapter interface for these behaviors; plugins must not own the application's event loop or arbitrary cross-tab UI. New theme targets should be possible using only manifest + role/scene data + templates when their requirements fit the generic renderer.
+
+#### Theme plugins and export contract
+
+- Use **trusted Python plugins** initially, discovered through an explicit manifest/entry-point API. The supported v1 authoring contract is **declarative data + Jinja2 templates, with optional Python hooks**. Do not embed Lua in v1; reconsider additional scripting engines only when concrete plugins require them.
+- Export pipeline: load plugin metadata → resolve palette links and overrides → normalize and validate semantic roles → format target-native color values → render Jinja2 template(s) with strict undefined-variable handling → validate the rendered output where practical → write requested export file(s). Keep validation and escaping separate from templates.
+- Use a per-plugin **role adapter**, not direct Qt widget color values, as the input to exports. A plugin must declare supported application/config schema versions, output paths/extensions, template assets, and test fixtures. Do not infer arbitrary filesystem destinations from untrusted template values.
+- Use reproducible golden-file export tests and data-driven scene tests (select/click/transition/drop). Add screenshot-based regression tests for representative mock states where feasible. Importers are optional if the target cannot be reliably round-tripped; do not claim lossless import/export otherwise.
+- Load only the selected plugin's optional Python modules/assets and preview state on demand. Do not preinitialize all plugins or load them in Rust/tray. Plugins are treated as **trusted executable code**; never automatically execute third-party downloaded plugins.
 
 Implement plugins **in order**:
 
-1. **Ghostty**: terminal background/foreground, ANSI 0–15, cursor, selection; native theme/config text export.
-2. **Zed**: editor/tabs/sidebar/panels, syntax roles, dialogs, terminal colors; versioned JSON theme export.
-3. **KDE `.colors`**: window/view/button/selection/tooltip/disabled/inactive color sets; representative native-looking widget mockup; INI-compatible export.
+1. **Ghostty**: terminal background/foreground, ANSI 0–15, cursor, selection; native theme/config text export. Use this first plugin to test that **the generic renderer and declarative state transitions work without custom Qt scene code**.
+2. **Zed**: editor/tabs/sidebar/panels, syntax roles, dialogs, terminal colors; versioned JSON theme export. Exercise multiple scenes and nested menus.
+3. **KDE `.colors`**: window/view/button/selection/tooltip/disabled/inactive color sets; representative native-looking widget mockup; INI-compatible export. Add application-specific adapters only where required by KDE semantics.
 
 Use Jinja2 for text templates, but separate role validation and escaping/format conversion from template presentation. Golden-file tests must cover each export target; retain unknown imported keys when round-tripping where feasible. Never apply generated themes to the live desktop automatically.
+
+**Phase 5 gate:** Ghostty's preview is rendered through the common data-driven system; at least one hidden state opens through a declarative click transition; inspector, drag/drop, override/link, saved project, and exported text all agree. Zed and KDE may follow as independent deliverables without modifying the generic editor for ordinary new roles or scenes.
 
 ### Phase 6 — Release hardening
 
@@ -304,6 +349,7 @@ colorboard/
 │   ├── tray/
 │   ├── picker/
 │   ├── history-popup/
+│   ├── db-cli/              # one-shot Rust migration/check command
 │   └── common/
 │       ├── colors/
 │       ├── config/
@@ -321,11 +367,17 @@ colorboard/
 │       ├── palettes/
 │       └── themes/
 │           ├── api.py
+│           ├── renderer/     # shared QGraphicsScene + reusable nodes
+│           ├── schemas/      # validated data objects / loaders
 │           └── plugins/
 │               ├── ghostty/
 │               ├── zed/
 │               └── kde/
 ├── schemas/
+│   ├── theme-plugin-manifest.schema.json
+│   ├── theme-roles.schema.json
+│   ├── preview-scenes.schema.json
+│   └── theme-project.schema.json
 ├── assets/
 ├── packaging/
 ├── tests/
@@ -333,6 +385,8 @@ colorboard/
     ├── architecture.md
     ├── requirements.md
     ├── ipc.md
+    ├── storage.md
+    ├── theme-plugin-api.md
     ├── decisions.md
     ├── roadmap.md
     └── testing.md
@@ -345,12 +399,28 @@ colorboard/
 - Before adding a new framework, document why the standard Rust/Qt stack cannot meet the requirement.
 - Keep the exact user behavior above in acceptance tests, not merely in prose.
 - Use Rustfmt/Clippy and cargo tests, Ruff/pytest/type checking for Python, and automated export golden tests.
-- Include a single source of truth for semantic colors and a versioned serialized schema across languages.
+- Define one canonical color representation, a versioned IPC/schema contract across Rust and Python, and stable semantic role IDs for theme targets.
+- Keep Rust as the **single schema migration owner**; test the one-shot migration CLI from both Rust and standalone Python start paths.
+- Keep theme UI previews **data-driven by default**. Avoid custom per-plugin Qt interfaces and keep Python plugin hooks narrowly scoped.
+- The optional KWin C++ component must never become an application backend for anything except native screen picking/magnification. Version-detect it and keep the Rust-facing contract stable.
+- Keep the Python editor strictly on demand, with no resident Python process or interpreter loaded in the Rust tray service.
 - Avoid constant polling or repeated frame capture while idle.
 - Keep dependencies pinned by lockfiles; record verified Plasma/KWin/Qt/PipeWire versions during testing.
 - Do not invent platform APIs. Consult the current API docs and annotate any private interfaces and their compatibility limits.
 - Report changes, validation, blockers, and the next task at each phase handoff.
 
-## 9. Immediate copy/paste agent kickoff instruction
+## 9. Ratified architecture decisions (for agent review)
+
+| Decision | Selected approach | Rationale / revisit rule |
+|---|---|---|
+| Main language split | Rust picker/tray + Python/PySide6 Board | Qt's mature editing primitives speed up WYSIWYG construction; the editor is not resident, so Python does not contribute to idle tray memory. Reassess all-Rust only at the Phase 1 → 2 gate if warranted. |
+| Theme preview authoring | Declarative scenes/roles, shared Qt renderer, optional Python hooks | Avoid duplicating scene and interaction logic across Ghostty/Zed/KDE plugins. |
+| Schema evolution | Rust migrations only; one-shot CLI usable by standalone Board | Prevent two languages from competing to mutate the same SQLite schema. |
+| KWin component | Optional, minimal, isolated C++ exception | Native compositor APIs may be required for mandatory magnification/focus; limit version coupling and maintenance exposure. |
+| Python lifetime | Fully transient; exits on close | Keep resident memory and startup overhead isolated to Rust. |
+
+Any change to these decisions requires recording the technical reason and updating the acceptance/integration tests. Decisions must **not** weaken the mandatory live magnifier or focus requirements.
+
+## 10. Immediate copy/paste agent kickoff instruction
 
 > Implement **Phase 1A** of `docs/implementation-plan.md` (or this plan if not yet committed). Target KDE Plasma 6 Wayland. The deliverable is a **working Rust live pixel magnifier and picker**, not an architecture-only proof-of-concept. Live capture, cursor-following magnification, exact center pixel selection, left-click confirmation, right-click cancellation, and preservation of the previously active application's keyboard focus are mandatory. Investigate and implement the XDG ScreenCast/PipeWire + Wayland overlay approach. If that approach cannot meet all constraints, implement the expressly permitted minimal KWin-native C++ component without replacing the Rust program. Add coordinate/pixel tests and validate the actual desktop UX on a KDE Wayland session. Do not begin tray, Python, or theme-generator work. Report what was implemented, precise test results, any version-dependent interfaces, and remaining Phase 1A blockers. Do not mark Phase 1A complete until the live magnifier meets every acceptance criterion.
