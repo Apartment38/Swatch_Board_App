@@ -1,4 +1,5 @@
 mod capture;
+mod overlay;
 mod portal;
 mod selection;
 
@@ -21,12 +22,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let (frame_tx, frame_rx) = mpsc::sync_channel::<CapturedFrame>(2);
-    std::thread::Builder::new()
+    let (capture_stop_tx, capture_stop_rx) = mpsc::channel();
+    let capture_thread = std::thread::Builder::new()
         .name("colorboard-pipewire".into())
-        .spawn(move || capture::run(pipewire_fd, streams, frame_tx))?;
+        .spawn(move || capture::run(pipewire_fd, streams, frame_tx, capture_stop_rx))?;
 
     // Do not begin KWin's selection grab until at least one live frame arrives.
-    let first_frame = tokio::task::spawn_blocking(move || frame_rx.recv()).await??;
+    let first_frame = frame_rx.recv()?;
     eprintln!(
         "Live capture ready: stream={} frame={}x{} pointer={:?}",
         first_frame.stream_id,
@@ -35,8 +37,39 @@ async fn main() -> Result<(), Box<dyn Error>> {
         first_frame.pointer
     );
 
-    // Phase 1A continues by showing the non-interactive Wayland overlay here;
-    // KWin selection is intentionally not triggered until that overlay exists.
-    drop(first_frame);
+    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    let (overlay_stop_tx, overlay_stop_rx) = mpsc::channel();
+    let overlay = tokio::task::spawn_blocking(move || {
+        overlay::run(first_frame, frame_rx, ready_tx, overlay_stop_rx)
+    });
+
+    // Wait for the configured, rendered layer surface before asking KWin to
+    // take the pointer. KWin remains authoritative for selection/cancellation.
+    if ready_rx.await.is_err() {
+        let _ = overlay_stop_tx.send(());
+        let _ = capture_stop_tx.send(());
+        let _ = overlay.await;
+        let _ = capture_thread.join();
+        return Err("magnifier overlay exited before becoming visible".into());
+    }
+    let selection = selection::pick_color().await;
+    let _ = overlay_stop_tx.send(());
+    let _ = capture_stop_tx.send(());
+    let overlay_result = overlay.await?;
+    capture_thread
+        .join()
+        .map_err(|_| "PipeWire capture thread panicked")?;
+    overlay_result?;
+
+    match selection {
+        Ok(qrgb) => {
+            let color = selection::SelectedColor::from(qrgb);
+            eprintln!(
+                "KWin selected #{:02X}{:02X}{:02X}",
+                color.r, color.g, color.b
+            );
+        }
+        Err(error) => eprintln!("KWin color selection ended: {error}"),
+    }
     Ok(())
 }

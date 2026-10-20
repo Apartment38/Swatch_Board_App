@@ -1,4 +1,8 @@
-use std::{os::fd::OwnedFd, sync::mpsc::SyncSender, time::SystemTime};
+use std::{
+    os::fd::OwnedFd,
+    sync::mpsc::{Receiver, SyncSender},
+    time::SystemTime,
+};
 
 use ashpd::desktop::screencast::Stream;
 use colorboard_picker_core::{PixelPoint, Rgba8, RgbaFrame};
@@ -20,8 +24,13 @@ struct StreamState {
 }
 
 /// Run PipeWire on its own thread: pipewire-rs uses thread-local Rc objects.
-pub fn run(fd: OwnedFd, portal_streams: Vec<Stream>, sender: SyncSender<CapturedFrame>) {
-    if let Err(error) = run_inner(fd, portal_streams, sender) {
+pub fn run(
+    fd: OwnedFd,
+    portal_streams: Vec<Stream>,
+    sender: SyncSender<CapturedFrame>,
+    stop: Receiver<()>,
+) {
+    if let Err(error) = run_inner(fd, portal_streams, sender, stop) {
         eprintln!("PipeWire capture stopped: {error}");
     }
 }
@@ -30,6 +39,7 @@ fn run_inner(
     fd: OwnedFd,
     portal_streams: Vec<Stream>,
     sender: SyncSender<CapturedFrame>,
+    stop: Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     pw::init();
     let mainloop = pw::main_loop::MainLoopRc::new(None)?;
@@ -188,7 +198,11 @@ fn run_inner(
         streams.push(stream);
     }
 
-    mainloop.run();
+    while stop.try_recv().is_err() {
+        mainloop.loop_().iterate(pw::loop_::Timeout::Finite(
+            std::time::Duration::from_millis(100),
+        ));
+    }
     Ok(())
 }
 
