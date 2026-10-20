@@ -11,6 +11,8 @@ use pw::{properties::properties, spa};
 
 pub struct CapturedFrame {
     pub stream_id: u32,
+    pub stream_position: (i32, i32),
+    pub stream_logical_size: (i32, i32),
     pub frame: RgbaFrame,
     pub pointer: Option<PixelPoint>,
     pub presentation_time_ns: Option<u64>,
@@ -19,6 +21,8 @@ pub struct CapturedFrame {
 
 struct StreamState {
     stream_id: u32,
+    stream_position: (i32, i32),
+    stream_logical_size: (i32, i32),
     format: spa::param::video::VideoInfoRaw,
     sender: SyncSender<CapturedFrame>,
 }
@@ -46,17 +50,23 @@ fn run_inner(
     let context = pw::context::ContextRc::new(&mainloop, None)?;
     let core = context.connect_fd_rc(fd, None)?;
     let mut streams = Vec::with_capacity(portal_streams.len());
+    let mut listeners = Vec::with_capacity(portal_streams.len());
 
     for (index, portal_stream) in portal_streams.iter().enumerate() {
         let node_id = portal_stream.pipe_wire_node_id();
         let (width, height) = portal_stream
             .size()
             .ok_or("portal monitor stream did not include dimensions")?;
+        let position = portal_stream
+            .position()
+            .ok_or("portal monitor stream did not include position")?;
         if width <= 0 || height <= 0 {
             return Err("portal provided invalid stream dimensions".into());
         }
         let state = StreamState {
             stream_id: node_id,
+            stream_position: position,
+            stream_logical_size: (width, height),
             format: Default::default(),
             sender: sender.clone(),
         };
@@ -69,8 +79,14 @@ fn run_inner(
                 *pw::keys::MEDIA_ROLE => "Screen",
             },
         )?;
-        let _listener = stream
+        let listener = stream
             .add_local_listener_with_user_data(state)
+            .state_changed(|_, data, old, new| {
+                eprintln!(
+                    "PipeWire stream {} changed from {old:?} to {new:?}",
+                    data.stream_id
+                );
+            })
             .param_changed(|_, data, id, param| {
                 if id != pw::spa::param::ParamType::Format.as_raw() {
                     return;
@@ -89,6 +105,14 @@ fn run_inner(
                     eprintln!(
                         "Ignoring invalid PipeWire video format for stream {}",
                         data.stream_id
+                    );
+                } else {
+                    eprintln!(
+                        "PipeWire stream {} negotiated {:?} {}x{}",
+                        data.stream_id,
+                        data.format.format(),
+                        data.format.size().width,
+                        data.format.size().height
                     );
                 }
             })
@@ -123,7 +147,6 @@ fn run_inner(
                 };
                 let pointer = buffer
                     .find_meta::<spa::buffer::meta::MetaCursor>()
-                    .filter(|cursor| cursor.is_valid())
                     .map(|cursor| cursor.position())
                     .and_then(|point| {
                         (point.x >= 0 && point.y >= 0).then_some(PixelPoint {
@@ -136,6 +159,8 @@ fn run_inner(
                     .and_then(|header| u64::try_from(header.pts()).ok());
                 let message = CapturedFrame {
                     stream_id: data.stream_id,
+                    stream_position: data.stream_position,
+                    stream_logical_size: data.stream_logical_size,
                     frame,
                     pointer,
                     presentation_time_ns,
@@ -174,10 +199,20 @@ fn run_inner(
             ),
             spa::pod::property!(
                 spa::param::format::FormatProperties::VideoSize,
+                Choice,
+                Range,
                 Rectangle,
                 spa::utils::Rectangle {
                     width: width as u32,
-                    height: height as u32
+                    height: height as u32,
+                },
+                spa::utils::Rectangle {
+                    width: 1,
+                    height: 1,
+                },
+                spa::utils::Rectangle {
+                    width: 8192,
+                    height: 8192,
                 }
             )
         );
@@ -192,9 +227,10 @@ fn run_inner(
         stream.connect(
             spa::utils::Direction::Input,
             Some(node_id),
-            pw::stream::StreamFlags::MAP_BUFFERS,
+            pw::stream::StreamFlags::AUTOCONNECT | pw::stream::StreamFlags::MAP_BUFFERS,
             &mut params,
         )?;
+        listeners.push(listener);
         streams.push(stream);
     }
 

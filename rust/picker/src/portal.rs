@@ -14,13 +14,16 @@ pub struct CaptureSession {
 }
 
 pub async fn begin_capture() -> Result<CaptureSession, Box<dyn std::error::Error>> {
+    eprintln!("Connecting to the ScreenCast portal");
     let portal = Screencast::new().await?;
     let available = portal.available_cursor_modes().await?;
     if !available.contains(CursorMode::Metadata) {
         return Err("ScreenCast portal does not advertise cursor metadata mode".into());
     }
 
+    eprintln!("Creating the ScreenCast portal session");
     let session = portal.create_session(Default::default()).await?;
+    eprintln!("Requesting monitor selection and capture authorization");
     portal
         .select_sources(
             &session,
@@ -33,6 +36,7 @@ pub async fn begin_capture() -> Result<CaptureSession, Box<dyn std::error::Error
         .await?
         .response()?;
 
+    eprintln!("Starting the authorized ScreenCast streams");
     let streams = portal
         .start(&session, None, Default::default())
         .await?
@@ -42,6 +46,7 @@ pub async fn begin_capture() -> Result<CaptureSession, Box<dyn std::error::Error
     if streams.iter().any(|stream| stream.position().is_none()) {
         return Err("portal omitted compositor-space monitor positions".into());
     }
+    eprintln!("Opening the PipeWire remote");
     let pipewire_fd = portal
         .open_pipe_wire_remote(&session, Default::default())
         .await?;

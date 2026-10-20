@@ -28,7 +28,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .spawn(move || capture::run(pipewire_fd, streams, frame_tx, capture_stop_rx))?;
 
     // Do not begin KWin's selection grab until at least one live frame arrives.
-    let first_frame = frame_rx.recv()?;
+    let first_frame = match frame_rx.recv_timeout(std::time::Duration::from_secs(10)) {
+        Ok(frame) => frame,
+        Err(error) => {
+            let _ = capture_stop_tx.send(());
+            let _ = capture_thread.join();
+            return Err(format!("timed out waiting for a PipeWire frame: {error}").into());
+        }
+    };
     eprintln!(
         "Live capture ready: stream={} frame={}x{} pointer={:?}",
         first_frame.stream_id,
@@ -45,12 +52,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Wait for the configured, rendered layer surface before asking KWin to
     // take the pointer. KWin remains authoritative for selection/cancellation.
-    if ready_rx.await.is_err() {
-        let _ = overlay_stop_tx.send(());
-        let _ = capture_stop_tx.send(());
-        let _ = overlay.await;
-        let _ = capture_thread.join();
-        return Err("magnifier overlay exited before becoming visible".into());
+    match tokio::time::timeout(std::time::Duration::from_secs(10), ready_rx).await {
+        Ok(Ok(())) => {}
+        Ok(Err(_)) => {
+            let _ = overlay_stop_tx.send(());
+            let _ = capture_stop_tx.send(());
+            let _ = overlay.await;
+            let _ = capture_thread.join();
+            return Err("magnifier overlay exited before becoming visible".into());
+        }
+        Err(_) => {
+            eprintln!("Magnifier did not receive usable cursor metadata within 10 seconds");
+            let _ = overlay_stop_tx.send(());
+            let _ = capture_stop_tx.send(());
+            let _ = overlay.await;
+            let _ = capture_thread.join();
+            return Err("magnifier did not become ready: no usable cursor metadata".into());
+        }
     }
     let selection = selection::pick_color().await;
     let _ = overlay_stop_tx.send(());
