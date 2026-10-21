@@ -45,9 +45,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     );
 
     let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+    let (sample_tx, sample_rx) = tokio::sync::watch::channel(None);
     let (overlay_stop_tx, overlay_stop_rx) = mpsc::channel();
     let overlay = tokio::task::spawn_blocking(move || {
-        overlay::run(first_frame, frame_rx, ready_tx, overlay_stop_rx)
+        overlay::run(first_frame, frame_rx, sample_tx, ready_tx, overlay_stop_rx)
     });
 
     // Wait for the configured, rendered layer surface before asking KWin to
@@ -71,6 +72,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     let selection = selection::pick_color().await;
+    let last_sample = sample_rx.borrow().clone();
     let _ = overlay_stop_tx.send(());
     let _ = capture_stop_tx.send(());
     let overlay_result = overlay.await?;
@@ -86,6 +88,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 "KWin selected #{:02X}{:02X}{:02X}",
                 color.r, color.g, color.b
             );
+            if let Some(sample) = last_sample {
+                let age_ms = sample.received_at.elapsed().unwrap_or_default().as_millis();
+                eprintln!(
+                    "Last displayed center at ({}, {}) was #{:02X}{:02X}{:02X}; frame_age={}ms pts={:?}; RGB match={}",
+                    sample.source_point.x,
+                    sample.source_point.y,
+                    sample.color.r,
+                    sample.color.g,
+                    sample.color.b,
+                    age_ms,
+                    sample.presentation_time_ns,
+                    (sample.color.r, sample.color.g, sample.color.b) == (color.r, color.g, color.b)
+                );
+            }
         }
         Err(error) => eprintln!("KWin color selection ended: {error}"),
     }

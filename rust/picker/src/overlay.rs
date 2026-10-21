@@ -1,6 +1,6 @@
-use std::{error::Error, num::NonZeroU32, sync::mpsc};
+use std::{error::Error, num::NonZeroU32, sync::mpsc, time::SystemTime};
 
-use colorboard_picker_core::{Magnifier, Rgba8, render_magnifier};
+use colorboard_picker_core::{Magnifier, PixelPoint, Rgba8, render_magnifier};
 use smithay_client_toolkit::{
     compositor::{CompositorHandler, CompositorState, FrameCallbackData, Region},
     delegate_registry,
@@ -27,25 +27,34 @@ use wayland_client::{
 
 use crate::capture::CapturedFrame;
 
+#[derive(Clone, Debug)]
+pub struct LensSample {
+    pub source_point: PixelPoint,
+    pub color: Rgba8,
+    pub presentation_time_ns: Option<u64>,
+    pub received_at: SystemTime,
+}
+
 const MIN_SURFACE_SIZE: u32 = 200;
 const RADIUS: u32 = 7;
 const ZOOM: u32 = 10;
 
 /// Display a live source-pixel lens on a non-interactive layer surface.
-/// The current prototype anchors the lens in the upper-right corner; source
-/// sampling follows PipeWire cursor metadata.
+/// The lens follows PipeWire cursor metadata on the matched output.
 pub fn run(
     first_frame: CapturedFrame,
     frames: mpsc::Receiver<CapturedFrame>,
+    sample: tokio::sync::watch::Sender<Option<LensSample>>,
     ready: tokio::sync::oneshot::Sender<()>,
     stop: mpsc::Receiver<()>,
 ) -> Result<(), String> {
-    run_inner(first_frame, frames, ready, stop).map_err(|error| error.to_string())
+    run_inner(first_frame, frames, sample, ready, stop).map_err(|error| error.to_string())
 }
 
 fn run_inner(
     first_frame: CapturedFrame,
     frames: mpsc::Receiver<CapturedFrame>,
+    sample: tokio::sync::watch::Sender<Option<LensSample>>,
     ready: tokio::sync::oneshot::Sender<()>,
     stop: mpsc::Receiver<()>,
 ) -> Result<(), Box<dyn Error>> {
@@ -68,6 +77,7 @@ fn run_inner(
         zoom: ZOOM,
         frame: first_frame,
         frames,
+        sample,
         stop,
         ready: Some(ready),
         configured: false,
@@ -156,6 +166,7 @@ struct Overlay {
     zoom: u32,
     frame: CapturedFrame,
     frames: mpsc::Receiver<CapturedFrame>,
+    sample: tokio::sync::watch::Sender<Option<LensSample>>,
     stop: mpsc::Receiver<()>,
     ready: Option<tokio::sync::oneshot::Sender<()>>,
     configured: bool,
@@ -252,6 +263,12 @@ impl Overlay {
             let center_index =
                 lens.center.y as usize * lens.width as usize + lens.center.x as usize;
             if let Some(color) = lens.pixels.get(center_index) {
+                self.sample.send_replace(Some(LensSample {
+                    source_point: pointer,
+                    color: *color,
+                    presentation_time_ns: self.frame.presentation_time_ns,
+                    received_at: self.frame.received_at,
+                }));
                 paint_color_value(canvas, *color, width);
             }
         }

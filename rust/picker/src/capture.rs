@@ -265,37 +265,50 @@ fn request_cursor_metadata(stream: &pw::stream::Stream) -> Result<(), Box<dyn st
         cursor_meta_min + std::mem::size_of::<spa::sys::spa_meta_bitmap>() + 64 * 64 * 4;
     let cursor_meta_max =
         cursor_meta_min + std::mem::size_of::<spa::sys::spa_meta_bitmap>() + 256 * 256 * 4;
+    let cursor_meta = meta_param(
+        spa::sys::SPA_META_Cursor,
+        spa::pod::Value::Choice(spa::pod::ChoiceValue::Int(spa::utils::Choice(
+            spa::utils::ChoiceFlags::empty(),
+            spa::utils::ChoiceEnum::Range {
+                default: cursor_meta_default as i32,
+                min: cursor_meta_min as i32,
+                max: cursor_meta_max as i32,
+            },
+        ))),
+    )?;
+    let header_meta = meta_param(
+        spa::sys::SPA_META_Header,
+        spa::pod::Value::Int(std::mem::size_of::<spa::sys::spa_meta_header>() as i32),
+    )?;
+    let mut params = [
+        spa::pod::Pod::from_bytes(&cursor_meta).ok_or("PipeWire rejected cursor metadata pod")?,
+        spa::pod::Pod::from_bytes(&header_meta).ok_or("PipeWire rejected header metadata pod")?,
+    ];
+    stream.update_params(&mut params)?;
+    Ok(())
+}
+
+fn meta_param(
+    meta_type: u32,
+    size: spa::pod::Value,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let metadata = spa::pod::Object {
         type_: spa::utils::SpaTypes::ObjectParamMeta.as_raw(),
         id: spa::param::ParamType::Meta.as_raw(),
         properties: vec![
             spa::pod::Property::new(
                 spa::sys::SPA_PARAM_META_type,
-                spa::pod::Value::Id(spa::utils::Id(spa::sys::SPA_META_Cursor)),
+                spa::pod::Value::Id(spa::utils::Id(meta_type)),
             ),
-            spa::pod::Property::new(
-                spa::sys::SPA_PARAM_META_size,
-                spa::pod::Value::Choice(spa::pod::ChoiceValue::Int(spa::utils::Choice(
-                    spa::utils::ChoiceFlags::empty(),
-                    spa::utils::ChoiceEnum::Range {
-                        default: cursor_meta_default as i32,
-                        min: cursor_meta_min as i32,
-                        max: cursor_meta_max as i32,
-                    },
-                ))),
-            ),
+            spa::pod::Property::new(spa::sys::SPA_PARAM_META_size, size),
         ],
     };
-    let bytes = spa::pod::serialize::PodSerializer::serialize(
+    Ok(spa::pod::serialize::PodSerializer::serialize(
         std::io::Cursor::new(Vec::new()),
         &spa::pod::Value::Object(metadata),
     )?
     .0
-    .into_inner();
-    let mut params =
-        [spa::pod::Pod::from_bytes(&bytes).ok_or("PipeWire rejected cursor metadata pod")?];
-    stream.update_params(&mut params)?;
-    Ok(())
+    .into_inner())
 }
 
 fn decode_frame(
