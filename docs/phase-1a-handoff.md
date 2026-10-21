@@ -4,20 +4,20 @@
 
 Phase 1A is **in progress; its hard exit gate has not passed**. PipeWire capture is live and delivers 2880×1800 BGRA frames on the current scaled KDE Wayland display. The first frame had no usable cursor position, so the cursor-following lens did not become ready and KWin's selection method was not invoked. Startup now exits with a diagnostic and releases its workers if cursor metadata does not arrive within ten seconds.
 
-The repo contains the `colorboard-picker-core` geometry and magnifier library, plus a Rust `colorboard-picker` using ashpd ScreenCast, PipeWire, KWin's ColorPicker D-Bus method, and a pointer-transparent/non-focusable SCTK layer surface. Stream origins are matched to Wayland output positions, and scale is derived from logical output and actual PipeWire frame dimensions.
+The repo contains the `colorboard-picker-core` geometry and magnifier library, plus a Rust `colorboard-picker` using ashpd ScreenCast, PipeWire, KWin's ColorPicker D-Bus method, and a pointer-transparent/non-focusable SCTK layer surface. Stream origins are matched to Wayland output positions, and scale is derived from logical output and actual PipeWire frame dimensions. After format negotiation the app now explicitly requests `SPA_META_Cursor` buffers, as PipeWire's video stream example does; this change has not yet been confirmed in a live run.
 
 ## Commits
 
 - `3b4c08c` — Add live Wayland magnifier overlay prototype
 
-There are follow-up capture, startup, output-positioning, and handoff updates in progress after that checkpoint. Commit those as the next logical change after reviewing the final diff.
+Follow-up commits `79ccff1` and `121eda5` add capture/overlay mapping and request portal permission persistence. The cursor metadata buffer request and updated runtime evidence are the current uncommitted change.
 
 ## Build and runtime
 
 - `cargo fmt --all` passes.
 - `cargo check --offline -p colorboard-picker` passes with a warning that presentation/receive timestamps are not yet used.
 - A real portal session was authorized; PipeWire negotiated `VideoFormat::BGRA 2880x1800` and delivered a frame.
-- That frame had `pointer=None`; no visible cursor-driven lens or KWin color result has been observed yet.
+- Before the explicit PipeWire cursor metadata buffer request was added, a delivered frame had `pointer=None`; no visible cursor-driven lens or KWin color result has been observed yet. The next run stopped at portal authorization before testing the new request.
 - The portal request now uses `PersistMode::Application` so KDE can offer to remember permission. Whether this stops repeat prompts depends on the portal and the user's choice; it has not been exercised since the change.
 
 ## Environment and remaining work

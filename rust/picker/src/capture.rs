@@ -24,6 +24,7 @@ struct StreamState {
     stream_position: (i32, i32),
     stream_logical_size: (i32, i32),
     format: spa::param::video::VideoInfoRaw,
+    cursor_meta_requested: bool,
     sender: SyncSender<CapturedFrame>,
 }
 
@@ -68,6 +69,7 @@ fn run_inner(
             stream_position: position,
             stream_logical_size: (width, height),
             format: Default::default(),
+            cursor_meta_requested: false,
             sender: sender.clone(),
         };
         let stream = pw::stream::StreamRc::new(
@@ -87,7 +89,7 @@ fn run_inner(
                     data.stream_id
                 );
             })
-            .param_changed(|_, data, id, param| {
+            .param_changed(|stream, data, id, param| {
                 if id != pw::spa::param::ParamType::Format.as_raw() {
                     return;
                 }
@@ -114,6 +116,21 @@ fn run_inner(
                         data.format.size().width,
                         data.format.size().height
                     );
+                    if !data.cursor_meta_requested {
+                        match request_cursor_metadata(stream) {
+                            Ok(()) => {
+                                data.cursor_meta_requested = true;
+                                eprintln!(
+                                    "Requested PipeWire cursor metadata for stream {}",
+                                    data.stream_id
+                                );
+                            }
+                            Err(error) => eprintln!(
+                                "Could not request PipeWire cursor metadata for stream {}: {error}",
+                                data.stream_id
+                            ),
+                        }
+                    }
                 }
             })
             .process(|stream, data| {
@@ -239,6 +256,45 @@ fn run_inner(
             std::time::Duration::from_millis(100),
         ));
     }
+    Ok(())
+}
+
+fn request_cursor_metadata(stream: &pw::stream::Stream) -> Result<(), Box<dyn std::error::Error>> {
+    let cursor_meta_min = std::mem::size_of::<spa::sys::spa_meta_cursor>();
+    let cursor_meta_default =
+        cursor_meta_min + std::mem::size_of::<spa::sys::spa_meta_bitmap>() + 64 * 64 * 4;
+    let cursor_meta_max =
+        cursor_meta_min + std::mem::size_of::<spa::sys::spa_meta_bitmap>() + 256 * 256 * 4;
+    let metadata = spa::pod::Object {
+        type_: spa::utils::SpaTypes::ObjectParamMeta.as_raw(),
+        id: spa::param::ParamType::Meta.as_raw(),
+        properties: vec![
+            spa::pod::Property::new(
+                spa::sys::SPA_PARAM_META_type,
+                spa::pod::Value::Id(spa::utils::Id(spa::sys::SPA_META_Cursor)),
+            ),
+            spa::pod::Property::new(
+                spa::sys::SPA_PARAM_META_size,
+                spa::pod::Value::Choice(spa::pod::ChoiceValue::Int(spa::utils::Choice(
+                    spa::utils::ChoiceFlags::empty(),
+                    spa::utils::ChoiceEnum::Range {
+                        default: cursor_meta_default as i32,
+                        min: cursor_meta_min as i32,
+                        max: cursor_meta_max as i32,
+                    },
+                ))),
+            ),
+        ],
+    };
+    let bytes = spa::pod::serialize::PodSerializer::serialize(
+        std::io::Cursor::new(Vec::new()),
+        &spa::pod::Value::Object(metadata),
+    )?
+    .0
+    .into_inner();
+    let mut params =
+        [spa::pod::Pod::from_bytes(&bytes).ok_or("PipeWire rejected cursor metadata pod")?];
+    stream.update_params(&mut params)?;
     Ok(())
 }
 
