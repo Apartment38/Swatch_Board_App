@@ -27,4 +27,6 @@
 3. Validate required scaling and output geometries, including multiple outputs, negative origins, and rotation, on suitable live configurations.
 4. Verify successful and canceled selection both promptly release capture, overlay, and portal resources; record observed results here.
 
+For controlled solid-color samples, use `phase-1a-color-fixture.html` from the `docs` directory. The picker now prints the last displayed center color, frame age, PTS, and whether that color matched KWin's result.
+
 Do not mark Phase 1A complete or start Phase 1B until every hard exit criterion in `colorboard-agent-implementation-plan.md` passes on a real Plasma Wayland session.

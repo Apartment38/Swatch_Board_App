@@ -25,3 +25,5 @@ Follow-up commits `79ccff1`, `121eda5`, `90688f5`, and `64a6d23` add capture/ove
 KWin reports 6.8.0, PipeWire 1.6.9, Rust 1.99.1, and SCTK 0.21.1. One 1.75× output is available at 1646×1029 logical / 2880×1800 captured. Multi-monitor, negative-origin, rotated-output, live cursor following, center-color agreement, focus, click routing, confirmation/cancellation, feedback recursion, and completed-session cleanup remain unverified.
 
 Next validate visible cursor tracking and center-sample agreement on controlled colors, then cancellation, focus, click routing, and cleanup. Continue the Phase 1A criteria in `colorboard-agent-implementation-plan.md`; do not begin Phase 1B until the entire hard gate passes. See `phase-1a-status.md` for the current evidence.
+
+Use `phase-1a-color-fixture.html` in this directory for large flat known-color targets. The picker logs the last displayed center RGB and whether it matches KWin's final sample.
