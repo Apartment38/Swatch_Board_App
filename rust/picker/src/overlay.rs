@@ -38,6 +38,7 @@ pub struct LensSample {
 const MIN_SURFACE_SIZE: u32 = 200;
 const RADIUS: u32 = 7;
 const ZOOM: u32 = 10;
+const POINTER_GAP: i32 = 16;
 
 /// Display a live source-pixel lens on a non-interactive layer surface.
 /// The lens follows PipeWire cursor metadata on the matched output.
@@ -246,13 +247,25 @@ impl Overlay {
             let cursor_x = (pointer.x as f64 * x_scale).round() as i32;
             let cursor_y = (pointer.y as f64 * y_scale).round() as i32;
             let center = self.surface_size as i32 / 2;
-            let offset = 16;
-            let surface_left = if cursor_x + offset + center <= self.output_logical_size.0 as i32 {
-                cursor_x + offset - center
+            // Keep the sampled screen point outside the visible lens. Otherwise
+            // PipeWire captures our own magnified pixels and feeds them back
+            // into the next magnifier frame, causing the sample to drift.
+            let half_lens = (RADIUS * 2 + 1) as i32 * self.zoom as i32 / 2;
+            let minimum_offset = half_lens + POINTER_GAP;
+            let max_left = (self.output_logical_size.0 as i32 - width as i32).max(0);
+            let right = (cursor_x + minimum_offset - center).clamp(0, max_left);
+            let left = (cursor_x - minimum_offset - center).clamp(0, max_left);
+            let right_clearance = right + center - cursor_x;
+            let left_clearance = cursor_x - (left + center);
+            let surface_left = if right_clearance >= minimum_offset {
+                right
+            } else if left_clearance >= minimum_offset {
+                left
+            } else if right_clearance >= left_clearance {
+                right
             } else {
-                cursor_x - offset - center
-            }
-            .clamp(0, (self.output_logical_size.0 as i32 - width as i32).max(0));
+                left
+            };
             let surface_top = (cursor_y - center).clamp(
                 0,
                 (self.output_logical_size.1 as i32 - height as i32).max(0),
