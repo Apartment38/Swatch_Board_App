@@ -15,7 +15,7 @@ Follow-up commits `79ccff1`, `121eda5`, `90688f5`, and `64a6d23` add capture/ove
 ## Build and runtime
 
 - `cargo fmt --all` passes.
-- `cargo check --offline -p colorboard-picker` and `cargo test --offline --workspace` pass (4 core tests). The picker now logs its last displayed center sample, frame age, presentation timestamp, and RGB equality with KWin's returned color. Timestamp skew correction is still outstanding.
+- `cargo check --offline -p colorboard-picker` passes. `cargo test --offline -p colorboard-picker-core` passes (7 tests), covering nearest-neighbor rendering, checkerboard/gradient samples, negative origins, 100/125/150/200% scales, and all 8 output transforms. The picker logs its last displayed center sample, frame age, presentation timestamp, and RGB equality with KWin's returned color. Timestamp skew evaluation on changing live content remains outstanding.
 - A real portal session was authorized; PipeWire negotiated `VideoFormat::BGRA 2880x1800` and delivered a frame.
 - A subsequent live run received cursor position `(1836, 1496)` and KWin returned `#3A2F2D`.
 - An initial run over the known `#0000FF` fixture reported KWin `#272777` versus displayed center `#282898`, with frame age 201 ms and `RGB match=false`; the user observed progressive darkening. The lens was moved to one side of the cursor to prevent recursive capture.
@@ -27,6 +27,6 @@ Follow-up commits `79ccff1`, `121eda5`, `90688f5`, and `64a6d23` add capture/ove
 
 KWin reports 6.8.0, PipeWire 1.6.9, Rust 1.99.1, and SCTK 0.21.1. One 1.75× output is available at 1646×1029 logical / 2880×1800 captured. Multi-monitor, negative-origin, rotated-output, left-click confirmation, right-click cancellation, focus, click routing/no click-through, changing content/timestamp behavior, and completed-session cleanup remain unverified.
 
-Next verify left-click confirmation, right-click cancellation, focus preservation, click routing/no click-through, live cursor following on changing targets, additional scale/output geometries, and prompt resource cleanup on success/cancel/failure. Continue the Phase 1A criteria in `colorboard-agent-implementation-plan.md`; do not begin Phase 1B until the entire hard gate passes. See `phase-1a-status.md` for the current evidence.
+Next verify left-click confirmation, right-click cancellation, focus preservation, click routing/no click-through, live cursor following on changing targets, live additional scale/output geometries, and prompt resource cleanup on success/cancel/failure. Continue the Phase 1A criteria in `colorboard-agent-implementation-plan.md`; do not begin Phase 1B until the entire hard gate passes. See `phase-1a-status.md` for the current evidence.
 
 Use `phase-1a-color-fixture.html` in this directory for large flat known-color targets. The picker logs the last displayed center RGB and whether it matches KWin's final sample.

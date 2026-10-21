@@ -333,4 +333,113 @@ mod tests {
         assert_eq!(frame.pixel(PixelPoint { x: 1, y: 0 }), None);
         assert!(RgbaFrame::new(2, 2, vec![]).is_none());
     }
+
+    #[test]
+    fn maps_required_display_scales_to_exact_source_pixels() {
+        for scale in [1.0, 1.25, 1.5, 2.0] {
+            let physical_width = (8.0 * scale) as u32;
+            let physical_height = (6.0 * scale) as u32;
+            let output = OutputGeometry {
+                logical_origin: Point { x: 0.0, y: 0.0 },
+                logical_size: Point { x: 8.0, y: 6.0 },
+                scale,
+                stream_width: physical_width,
+                stream_height: physical_height,
+                transform: OutputTransform::Normal,
+            };
+            assert_eq!(
+                output.desktop_to_stream(Point { x: 3.9, y: 2.9 }),
+                Some(PixelPoint {
+                    x: (3.9_f64 * scale).floor() as u32,
+                    y: (2.9_f64 * scale).floor() as u32,
+                }),
+                "scale {scale}"
+            );
+            assert_eq!(
+                output.desktop_to_stream(Point { x: 8.0, y: 0.0 }),
+                None,
+                "right edge is outside at scale {scale}"
+            );
+        }
+    }
+
+    #[test]
+    fn maps_all_output_transforms_with_negative_origin() {
+        let origin = Point { x: -4.0, y: -3.0 };
+        let expected = [
+            (OutputTransform::Normal, PixelPoint { x: 0, y: 0 }),
+            (OutputTransform::Rotate90, PixelPoint { x: 2, y: 0 }),
+            (OutputTransform::Rotate180, PixelPoint { x: 3, y: 2 }),
+            (OutputTransform::Rotate270, PixelPoint { x: 0, y: 3 }),
+            (OutputTransform::Flipped, PixelPoint { x: 3, y: 0 }),
+            (OutputTransform::Flipped90, PixelPoint { x: 2, y: 3 }),
+            (OutputTransform::Flipped180, PixelPoint { x: 0, y: 2 }),
+            (OutputTransform::Flipped270, PixelPoint { x: 0, y: 0 }),
+        ];
+        for (transform, expected_top_left) in expected {
+            let output = geometry(transform, origin);
+            assert_eq!(
+                output.desktop_to_stream(origin),
+                Some(expected_top_left),
+                "transform {transform:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn samples_checkerboard_and_gradient_without_interpolation() {
+        let pixels = (0..4)
+            .flat_map(|y| {
+                (0..4).map(move |x| {
+                    if (x + y) % 2 == 0 {
+                        Rgba8 {
+                            r: 255,
+                            g: 255,
+                            b: 255,
+                            a: 255,
+                        }
+                    } else {
+                        Rgba8 {
+                            r: 0,
+                            g: 0,
+                            b: 0,
+                            a: 255,
+                        }
+                    }
+                })
+            })
+            .collect();
+        let checkerboard = RgbaFrame::new(4, 4, pixels).unwrap();
+        let lens = render_magnifier(&checkerboard, PixelPoint { x: 1, y: 1 }, 1, 3).unwrap();
+        assert_eq!(
+            lens.pixels[lens.center.y as usize * lens.width as usize + lens.center.x as usize],
+            checkerboard.pixel(PixelPoint { x: 1, y: 1 }).unwrap()
+        );
+        assert_eq!(
+            lens.pixels[0],
+            checkerboard.pixel(PixelPoint { x: 0, y: 0 }).unwrap()
+        );
+
+        let gradient = RgbaFrame::new(
+            4,
+            1,
+            (0..4)
+                .map(|value| Rgba8 {
+                    r: (value * 64) as u8,
+                    g: 0,
+                    b: 255 - (value * 64) as u8,
+                    a: 255,
+                })
+                .collect(),
+        )
+        .unwrap();
+        for x in 0..gradient.width {
+            let lens = render_magnifier(&gradient, PixelPoint { x, y: 0 }, 0, 4).unwrap();
+            assert!(
+                lens.pixels
+                    .iter()
+                    .all(|pixel| *pixel == gradient.pixel(PixelPoint { x, y: 0 }).unwrap())
+            );
+        }
+    }
 }
