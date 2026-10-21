@@ -18,12 +18,13 @@
 - On KDE Wayland with KWin 6.8.0 and PipeWire 1.6.9, the portal authorized capture and PipeWire negotiated `BGRA 2880x1800`; the stream entered `Streaming` and delivered frames.
 - A live run on stream 120 delivered cursor position `(1836, 1496)`, reached the cursor-driven overlay ready state, and completed KWin selection with `#3A2F2D`. A later run over the `#0000FF` fixture returned `#272777`; the app's displayed center was `#282898`, with RGB mismatch and a 201 ms old frame. The user also observed the shade darkening toward black. This is consistent with PipeWire capturing the lens over the cursor and feeding those displayed pixels into later samples.
 - The lens is now positioned to the side of the cursor, leaving a gap between the sampled point and all visible lens/readout pixels. This should break the feedback path while preserving the live sample; it needs a new controlled-color runtime check.
+- On stream 118, another run over the `#0000FF` fixture returned `#2323C6` from both KWin and the displayed center sample (frame age 166 ms, `RGB match=true`). This confirms the two sampling paths agree and that the progressive feedback is gone, but the sampled scene differs from the fixture's CSS color. The local KWin config enables the Dim Inactive effect; test again with that effect disabled because an inactive browser window may be dimmed while the picker is launched from a terminal. Night Color is also configured at 3000 K, but KWin documents that screenshots, screencasts, and color picking are rendered into a separate sRGB framebuffer, so Night Color alone is not the leading explanation.
 - The ScreenCast portal now requests `PersistMode::Application`. KDE controls whether it can remember the grant and may still ask for approval; this has not been exercised since the change.
 - A single 1.75× display was available (`1646x1029` logical, `2880x1800` captured). Multi-output, negative-origin, rotated-output, cursor movement, focus, pointer routing, color agreement after the side placement, cancellation, feedback recursion after the fix, and normal completion cleanup have not been validated.
 
 ## Remaining Phase 1A work
 
-1. Re-run over the `#0000FF` fixture and verify the side-placed lens remains stable and its center matches KWin's result.
+1. Disable KWin's Dim Inactive effect temporarily and re-run over the `#0000FF` fixture. Verify whether both KWin and the lens now return the fixture's CSS value.
 2. Verify confirmation/cancellation, focus preservation, no click-through, and no capture feedback.
 3. Validate required scaling and output geometries, including multiple outputs, negative origins, and rotation, on suitable live configurations.
 4. Verify successful and canceled selection both promptly release capture, overlay, and portal resources; record observed results here.
