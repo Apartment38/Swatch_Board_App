@@ -6,6 +6,7 @@ use zbus::{Connection, proxy};
     default_path = "/ColorPicker"
 )]
 trait KWinColorPicker {
+    #[zbus(name = "pick")]
     fn pick(&self) -> zbus::Result<(u32,)>;
 }
 
