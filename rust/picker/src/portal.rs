@@ -31,7 +31,7 @@ pub async fn begin_capture() -> Result<CaptureSession, Box<dyn std::error::Error
                 .set_cursor_mode(CursorMode::Metadata)
                 .set_sources(ashpd::enumflags2::BitFlags::from(SourceType::Monitor))
                 .set_multiple(true)
-                .set_persist_mode(PersistMode::DoNot),
+                .set_persist_mode(PersistMode::Application),
         )
         .await?
         .response()?;

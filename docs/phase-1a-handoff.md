@@ -18,7 +18,7 @@ There are follow-up capture, startup, output-positioning, and handoff updates in
 - `cargo check --offline -p colorboard-picker` passes with a warning that presentation/receive timestamps are not yet used.
 - A real portal session was authorized; PipeWire negotiated `VideoFormat::BGRA 2880x1800` and delivered a frame.
 - That frame had `pointer=None`; no visible cursor-driven lens or KWin color result has been observed yet.
-- Portal capture approval repeats because the request explicitly uses `PersistMode::DoNot`.
+- The portal request now uses `PersistMode::Application` so KDE can offer to remember permission. Whether this stops repeat prompts depends on the portal and the user's choice; it has not been exercised since the change.
 
 ## Environment and remaining work
 
