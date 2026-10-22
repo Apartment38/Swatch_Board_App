@@ -1,0 +1,132 @@
+{
+  "exit_code": 0,
+  "results": [
+    {
+      "test": "blue",
+      "selected": "#0000FF",
+      "expected": "#0000FF",
+      "cancelled": false,
+      "match": true,
+      "helpers_stopped": true,
+      "sample_colors": [
+        "#0000FF"
+      ]
+    },
+    {
+      "test": "red",
+      "selected": "#FF0000",
+      "expected": "#FF0000",
+      "cancelled": false,
+      "match": true,
+      "helpers_stopped": true,
+      "sample_colors": [
+        "#FF0000"
+      ]
+    },
+    {
+      "test": "green",
+      "selected": "#00FF00",
+      "expected": "#00FF00",
+      "cancelled": false,
+      "match": true,
+      "helpers_stopped": true,
+      "sample_colors": [
+        "#00FF00"
+      ]
+    },
+    {
+      "test": "white",
+      "selected": "#FFFFFF",
+      "expected": "#FFFFFF",
+      "cancelled": false,
+      "match": true,
+      "helpers_stopped": true,
+      "sample_colors": [
+        "#FFFFFF"
+      ]
+    },
+    {
+      "test": "black",
+      "selected": "#000000",
+      "expected": "#000000",
+      "cancelled": false,
+      "match": true,
+      "helpers_stopped": true,
+      "sample_colors": [
+        "#000000"
+      ]
+    },
+    {
+      "test": "checker_white",
+      "selected": "#FFFFFF",
+      "expected": "#FFFFFF",
+      "cancelled": false,
+      "match": true,
+      "helpers_stopped": true,
+      "sample_colors": [
+        "#FFFFFF"
+      ]
+    },
+    {
+      "test": "checker_black",
+      "selected": "#000000",
+      "expected": "#000000",
+      "cancelled": false,
+      "match": true,
+      "helpers_stopped": true,
+      "sample_colors": [
+        "#000000"
+      ]
+    },
+    {
+      "test": "right_cancel",
+      "selected": null,
+      "expected": null,
+      "cancelled": true,
+      "match": false,
+      "helpers_stopped": true,
+      "sample_colors": [
+        "#0000FF"
+      ]
+    },
+    {
+      "test": "escape_cancel",
+      "selected": null,
+      "expected": null,
+      "cancelled": true,
+      "match": false,
+      "helpers_stopped": true,
+      "sample_colors": [
+        "#0000FF"
+      ]
+    },
+    {
+      "test": "animation",
+      "selected": "#00FFFF",
+      "expected": "dynamic",
+      "cancelled": false,
+      "match": false,
+      "helpers_stopped": true,
+      "sample_colors": [
+        "#00FFFF",
+        "#FF00FF"
+      ]
+    }
+  ],
+  "session_closed": true,
+  "fixture_pid": 138751,
+  "origin": [
+    372.0,
+    187.57
+  ],
+  "fixture_baseline": "EVENT n=47 unix_ms=1792547993117 elapsed_ms=866 button_release code=272 local_x=428.000 local_y=312.430 focused=true presses=1 releases=1 motions=38 keyboard_enters=1 keyboard_leaves=0",
+  "fixture_final_events": [
+    "EVENT n=167 unix_ms=1792548004163 elapsed_ms=11912 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=10 keyboard_leaves=9",
+    "EVENT n=168 unix_ms=1792548004242 elapsed_ms=11990 key_release KeyEvent { time: 46185333, raw_code: 1, keysym: XK_Escape, utf8: None } focused=true presses=1 releases=1 motions=122 keyboard_enters=10 keyboard_leaves=9",
+    "EVENT n=169 unix_ms=1792548004271 elapsed_ms=12020 keyboard_leave focused=false presses=1 releases=1 motions=122 keyboard_enters=10 keyboard_leaves=10",
+    "EVENT n=170 unix_ms=1792548004271 elapsed_ms=12020 pointer_leave local_x=450.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=10 keyboard_leaves=10",
+    "EVENT n=171 unix_ms=1792548007340 elapsed_ms=15088 pointer_enter local_x=680.000 local_y=459.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=10 keyboard_leaves=10",
+    "EVENT n=172 unix_ms=1792548007340 elapsed_ms=15088 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=11 keyboard_leaves=10"
+  ],
+  "evidence_note": "Release live run before fail-closed mismatch validation was added: process exit 0 is preserved as observed, not treated as acceptance. The animated mismatch blocks Phase1A. Current code returns error on mismatched/missing presented samples."
+}

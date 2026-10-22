@@ -1,0 +1,22 @@
+{
+  "case": "integrated_global_escape_and_release",
+  "native_cancelled": true,
+  "shortcut_session_closed": true,
+  "capture_session_closed": true,
+  "fixture_alive_until_second_escape": true,
+  "fixture_exited_after_second_escape": true,
+  "baseline_counts": {
+    "presses": 1,
+    "releases": 1,
+    "keyboard_enters": 3,
+    "keyboard_leaves": 2
+  },
+  "final_counts": {
+    "presses": 1,
+    "releases": 1,
+    "keyboard_enters": 3,
+    "keyboard_leaves": 2
+  },
+  "genuine_presented_count": 202,
+  "gate": "partial_not_phase1a"
+}

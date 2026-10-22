@@ -1,0 +1,64 @@
+Connecting to the ScreenCast portal
+Creating the ScreenCast portal session
+Requesting monitor selection and capture authorization
+Starting the authorized ScreenCast streams
+Opening the PipeWire remote
+PipeWire stream 53 changed from Unconnected to Connecting
+PipeWire stream 51 changed from Unconnected to Connecting
+PipeWire stream 53 changed from Connecting to Paused
+PipeWire stream 51 changed from Connecting to Paused
+PipeWire stream 53 negotiated VideoFormat::BGRA 1024x768
+Requested PipeWire cursor metadata for stream 53
+PipeWire stream 53 changed from Paused to Streaming
+PipeWire stream 51 negotiated VideoFormat::BGRA 1024x768
+Requested PipeWire cursor metadata for stream 51
+PipeWire stream 51 changed from Paused to Streaming
+CAPTURE_READY stream=51 image=1024x768 portal_origin=(1024, 0) portal_size=(1024, 768)
+PREPARE 3s: activate the native fixture NOW; shield has not been created. Timeout starts after mapping requests. No keyboard is bound.
+SEAT capability=Keyboard (only Pointer is bound)
+SEAT capability=Pointer (only Pointer is bound)
+SEAT capability=Touch (only Pointer is bound)
+OUTPUT name=Some("Virtual-0") origin=(0, 0) logical=(1024, 768) integer_scale=1 modes=[Mode { dimensions: (1024, 768), refresh_rate: 60000, current: true, preferred: false }]
+OUTPUT name=Some("Virtual-1") origin=(1024, 0) logical=(1024, 768) integer_scale=1 modes=[Mode { dimensions: (1024, 768), refresh_rate: 60000, current: true, preferred: false }]
+SHIELD_REQUESTED outputs=2 keyboard_interactivity=None keyboard_objects=0 timeout=12s cursor_sentinel=80x80 hotspot=0,0
+SHIELD_CONFIGURE origin=(0, 0) size=(1024, 768)
+SHIELD_MAPPED transparent=true full_input=true keyboard=None
+SHIELD_CONFIGURE origin=(1024, 0) size=(1024, 768)
+SHIELD_MAPPED transparent=true full_input=true keyboard=None
+SAMPLE_NO_POINTER stream=51 image_age_ms=Some(2773)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=metadata meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=0 physical=Some((512, 227)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(56) cursor_age_ms=Some(56) pts=Some(101126895954924)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=metadata meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=40 physical=Some((552, 267)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(56) cursor_age_ms=Some(56) pts=Some(101126895954924)
+POINTER id=17 event=Enter { serial: 139, surface: WlSurface { id: ObjectId(wl_surface@18, 20), version: 6, data: Some(ObjectData { .. }), backend: WeakBackend { inner: WeakInnerBackend { state: (Weak) } } }, surface_x: 512.0, surface_y: 227.0 }
+CURSOR_SET enter_serial=139 buffer_side=512 pointer=17 actual_wl_pointer_cursor=true sentinel_at_offset_40_40=#FF00FF feedback_requested=true
+POINTER id=17 event=Frame
+CURSOR_FRAME_CALLBACK Done { callback_data: 101126895 }; not presentation proof
+SAMPLE_NO_POINTER stream=51 image_age_ms=Some(4)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=0 physical=Some((512, 227)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(2) cursor_age_ms=Some(2) pts=Some(101127162621580)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=40 physical=Some((552, 267)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(2) cursor_age_ms=Some(2) pts=Some(101127162621580)
+SAMPLE_NO_POINTER stream=51 image_age_ms=Some(197)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=0 physical=Some((512, 227)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(195) cursor_age_ms=Some(195) pts=Some(101127179288246)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=40 physical=Some((552, 267)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(195) cursor_age_ms=Some(195) pts=Some(101127179288246)
+SAMPLE_NO_POINTER stream=51 image_age_ms=Some(407)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=0 physical=Some((512, 227)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(173) cursor_age_ms=Some(173) pts=Some(101127412621570)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=40 physical=Some((552, 267)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(173) cursor_age_ms=Some(173) pts=Some(101127412621570)
+SAMPLE_NO_POINTER stream=51 image_age_ms=Some(616)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=0 physical=Some((512, 227)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(116) cursor_age_ms=Some(116) pts=Some(101127679288226)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=40 physical=Some((552, 267)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(116) cursor_age_ms=Some(116) pts=Some(101127679288226)
+SAMPLE_NO_POINTER stream=51 image_age_ms=Some(826)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=0 physical=Some((512, 227)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(74) cursor_age_ms=Some(74) pts=Some(101127929288216)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=40 physical=Some((552, 267)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(74) cursor_age_ms=Some(74) pts=Some(101127929288216)
+SAMPLE_NO_POINTER stream=51 image_age_ms=Some(1036)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=0 physical=Some((512, 227)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(19) cursor_age_ms=Some(19) pts=Some(101128195954872)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=40 physical=Some((552, 267)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(19) cursor_age_ms=Some(19) pts=Some(101128195954872)
+POINTER id=17 event=Button { serial: 141, time: 101128324, button: 273, state: Value(Pressed) }
+POINTER id=17 event=Frame
+POINTER id=17 event=Button { serial: 142, time: 101128384, button: 273, state: Value(Released) }
+SELECTED_RELEASE button=273 action=cancel (observed press+release, not yet proof of no clickthrough)
+POINTER id=17 event=Frame
+SAMPLE_NO_POINTER stream=51 image_age_ms=Some(1201)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=0 physical=Some((512, 227)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(185) cursor_age_ms=Some(185) pts=Some(101128195954872)
+SAMPLE stream=53 pointer_logical=(512.0, 227.0) pointer_source=wl_pointer meta_pointer=Some(PixelPoint { x: 512, y: 227 }) offset=40 physical=Some((552, 267)) rgba=Some(Rgba8 { r: 0, g: 0, b: 255, a: 255 }) image=1024x768 image_age_ms=Some(185) cursor_age_ms=Some(185) pts=Some(101128195954872)
+END reason=release_or_error selected_released_button=Some(273) still_pressed={} cursor_feedback_presented=0 discarded=0
+CLEANUP layers_dropped=2 cursor_surface_destroyed=true pointers_released=true keyboard_objects=0
+WAYLAND_CLEANUP destroy requests queued; flush=Ok(()); connection drops on return
+CAPTURE_CLEANUP worker=Ok(Ok(())) session_close=Ok(())

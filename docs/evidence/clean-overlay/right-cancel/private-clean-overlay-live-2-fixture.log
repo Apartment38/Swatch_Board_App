@@ -1,0 +1,56 @@
+FIXTURE start unix_ms=1792633872078 title='Swatch Board Phase 1A Fixture' app_id=swatch-board-phase1a-fixture desired=900x650 opaque=true buffer_scale=1
+LAYOUT surface-local logical coordinates, half-open bounds; global origin must be measured externally (decorations excluded)
+TARGET red rect=[40,40,204,260) center=(122,150) argb=FFFF0000
+TARGET green rect=[204,40,368,260) center=(286,150) argb=FF00FF00
+TARGET blue rect=[368,40,532,260) center=(450,150) argb=FF0000FF
+TARGET white rect=[532,40,696,260) center=(614,150) argb=FFFFFFFF
+TARGET black rect=[696,40,860,260) center=(778,150) argb=FF000000
+TARGET checker rect=[40,320,440,600) cell=20 white_center=(50,330) black_center=(70,330)
+TARGET animation rect=[500,320,860,600) center=(680,460) cyan=FF00FFFF magenta=FFFF00FF alternates_every_ms=250
+EVENT n=1 unix_ms=1792633872082 elapsed_ms=4 configure size=900x650 state=WindowState(0x0) focused=false presses=0 releases=0 motions=0 keyboard_enters=0 keyboard_leaves=0
+REDRAW commit=1 unix_ms=1792633872088 elapsed_ms=10 size=900x650 animation_argb=FF00FFFF focused=false
+EVENT n=2 unix_ms=1792633872091 elapsed_ms=13 keyboard_enter focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0
+EVENT n=3 unix_ms=1792633872091 elapsed_ms=13 configure size=900x650 state=WindowState(ACTIVATED) focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=2 unix_ms=1792633872095 elapsed_ms=17 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792633872099 compositor_ms=132053178 latest_commit=2
+FRAME_CALLBACK unix_ms=1792633872099 compositor_ms=132053178 latest_commit=2
+REDRAW commit=3 unix_ms=1792633872359 elapsed_ms=281 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792633872363 compositor_ms=132053428 latest_commit=3
+REDRAW commit=4 unix_ms=1792633872622 elapsed_ms=544 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792633872630 compositor_ms=132053461 latest_commit=4
+EVENT n=4 unix_ms=1792633872778 elapsed_ms=700 pointer_enter local_x=738.000 local_y=423.000 focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=5 unix_ms=1792633872877 elapsed_ms=799 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792633872880 compositor_ms=132053878 latest_commit=5
+EVENT n=5 unix_ms=1792633872885 elapsed_ms=807 button_press code=272 local_x=738.000 local_y=423.000 focused=true presses=1 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0
+EVENT n=6 unix_ms=1792633872945 elapsed_ms=867 button_release code=272 local_x=738.000 local_y=423.000 focused=true presses=1 releases=1 motions=0 keyboard_enters=1 keyboard_leaves=0
+EVENT n=7 unix_ms=1792633873050 elapsed_ms=971 motion local_x=450.000 local_y=150.000 focused=true presses=1 releases=1 motions=1 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=6 unix_ms=1792633873132 elapsed_ms=1054 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792633873133 compositor_ms=132054144 latest_commit=6
+REDRAW commit=7 unix_ms=1792633873392 elapsed_ms=1314 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792633873397 compositor_ms=132054228 latest_commit=7
+REDRAW commit=8 unix_ms=1792633873657 elapsed_ms=1579 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792633873664 compositor_ms=132054494 latest_commit=8
+REDRAW commit=9 unix_ms=1792633873925 elapsed_ms=1847 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792633873931 compositor_ms=132054761 latest_commit=9
+REDRAW commit=10 unix_ms=1792633874191 elapsed_ms=2113 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792633874197 compositor_ms=132055028 latest_commit=10
+REDRAW commit=11 unix_ms=1792633874457 elapsed_ms=2379 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792633874464 compositor_ms=132055294 latest_commit=11
+REDRAW commit=12 unix_ms=1792633874723 elapsed_ms=2645 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792633874731 compositor_ms=132055561 latest_commit=12
+REDRAW commit=13 unix_ms=1792633874991 elapsed_ms=2912 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792633874998 compositor_ms=132055828 latest_commit=13
+EVENT n=8 unix_ms=1792633875077 elapsed_ms=2999 pointer_leave local_x=450.000 local_y=150.000 focused=true presses=1 releases=1 motions=1 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=14 unix_ms=1792633875243 elapsed_ms=3165 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792633875248 compositor_ms=132056328 latest_commit=14
+REDRAW commit=15 unix_ms=1792633875508 elapsed_ms=3430 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792633875515 compositor_ms=132056511 latest_commit=15
+REDRAW commit=16 unix_ms=1792633875776 elapsed_ms=3698 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792633875782 compositor_ms=132056844 latest_commit=16
+REDRAW commit=17 unix_ms=1792633876042 elapsed_ms=3963 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792633876048 compositor_ms=132056978 latest_commit=17
+REDRAW commit=18 unix_ms=1792633876295 elapsed_ms=4217 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792633876299 compositor_ms=132057378 latest_commit=18
+REDRAW commit=19 unix_ms=1792633876559 elapsed_ms=4481 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792633876565 compositor_ms=132057611 latest_commit=19
+EVENT n=9 unix_ms=1792633876716 elapsed_ms=4638 pointer_enter local_x=544.000 local_y=150.000 focused=true presses=1 releases=1 motions=1 keyboard_enters=1 keyboard_leaves=0

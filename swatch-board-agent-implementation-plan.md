@@ -1,8 +1,8 @@
-# Colorboard — Rust-Only Agent Implementation Plan
+# Swatch Board — Rust-Only Agent Implementation Plan
 
 **Revision:** 5.0 — 2026-10-20  
 **Status:** Requirements ratified; implementation not yet validated on a live Plasma session  
-**Project name:** Colorboard (working name; identifiers are placeholders until finalized)  
+**Project name:** Swatch Board (`swatch-board` executable/package prefix)  
 **Initial target:** KDE Plasma 6 on **Wayland only**  
 **Application implementation language:** **Rust exclusively**  
 **Primary GUI:** `egui` / `eframe`, started on demand  
@@ -13,12 +13,25 @@
 
 ---
 
+## Approved native-selection investigation
+
+The user explicitly approved investigating **Rust-owned selection with the actually
+presented magnifier sample as authority** after the existing portal + KWin backend
+failed animated-content equality and lacked request-owned cancellation. See
+[`docs/decisions/native-selection-authority.md`](docs/decisions/native-selection-authority.md).
+For that investigated backend, earlier requirements making KWin's independently
+rendered final color authoritative are superseded by displayed-sample authority;
+KWin may remain a static-fixture diagnostic. Equivalent no-focus, no-click-through,
+Escape/right-click, live pixels, and autonomous cleanup requirements are retained.
+This authorizes investigation, **not** a completed Phase 1A or later-phase work.
+The KWin-backed implementation and its original failures below remain documented.
+
 ## 1. Product scope and immovable requirements
 
 Build **one Rust Cargo workspace with separate, independently runnable Rust processes**:
 
-1. **Colorboard Picker:** A lightweight, always-on system-tray service orchestrating an on-demand **live, pixel-accurate magnifier**, color picking, copied color formats, history, centered history popup, global shortcuts, and configuration.
-2. **Colorboard Board:** An on-demand Rust desktop application with **Color Mixer**, **Palette Editor**, and **Theme Generator** tabs, plus a shared color-history strip. Its full GUI must not remain resident when the Board is closed.
+1. **Swatch Board Picker:** A lightweight, always-on system-tray service orchestrating an on-demand **live, pixel-accurate magnifier**, color picking, copied color formats, history, centered history popup, global shortcuts, and configuration.
+2. **Swatch Board:** An on-demand Rust desktop application with **Color Mixer**, **Palette Editor**, and **Theme Generator** tabs, plus a shared color-history strip. Its full GUI must not remain resident when the Board is closed.
 
 The processes share Rust crates for models, color science, configuration, storage, and IPC. A stable D-Bus interface is retained for independent launching and future automation, although the applications share a language.
 
@@ -26,11 +39,11 @@ The processes share Rust crates for models, color science, configuration, storag
 
 - **Live magnification is mandatory from the first development milestone.** Magnified source pixels update with pointer motion **and** underlying desktop changes. A frozen screenshot, ordinary KDE single-pixel picker without magnification, or fake preview is not acceptable.
 - The selection crosshair marks **the exact physical pixel** that will be selected. The final selected color must agree with KWin's returned color on known test imagery.
-- Invoking the picker must not focus/raise a Colorboard window or steal keyboard focus from the previously focused application. A KDE-controlled screen-capture permission dialog is the **only** accepted exception during picking.
+- Invoking the picker must not focus/raise a Swatch Board window or steal keyboard focus from the previously focused application. A KDE-controlled screen-capture permission dialog is the **only** accepted exception during picking.
 - KWin must handle left-click selection and right-click/Escape cancellation, or another supported Rust-accessible selection path must demonstrate equivalent behavior with no click-through to underlying apps. A picker overlay must not intercept KWin's selection pointer input.
 - KDE Plasma 6 Wayland is the target; X11 and other compositors are out of scope for the first release.
 - No screen capture, plugin engine, or main GUI runtime is left running when only the tray is idle.
-- **Theme plugin packages must install, reload, preview, edit, and export without recompiling, modifying, or reinstalling Colorboard.** A standard plugin needs no executable plugin code.
+- **Theme plugin packages must install, reload, preview, edit, and export without recompiling, modifying, or reinstalling Swatch Board.** A standard plugin needs no executable plugin code.
 - Preserve a low resident memory footprint. Measure actual USS/PSS and idle CPU; do not declare invented memory budgets as achieved benchmarks.
 - Any unmet mandatory criterion blocks the relevant phase and subsequent phases, rather than being relabeled an optional enhancement.
 
@@ -133,21 +146,21 @@ Crate names are **candidates, not promised API compatibility**. During each phas
 Plasma tray
    |
    v
-colorboard-tray [RUST, ALWAYS RESIDENT]
+swatch-board-tray [RUST, ALWAYS RESIDENT]
   ksni + zbus + configuration cache + history service + clipboard ownership
    |
-   +--- on demand ---> colorboard-picker [RUST]
+   +--- on demand ---> swatch-board-picker [RUST]
    |                       ScreenCast + PipeWire + SPA cursor metadata
    |                       Rust Wayland pixel-grid overlay
    |                       existing KWin ColorPicker.pick() D-Bus
    |
-   +--- on demand ---> colorboard-history [RUST]
+   +--- on demand ---> swatch-board-history [RUST]
    |                       centered, scrollable transient swatch UI
    |
-   +--- on demand ---> colorboard-config [RUST]
+   +--- on demand ---> swatch-board-config [RUST]
    |                       eframe/egui settings; exits on close
    |
-   +--- on demand ---> colorboard [RUST]
+   +--- on demand ---> swatch-board [RUST]
                            eframe/egui Board; exits on close
                            Mixer | Palette Editor | Theme Generator
                            external plugin loader initialized here only
@@ -215,7 +228,7 @@ KWin ScreenCast supports PipeWire cursor metadata. Under the ScreenCast portal, 
 
 ### 4.3 Rust-only failure policy
 
-A custom KWin QML/JavaScript effect is **not** a prescribed fallback. A native C++ KWin effect is **prohibited by the Rust-only implementation decision**. Existing KWin services remain external dependencies, not code shipped by Colorboard.
+A custom KWin QML/JavaScript effect is **not** a prescribed fallback. A native C++ KWin effect is **prohibited by the Rust-only implementation decision**. Existing KWin services remain external dependencies, not code shipped by Swatch Board.
 
 If a gate fails:
 
@@ -233,28 +246,28 @@ The hard gate is deliberate; it prevents building later phases on a picker that 
 
 Provide separate reusable crates for:
 
-- `colorboard-color`: canonical sRGB/RGBA types, parsing, formatters, perceptual conversion, blending, palette harmony and contrast logic.
-- `colorboard-model`: history entry, palette, palette swatch/link/lock, theme project, role assignment, preview state, plugin manifest types.
-- `colorboard-storage`: SQLite schema, migrations, transactions, typed repositories and data integrity.
-- `colorboard-config-core`: XDG paths, versioned `config.toml`, validation, schema migration for settings, shortcut preferences.
-- `colorboard-ipc`: versioned session D-Bus interface, events, typed errors, async Rust clients.
-- `colorboard-theme-core`: plugin loader/schema validation, scene graph, semantic roles, MiniJinja export pipeline.
+- `swatch-board-color`: canonical sRGB/RGBA types, parsing, formatters, perceptual conversion, blending, palette harmony and contrast logic.
+- `swatch-board-model`: history entry, palette, palette swatch/link/lock, theme project, role assignment, preview state, plugin manifest types.
+- `swatch-board-storage`: SQLite schema, migrations, transactions, typed repositories and data integrity.
+- `swatch-board-config-core`: XDG paths, versioned `config.toml`, validation, schema migration for settings, shortcut preferences.
+- `swatch-board-ipc`: versioned session D-Bus interface, events, typed errors, async Rust clients.
+- `swatch-board-theme-core`: plugin loader/schema validation, scene graph, semantic roles, MiniJinja export pipeline.
 
 These are Rust library crates, not always-running processes. Link the smallest subset into each binary; minimize tray dependencies.
 
 ### 5.2 XDG paths
 
-- Config: `${XDG_CONFIG_HOME:-$HOME/.config}/colorboard/config.toml`
-- Data: `${XDG_DATA_HOME:-$HOME/.local/share}/colorboard/library.sqlite3`
-- Saved project/export metadata: `${XDG_DATA_HOME:-$HOME/.local/share}/colorboard/themes/`
-- User plugin installation: `${XDG_DATA_HOME:-$HOME/.local/share}/colorboard/plugins/`
-- System plugin installation: each `${XDG_DATA_DIRS}` entry followed by `/colorboard/plugins/`
+- Config: `${XDG_CONFIG_HOME:-$HOME/.config}/swatch-board/config.toml`
+- Data: `${XDG_DATA_HOME:-$HOME/.local/share}/swatch-board/library.sqlite3`
+- Saved project/export metadata: `${XDG_DATA_HOME:-$HOME/.local/share}/swatch-board/themes/`
+- User plugin installation: `${XDG_DATA_HOME:-$HOME/.local/share}/swatch-board/plugins/`
+- System plugin installation: each `${XDG_DATA_DIRS}` entry followed by `/swatch-board/plugins/`
 
 Resolve XDG directories properly. Do not literally expand `${HOME}`/`~` inside a stored path string. Respect user-specific directory permissions.
 
 ### 5.3 SQLite ownership and migrations
 
-- **All schema creation and migrations live in `colorboard-storage` (Rust)**. Every executable invokes the same migration/check library at startup as needed. A one-shot `colorboard-db migrate/check` CLI is optional but recommended for troubleshooting; it must use the exact same Rust migration code.
+- **All schema creation and migrations live in `swatch-board-storage` (Rust)**. Every executable invokes the same migration/check library at startup as needed. A one-shot `swatch-board-db migrate/check` CLI is optional but recommended for troubleshooting; it must use the exact same Rust migration code.
 - The database can be opened by tray and Board independently; neither depends on the other being running.
 - Use WAL mode, `busy_timeout`, foreign-key enforcement, short transactions, versioned migrations, and clear `SQLITE_BUSY`/incompatible-schema errors. Make destructive migrations reversible through backups where feasible.
 - Store capture history, saved palettes, draft/generation history, and theme projects as separate logical entities. Design appropriate indexes before large data growth.
@@ -317,7 +330,7 @@ Tasks:
 
 ### Phase 1B — Minimal Rust tray and orchestration
 
-- Implement single-instance `colorboard-tray` using `ksni` and `zbus`.
+- Implement single-instance `swatch-board-tray` using `ksni` and `zbus`.
 - Pipette plus last-color indicator rendered as an appropriate tray pixmap; account for multiple sizes/themes.
 - Left-click pick; right-click exact specified menu.
 - Start transient picker asynchronously, enforce one pick at a time, surface errors without blocking tray events.
@@ -346,7 +359,7 @@ Tasks:
 
 ### Phase 1E — Rust settings, global shortcuts, startup, packaging
 
-- Implement `colorboard-config` as a **transient Rust egui** settings utility. No dependence on the unfinished main Board.
+- Implement `swatch-board-config` as a **transient Rust egui** settings utility. No dependence on the unfinished main Board.
 - Settings cover all choices in §2.4 and validate min/max/geometry/format values. Persist through typed TOML settings and notify tray.
 - Implement XDG GlobalShortcuts through `ashpd` where supported, with explicit KDE system shortcut fallback only if needed; never rely on X11 global key hooks. Handle permission/conflict/revocation and user reassignment.
 - Add session autostart via a single selected desktop-file/systemd-user path to avoid duplicates.
@@ -358,7 +371,7 @@ Tasks:
 
 ### Phase 2 — On-demand Rust Board application shell
 
-- Create a standalone `colorboard` binary using `eframe/egui`; it must start with or without the tray present.
+- Create a standalone `swatch-board` binary using `eframe/egui`; it must start with or without the tray present.
 - Create three tabs in this order: **Color Mixer**, **Palette Editor**, **Theme Generator**. Only the shell and shared layout are implemented in this phase.
 - Add a scrollable horizontal color-history strip visible in **every tab**.
 - Read history and settings through shared Rust crates; subscribe to D-Bus changes while the Board is open, with database refresh on reconnect.
@@ -396,7 +409,7 @@ Tasks:
 - Saved palette history, search/list, distinct draft generation history, and re-openable saved palettes.
 - Select active palette for Color Mixer and Theme Generator. Palette updates propagate to any linked theme roles according to a documented override policy.
 
-**Storage:** Add appropriate palette/generation migrations to `colorboard-storage`, used automatically by every executable. The Board is still the only process initializing the palette editor GUI.
+**Storage:** Add appropriate palette/generation migrations to `swatch-board-storage`, used automatically by every executable. The Board is still the only process initializing the palette editor GUI.
 
 **Gate:** Create, generate, lock, regenerate, edit, save, reopen, and select a palette; both mixer and theme-tab context can reference that palette.
 
@@ -476,7 +489,7 @@ Implement each as an installable **data-only plugin package** (where possible) r
 2. **Zed** — editor, tabs, sidebar, panes, status bar, borders, text/syntax roles, inactive views, menus/dialogs; export versioned JSON theme files.
 3. **KDE `.colors`** — window/view/button/selection/tooltip, enabled/inactive/disabled sets and representative controls; export a valid KDE color-scheme INI-style file. Test target KDE semantics against documented configuration format; don't pretend an egui mock is literally a running KDE widget.
 
-**Phase 5 hard gate:** A **new fixture plugin authored after Colorboard is built** can be placed into the user plugins directory, discovered by Reload Plugins, rendered with the shared scene renderer, interacted with (including opening a hidden submenu), assigned colors by drag/drop, edited, saved, and exported with its MiniJinja template **without modifying or rebuilding any Rust source**. Ghostty, Zed, and KDE plugins should satisfy the same data-package contract.
+**Phase 5 hard gate:** A **new fixture plugin authored after Swatch Board is built** can be placed into the user plugins directory, discovered by Reload Plugins, rendered with the shared scene renderer, interacted with (including opening a hidden submenu), assigned colors by drag/drop, edited, saved, and exported with its MiniJinja template **without modifying or rebuilding any Rust source**. Ghostty, Zed, and KDE plugins should satisfy the same data-package contract.
 
 ### Phase 6 — Packaging, documentation, and hardening
 
@@ -492,25 +505,25 @@ Implement each as an installable **data-only plugin package** (where possible) r
 ## 7. Cargo workspace and repository layout
 
 ```text
-colorboard/
+swatch-board/
 ├── Cargo.toml                       # one workspace / one Cargo.lock
 ├── Cargo.lock
 ├── crates/
-│   ├── colorboard-color/             # typed colors, conversions, harmony, formatters
-│   ├── colorboard-model/             # history/palette/theme/plugin data structures
-│   ├── colorboard-storage/           # sqlite, schema migrations, repositories
-│   ├── colorboard-config-core/       # XDG settings, defaults, validation
-│   ├── colorboard-ipc/               # D-Bus service/proxy contract
-│   ├── colorboard-picker-core/       # portal, PipeWire, cursor, magnifier core
-│   ├── colorboard-wayland-ui/        # small transient overlay/popup drawing
-│   ├── colorboard-theme-core/        # scene graph, plugin load, MiniJinja export
-│   └── colorboard-ui-common/         # reusable egui controls, Board/config only
+│   ├── swatch-board-color/             # typed colors, conversions, harmony, formatters
+│   ├── swatch-board-model/             # history/palette/theme/plugin data structures
+│   ├── swatch-board-storage/           # sqlite, schema migrations, repositories
+│   ├── swatch-board-config-core/       # XDG settings, defaults, validation
+│   ├── swatch-board-ipc/               # D-Bus service/proxy contract
+│   ├── swatch-board-picker-core/       # portal, PipeWire, cursor, magnifier core
+│   ├── swatch-board-wayland-ui/        # small transient overlay/popup drawing
+│   ├── swatch-board-theme-core/        # scene graph, plugin load, MiniJinja export
+│   └── swatch-board-ui-common/         # reusable egui controls, Board/config only
 ├── apps/
-│   ├── tray/                         # colorboard-tray, ALWAYS RESIDENT
-│   ├── picker/                       # colorboard-picker, transient
-│   ├── history/                      # colorboard-history, transient
-│   ├── config/                       # colorboard-config, transient egui
-│   ├── board/                        # colorboard, transient egui
+│   ├── tray/                         # swatch-board-tray, ALWAYS RESIDENT
+│   ├── picker/                       # swatch-board-picker, transient
+│   ├── history/                      # swatch-board-history, transient
+│   ├── config/                       # swatch-board-config, transient egui
+│   ├── board/                        # swatch-board, transient egui
 │   │   ├── src/mixer/
 │   │   ├── src/palettes/
 │   │   └── src/themes/
@@ -555,7 +568,7 @@ Crates may be consolidated when separation creates boilerplate without clear reu
 4. **No presumed compositor APIs:** Read current KWin/portal/Wayland/Rust binding signatures. Treat independent API support as distinct from demonstrated joint behavior.
 5. **No resident heavyweight GUI:** `eframe`, preview rendering, MiniJinja/Rhai, and screen capture must stay outside the idle tray lifetime.
 6. **One canonical data model:** Reuse typed Rust data structures for D-Bus serialization and SQLite mapping; don't create divergent application-specific color representations.
-7. **Storage migrations:** Only `colorboard-storage` performs SQLite migrations. Test fresh installs, independent Board startup, rollback/error handling, and concurrent access.
+7. **Storage migrations:** Only `swatch-board-storage` performs SQLite migrations. Test fresh installs, independent Board startup, rollback/error handling, and concurrent access.
 8. **External plugins:** A fixture plugin newly installed after compilation must pass discover → reload → preview → interact → edit → save → export with no rebuild. Reject untrusted files/syntax safely.
 9. **Tests:** Use rustfmt, Clippy, cargo unit/integration/property tests where useful, snapshot/rendering tests for scenes, and golden-file tests for exports. Real KDE Wayland manual acceptance is required in addition to headless tests.
 10. **No invented performance claims:** Benchmark idle PSS/USS, CPU, startup, per-pick capture memory, and transient process cleanup. Optimize proven hotspots.
@@ -584,4 +597,4 @@ The initial language/runtime decision is settled. Changes require documented use
 
 ## 10. Immediate copy/paste kickoff task for an implementation agent
 
-> Implement **Phase 1A ONLY** of `docs/implementation-plan.md`, Revision 2.0. The application must be written entirely in **Rust**, targeting **KDE Plasma 6 Wayland**. Build a **real live pixel-accurate magnifier** using the XDG ScreenCast portal, PipeWire frames, and `SPA_META_Cursor` metadata (request `cursor_mode=4` if supported), with a Rust-rendered Wayland layer-shell surface that has **no keyboard interactivity and an empty pointer input region**. Track source pixels correctly across fractional scaling, multiple monitors, negative geometry, and transforms. Once the magnifier is displaying live source pixels, call the existing KWin `org.kde.kwin.ColorPicker.pick()` D-Bus method asynchronously for final selection and cancel. Verify that the center highlighted pixel matches KWin's selected pixel, the overlay never steals keyboard focus, clicks do not reach underlying windows, the magnifier does not recursively capture itself, moving content is live, permissions behave correctly, and all capture/overlay resources shut down cleanly. Tests must include actual observations from a **real Plasma Wayland session**; passing mocks alone is not sufficient. Do **not** implement tray, history, Board, or theme plugins yet. Do **not** introduce Python, C++, a custom QML effect, or a frozen/single-pixel fallback. If a mandatory criterion is impossible under available Rust-facing interfaces, stop with a reproducible blocker report and an explicit decision request. Record versions, build/test results, outstanding limitations, and the next task.
+> Implement **Phase 1A ONLY** of `swatch-board-agent-implementation-plan.md`, Revision 5.0. The application must be written entirely in **Rust**, targeting **KDE Plasma 6 Wayland**. Build a **real live pixel-accurate magnifier** using the XDG ScreenCast portal, PipeWire frames, and `SPA_META_Cursor` metadata (request `cursor_mode=4` if supported), with a Rust-rendered Wayland layer-shell surface that has **no keyboard interactivity and an empty pointer input region**. Track source pixels correctly across fractional scaling, multiple monitors, negative geometry, and transforms. Once the magnifier is displaying live source pixels, call the existing KWin `org.kde.kwin.ColorPicker.pick()` D-Bus method asynchronously for final selection and cancel. Verify that the center highlighted pixel matches KWin's selected pixel, the overlay never steals keyboard focus, clicks do not reach underlying windows, the magnifier does not recursively capture itself, moving content is live, permissions behave correctly, and all capture/overlay resources shut down cleanly. Tests must include actual observations from a **real Plasma Wayland session**; passing mocks alone is not sufficient. Do **not** implement tray, history, Board, or theme plugins yet. Do **not** introduce Python, C++, a custom QML effect, or a frozen/single-pixel fallback. If a mandatory criterion is impossible under available Rust-facing interfaces, stop with a reproducible blocker report and an explicit decision request. Record versions, build/test results, outstanding limitations, and the next task.

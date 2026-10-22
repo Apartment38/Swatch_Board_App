@@ -1,0 +1,31 @@
+{
+  "case": "integrated_left_with_self_occlusion",
+  "stdout": "#FFFFFF",
+  "old_lens_pixel": [
+    0,
+    0,
+    255
+  ],
+  "uncovered_target_pixel": [
+    255,
+    255,
+    255
+  ],
+  "baseline_counts": {
+    "presses": 1,
+    "releases": 1,
+    "keyboard_enters": 2,
+    "keyboard_leaves": 1
+  },
+  "final_counts": {
+    "presses": 1,
+    "releases": 1,
+    "keyboard_enters": 2,
+    "keyboard_leaves": 1
+  },
+  "hide_receipt_cutoff_ns": 132973462491442,
+  "fresh_video_pts_ns": 132973544681058,
+  "shortcut_closed": true,
+  "capture_closed": true,
+  "gate": "partial_not_phase1a"
+}

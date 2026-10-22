@@ -326,23 +326,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "colorboard-picker"
-version = "0.1.0"
-dependencies = [
- "ashpd",
- "colorboard-picker-core",
- "pipewire",
- "smithay-client-toolkit",
- "tokio",
- "wayland-client",
- "zbus",
-]
-
-[[package]]
-name = "colorboard-picker-core"
-version = "0.1.0"
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -998,6 +981,27 @@ dependencies = [
  "libc",
  "windows-sys",
 ]
+
+[[package]]
+name = "swatch-board-picker"
+version = "0.1.0"
+dependencies = [
+ "ashpd",
+ "futures-util",
+ "libc",
+ "pipewire",
+ "smithay-client-toolkit",
+ "swatch-board-picker-core",
+ "tokio",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-scanner",
+ "zbus",
+]
+
+[[package]]
+name = "swatch-board-picker-core"
+version = "0.1.0"
 
 [[package]]
 name = "syn"

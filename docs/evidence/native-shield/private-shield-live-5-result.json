@@ -1,0 +1,29 @@
+{
+  "probe_exit": 0,
+  "origin": [
+    62.0,
+    77.0
+  ],
+  "baseline": "EVENT n=6 unix_ms=1792602687146 elapsed_ms=870 button_release code=272 local_x=738.000 local_y=423.000 focused=true presses=1 releases=1 motions=0 keyboard_enters=1 keyboard_leaves=0",
+  "fixture_final_events": [
+    "EVENT n=1 unix_ms=1792602686278 elapsed_ms=2 configure size=900x650 state=WindowState(0x0) focused=false presses=0 releases=0 motions=0 keyboard_enters=0 keyboard_leaves=0",
+    "EVENT n=2 unix_ms=1792602686280 elapsed_ms=4 keyboard_enter focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0",
+    "EVENT n=3 unix_ms=1792602686281 elapsed_ms=4 configure size=900x650 state=WindowState(ACTIVATED) focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0",
+    "EVENT n=4 unix_ms=1792602686979 elapsed_ms=703 pointer_enter local_x=738.000 local_y=423.000 focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0",
+    "EVENT n=5 unix_ms=1792602687085 elapsed_ms=809 button_press code=272 local_x=738.000 local_y=423.000 focused=true presses=1 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0",
+    "EVENT n=6 unix_ms=1792602687146 elapsed_ms=870 button_release code=272 local_x=738.000 local_y=423.000 focused=true presses=1 releases=1 motions=0 keyboard_enters=1 keyboard_leaves=0",
+    "EVENT n=7 unix_ms=1792602687252 elapsed_ms=976 motion local_x=450.000 local_y=150.000 focused=true presses=1 releases=1 motions=1 keyboard_enters=1 keyboard_leaves=0",
+    "EVENT n=8 unix_ms=1792602689277 elapsed_ms=3001 pointer_leave local_x=450.000 local_y=150.000 focused=true presses=1 releases=1 motions=1 keyboard_enters=1 keyboard_leaves=0",
+    "EVENT n=9 unix_ms=1792602690662 elapsed_ms=4386 pointer_enter local_x=450.000 local_y=150.000 focused=true presses=1 releases=1 motions=1 keyboard_enters=1 keyboard_leaves=0"
+  ],
+  "selected_left_release": true,
+  "cursor_set": true,
+  "frame_callback_events": 1,
+  "cursor_presented_events": 0,
+  "offset40_sample_count": 8,
+  "offset40_blue_count": 8,
+  "cleanup_reported": true,
+  "session_closed": true,
+  "fixture_press_count": "1",
+  "fixture_release_count": "1"
+}

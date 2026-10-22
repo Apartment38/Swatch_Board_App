@@ -1,0 +1,301 @@
+FIXTURE start unix_ms=1792547992251 title='Swatch Board Phase 1A Fixture' app_id=swatch-board-phase1a-fixture desired=900x650 opaque=true buffer_scale=1
+LAYOUT surface-local logical coordinates, half-open bounds; global origin must be measured externally (decorations excluded)
+TARGET red rect=[40,40,204,260) center=(122,150) argb=FFFF0000
+TARGET green rect=[204,40,368,260) center=(286,150) argb=FF00FF00
+TARGET blue rect=[368,40,532,260) center=(450,150) argb=FF0000FF
+TARGET white rect=[532,40,696,260) center=(614,150) argb=FFFFFFFF
+TARGET black rect=[696,40,860,260) center=(778,150) argb=FF000000
+TARGET checker rect=[40,320,440,600) cell=20 white_center=(50,330) black_center=(70,330)
+TARGET animation rect=[500,320,860,600) center=(680,460) cyan=FF00FFFF magenta=FFFF00FF alternates_every_ms=250
+EVENT n=1 unix_ms=1792547992255 elapsed_ms=4 output_scale=2 buffer_scale_remains=1 focused=false presses=0 releases=0 motions=0 keyboard_enters=0 keyboard_leaves=0
+EVENT n=2 unix_ms=1792547992255 elapsed_ms=4 configure size=900x650 state=WindowState(0x0) focused=false presses=0 releases=0 motions=0 keyboard_enters=0 keyboard_leaves=0
+REDRAW commit=1 unix_ms=1792547992259 elapsed_ms=8 size=900x650 animation_argb=FF00FFFF focused=false
+EVENT n=3 unix_ms=1792547992263 elapsed_ms=11 keyboard_enter focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0
+EVENT n=4 unix_ms=1792547992263 elapsed_ms=11 configure size=900x650 state=WindowState(ACTIVATED) focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=2 unix_ms=1792547992269 elapsed_ms=17 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792547992269 compositor_ms=46173350 latest_commit=2
+FRAME_CALLBACK unix_ms=1792547992286 compositor_ms=46173367 latest_commit=2
+EVENT n=5 unix_ms=1792547992485 elapsed_ms=234 pointer_enter local_x=716.621 local_y=646.445 focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0
+EVENT n=6 unix_ms=1792547992491 elapsed_ms=240 motion local_x=728.695 local_y=638.898 focused=true presses=0 releases=0 motions=1 keyboard_enters=1 keyboard_leaves=0
+EVENT n=7 unix_ms=1792547992498 elapsed_ms=247 motion local_x=741.914 local_y=630.887 focused=true presses=0 releases=0 motions=2 keyboard_enters=1 keyboard_leaves=0
+EVENT n=8 unix_ms=1792547992505 elapsed_ms=254 motion local_x=755.664 local_y=622.801 focused=true presses=0 releases=0 motions=3 keyboard_enters=1 keyboard_leaves=0
+EVENT n=9 unix_ms=1792547992512 elapsed_ms=261 motion local_x=768.414 local_y=615.625 focused=true presses=0 releases=0 motions=4 keyboard_enters=1 keyboard_leaves=0
+EVENT n=10 unix_ms=1792547992519 elapsed_ms=268 motion local_x=779.465 local_y=609.148 focused=true presses=0 releases=0 motions=5 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=3 unix_ms=1792547992523 elapsed_ms=272 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792547992528 compositor_ms=46173617 latest_commit=3
+EVENT n=11 unix_ms=1792547992528 elapsed_ms=277 motion local_x=788.418 local_y=603.418 focused=true presses=0 releases=0 motions=6 keyboard_enters=1 keyboard_leaves=0
+EVENT n=12 unix_ms=1792547992533 elapsed_ms=281 motion local_x=795.914 local_y=598.648 focused=true presses=0 releases=0 motions=7 keyboard_enters=1 keyboard_leaves=0
+EVENT n=13 unix_ms=1792547992540 elapsed_ms=289 motion local_x=803.379 local_y=593.898 focused=true presses=0 releases=0 motions=8 keyboard_enters=1 keyboard_leaves=0
+EVENT n=14 unix_ms=1792547992547 elapsed_ms=295 motion local_x=810.168 local_y=589.484 focused=true presses=0 releases=0 motions=9 keyboard_enters=1 keyboard_leaves=0
+EVENT n=15 unix_ms=1792547992554 elapsed_ms=302 motion local_x=816.957 local_y=585.414 focused=true presses=0 releases=0 motions=10 keyboard_enters=1 keyboard_leaves=0
+EVENT n=16 unix_ms=1792547992561 elapsed_ms=310 motion local_x=823.406 local_y=581.680 focused=true presses=0 releases=0 motions=11 keyboard_enters=1 keyboard_leaves=0
+EVENT n=17 unix_ms=1792547992569 elapsed_ms=318 motion local_x=828.836 local_y=578.285 focused=true presses=0 releases=0 motions=12 keyboard_enters=1 keyboard_leaves=0
+EVENT n=18 unix_ms=1792547992574 elapsed_ms=323 motion local_x=833.586 local_y=575.570 focused=true presses=0 releases=0 motions=13 keyboard_enters=1 keyboard_leaves=0
+EVENT n=19 unix_ms=1792547992581 elapsed_ms=330 motion local_x=837.660 local_y=573.191 focused=true presses=0 releases=0 motions=14 keyboard_enters=1 keyboard_leaves=0
+EVENT n=20 unix_ms=1792547992588 elapsed_ms=337 motion local_x=841.055 local_y=571.156 focused=true presses=0 releases=0 motions=15 keyboard_enters=1 keyboard_leaves=0
+EVENT n=21 unix_ms=1792547992595 elapsed_ms=344 motion local_x=843.770 local_y=569.801 focused=true presses=0 releases=0 motions=16 keyboard_enters=1 keyboard_leaves=0
+EVENT n=22 unix_ms=1792547992602 elapsed_ms=351 motion local_x=846.145 local_y=568.781 focused=true presses=0 releases=0 motions=17 keyboard_enters=1 keyboard_leaves=0
+EVENT n=23 unix_ms=1792547992609 elapsed_ms=357 motion local_x=848.523 local_y=567.762 focused=true presses=0 releases=0 motions=18 keyboard_enters=1 keyboard_leaves=0
+EVENT n=24 unix_ms=1792547992616 elapsed_ms=364 motion local_x=850.219 local_y=567.082 focused=true presses=0 releases=0 motions=19 keyboard_enters=1 keyboard_leaves=0
+EVENT n=25 unix_ms=1792547992623 elapsed_ms=371 motion local_x=851.578 local_y=566.746 focused=true presses=0 releases=0 motions=20 keyboard_enters=1 keyboard_leaves=0
+EVENT n=26 unix_ms=1792547992630 elapsed_ms=378 motion local_x=852.934 local_y=566.406 focused=true presses=0 releases=0 motions=21 keyboard_enters=1 keyboard_leaves=0
+EVENT n=27 unix_ms=1792547992637 elapsed_ms=385 motion local_x=853.953 local_y=566.066 focused=true presses=0 releases=0 motions=22 keyboard_enters=1 keyboard_leaves=0
+EVENT n=28 unix_ms=1792547992644 elapsed_ms=393 motion local_x=854.973 local_y=565.727 focused=true presses=0 releases=0 motions=23 keyboard_enters=1 keyboard_leaves=0
+EVENT n=29 unix_ms=1792547992651 elapsed_ms=399 motion local_x=855.648 local_y=565.387 focused=true presses=0 releases=0 motions=24 keyboard_enters=1 keyboard_leaves=0
+EVENT n=30 unix_ms=1792547992658 elapsed_ms=406 motion local_x=856.328 local_y=565.047 focused=true presses=0 releases=0 motions=25 keyboard_enters=1 keyboard_leaves=0
+EVENT n=31 unix_ms=1792547992665 elapsed_ms=413 motion local_x=857.008 local_y=564.707 focused=true presses=0 releases=0 motions=26 keyboard_enters=1 keyboard_leaves=0
+EVENT n=32 unix_ms=1792547992672 elapsed_ms=420 motion local_x=858.027 local_y=564.367 focused=true presses=0 releases=0 motions=27 keyboard_enters=1 keyboard_leaves=0
+EVENT n=33 unix_ms=1792547992679 elapsed_ms=427 motion local_x=859.383 local_y=563.691 focused=true presses=0 releases=0 motions=28 keyboard_enters=1 keyboard_leaves=0
+EVENT n=34 unix_ms=1792547992686 elapsed_ms=435 motion local_x=860.742 local_y=562.672 focused=true presses=0 releases=0 motions=29 keyboard_enters=1 keyboard_leaves=0
+EVENT n=35 unix_ms=1792547992694 elapsed_ms=443 motion local_x=862.438 local_y=561.652 focused=true presses=0 releases=0 motions=30 keyboard_enters=1 keyboard_leaves=0
+EVENT n=36 unix_ms=1792547992699 elapsed_ms=448 motion local_x=864.473 local_y=560.297 focused=true presses=0 releases=0 motions=31 keyboard_enters=1 keyboard_leaves=0
+EVENT n=37 unix_ms=1792547992706 elapsed_ms=455 motion local_x=867.191 local_y=558.598 focused=true presses=0 releases=0 motions=32 keyboard_enters=1 keyboard_leaves=0
+EVENT n=38 unix_ms=1792547992713 elapsed_ms=462 motion local_x=870.582 local_y=556.562 focused=true presses=0 releases=0 motions=33 keyboard_enters=1 keyboard_leaves=0
+EVENT n=39 unix_ms=1792547992720 elapsed_ms=469 motion local_x=874.316 local_y=554.188 focused=true presses=0 releases=0 motions=34 keyboard_enters=1 keyboard_leaves=0
+EVENT n=40 unix_ms=1792547992728 elapsed_ms=476 motion local_x=879.070 local_y=551.473 focused=true presses=0 releases=0 motions=35 keyboard_enters=1 keyboard_leaves=0
+EVENT n=41 unix_ms=1792547992734 elapsed_ms=483 motion local_x=884.160 local_y=548.414 focused=true presses=0 releases=0 motions=36 keyboard_enters=1 keyboard_leaves=0
+EVENT n=42 unix_ms=1792547992741 elapsed_ms=489 motion local_x=890.270 local_y=545.023 focused=true presses=0 releases=0 motions=37 keyboard_enters=1 keyboard_leaves=0
+EVENT n=43 unix_ms=1792547992748 elapsed_ms=496 motion local_x=897.738 local_y=541.289 focused=true presses=0 releases=0 motions=38 keyboard_enters=1 keyboard_leaves=0
+EVENT n=44 unix_ms=1792547992755 elapsed_ms=504 pointer_leave local_x=897.738 local_y=541.289 focused=true presses=0 releases=0 motions=38 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=4 unix_ms=1792547992789 elapsed_ms=537 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792547992794 compositor_ms=46173884 latest_commit=4
+EVENT n=45 unix_ms=1792547992953 elapsed_ms=702 pointer_enter local_x=428.000 local_y=312.430 focused=true presses=0 releases=0 motions=38 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=5 unix_ms=1792547993052 elapsed_ms=801 size=900x650 animation_argb=FFFF00FF focused=true
+EVENT n=46 unix_ms=1792547993056 elapsed_ms=805 button_press code=272 local_x=428.000 local_y=312.430 focused=true presses=1 releases=0 motions=38 keyboard_enters=1 keyboard_leaves=0
+FRAME_CALLBACK unix_ms=1792547993061 compositor_ms=46174150 latest_commit=5
+EVENT n=47 unix_ms=1792547993117 elapsed_ms=866 button_release code=272 local_x=428.000 local_y=312.430 focused=true presses=1 releases=1 motions=38 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=6 unix_ms=1792547993314 elapsed_ms=1063 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792547993320 compositor_ms=46174409 latest_commit=6
+EVENT n=48 unix_ms=1792547993441 elapsed_ms=1190 motion local_x=428.918 local_y=312.121 focused=true presses=1 releases=1 motions=39 keyboard_enters=1 keyboard_leaves=0
+EVENT n=49 unix_ms=1792547993448 elapsed_ms=1196 motion local_x=429.840 local_y=311.816 focused=true presses=1 releases=1 motions=40 keyboard_enters=1 keyboard_leaves=0
+EVENT n=50 unix_ms=1792547993455 elapsed_ms=1204 motion local_x=430.859 local_y=311.477 focused=true presses=1 releases=1 motions=41 keyboard_enters=1 keyboard_leaves=0
+EVENT n=51 unix_ms=1792547993462 elapsed_ms=1210 motion local_x=431.875 local_y=311.137 focused=true presses=1 releases=1 motions=42 keyboard_enters=1 keyboard_leaves=0
+EVENT n=52 unix_ms=1792547993470 elapsed_ms=1219 motion local_x=433.234 local_y=310.457 focused=true presses=1 releases=1 motions=43 keyboard_enters=1 keyboard_leaves=0
+EVENT n=53 unix_ms=1792547993475 elapsed_ms=1224 motion local_x=434.590 local_y=309.777 focused=true presses=1 releases=1 motions=44 keyboard_enters=1 keyboard_leaves=0
+EVENT n=54 unix_ms=1792547993482 elapsed_ms=1231 motion local_x=435.949 local_y=309.102 focused=true presses=1 releases=1 motions=45 keyboard_enters=1 keyboard_leaves=0
+EVENT n=55 unix_ms=1792547993489 elapsed_ms=1238 motion local_x=437.305 local_y=308.762 focused=true presses=1 releases=1 motions=46 keyboard_enters=1 keyboard_leaves=0
+EVENT n=56 unix_ms=1792547993496 elapsed_ms=1245 motion local_x=438.664 local_y=308.082 focused=true presses=1 releases=1 motions=47 keyboard_enters=1 keyboard_leaves=0
+EVENT n=57 unix_ms=1792547993503 elapsed_ms=1252 motion local_x=440.359 local_y=307.402 focused=true presses=1 releases=1 motions=48 keyboard_enters=1 keyboard_leaves=0
+EVENT n=58 unix_ms=1792547993511 elapsed_ms=1260 motion local_x=442.059 local_y=306.723 focused=true presses=1 releases=1 motions=49 keyboard_enters=1 keyboard_leaves=0
+EVENT n=59 unix_ms=1792547993517 elapsed_ms=1266 motion local_x=443.754 local_y=306.047 focused=true presses=1 releases=1 motions=50 keyboard_enters=1 keyboard_leaves=0
+EVENT n=60 unix_ms=1792547993524 elapsed_ms=1273 motion local_x=445.453 local_y=305.367 focused=true presses=1 releases=1 motions=51 keyboard_enters=1 keyboard_leaves=0
+EVENT n=61 unix_ms=1792547993531 elapsed_ms=1280 motion local_x=447.148 local_y=304.688 focused=true presses=1 releases=1 motions=52 keyboard_enters=1 keyboard_leaves=0
+EVENT n=62 unix_ms=1792547993538 elapsed_ms=1287 motion local_x=448.848 local_y=304.008 focused=true presses=1 releases=1 motions=53 keyboard_enters=1 keyboard_leaves=0
+EVENT n=63 unix_ms=1792547993545 elapsed_ms=1294 motion local_x=450.883 local_y=303.328 focused=true presses=1 releases=1 motions=54 keyboard_enters=1 keyboard_leaves=0
+EVENT n=64 unix_ms=1792547993553 elapsed_ms=1301 motion local_x=453.258 local_y=302.652 focused=true presses=1 releases=1 motions=55 keyboard_enters=1 keyboard_leaves=0
+EVENT n=65 unix_ms=1792547993559 elapsed_ms=1307 motion local_x=455.637 local_y=301.973 focused=true presses=1 releases=1 motions=56 keyboard_enters=1 keyboard_leaves=0
+EVENT n=66 unix_ms=1792547993566 elapsed_ms=1314 motion local_x=458.012 local_y=301.293 focused=true presses=1 releases=1 motions=57 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=7 unix_ms=1792547993569 elapsed_ms=1318 size=900x650 animation_argb=FFFF00FF focused=true
+EVENT n=67 unix_ms=1792547993573 elapsed_ms=1322 motion local_x=460.387 local_y=300.613 focused=true presses=1 releases=1 motions=58 keyboard_enters=1 keyboard_leaves=0
+FRAME_CALLBACK unix_ms=1792547993578 compositor_ms=46174667 latest_commit=7
+EVENT n=68 unix_ms=1792547993580 elapsed_ms=1328 motion local_x=462.762 local_y=299.938 focused=true presses=1 releases=1 motions=59 keyboard_enters=1 keyboard_leaves=0
+EVENT n=69 unix_ms=1792547993586 elapsed_ms=1335 motion local_x=464.801 local_y=299.258 focused=true presses=1 releases=1 motions=60 keyboard_enters=1 keyboard_leaves=0
+EVENT n=70 unix_ms=1792547993595 elapsed_ms=1343 motion local_x=466.836 local_y=298.578 focused=true presses=1 releases=1 motions=61 keyboard_enters=1 keyboard_leaves=0
+EVENT n=71 unix_ms=1792547993600 elapsed_ms=1349 motion local_x=468.871 local_y=298.238 focused=true presses=1 releases=1 motions=62 keyboard_enters=1 keyboard_leaves=0
+EVENT n=72 unix_ms=1792547993607 elapsed_ms=1356 motion local_x=471.250 local_y=297.559 focused=true presses=1 releases=1 motions=63 keyboard_enters=1 keyboard_leaves=0
+EVENT n=73 unix_ms=1792547993614 elapsed_ms=1363 motion local_x=473.625 local_y=296.883 focused=true presses=1 releases=1 motions=64 keyboard_enters=1 keyboard_leaves=0
+EVENT n=74 unix_ms=1792547993621 elapsed_ms=1370 motion local_x=476.000 local_y=296.203 focused=true presses=1 releases=1 motions=65 keyboard_enters=1 keyboard_leaves=0
+EVENT n=75 unix_ms=1792547993628 elapsed_ms=1377 motion local_x=478.375 local_y=295.523 focused=true presses=1 releases=1 motions=66 keyboard_enters=1 keyboard_leaves=0
+EVENT n=76 unix_ms=1792547993636 elapsed_ms=1385 motion local_x=481.090 local_y=294.844 focused=true presses=1 releases=1 motions=67 keyboard_enters=1 keyboard_leaves=0
+EVENT n=77 unix_ms=1792547993642 elapsed_ms=1391 motion local_x=484.145 local_y=294.164 focused=true presses=1 releases=1 motions=68 keyboard_enters=1 keyboard_leaves=0
+EVENT n=78 unix_ms=1792547993649 elapsed_ms=1398 motion local_x=487.879 local_y=293.148 focused=true presses=1 releases=1 motions=69 keyboard_enters=1 keyboard_leaves=0
+EVENT n=79 unix_ms=1792547993656 elapsed_ms=1404 motion local_x=492.293 local_y=291.789 focused=true presses=1 releases=1 motions=70 keyboard_enters=1 keyboard_leaves=0
+EVENT n=80 unix_ms=1792547993663 elapsed_ms=1411 motion local_x=496.363 local_y=290.434 focused=true presses=1 releases=1 motions=71 keyboard_enters=1 keyboard_leaves=0
+EVENT n=81 unix_ms=1792547993670 elapsed_ms=1418 motion local_x=500.438 local_y=289.074 focused=true presses=1 releases=1 motions=72 keyboard_enters=1 keyboard_leaves=0
+EVENT n=82 unix_ms=1792547993678 elapsed_ms=1427 motion local_x=504.512 local_y=287.719 focused=true presses=1 releases=1 motions=73 keyboard_enters=1 keyboard_leaves=0
+EVENT n=83 unix_ms=1792547993684 elapsed_ms=1432 motion local_x=508.582 local_y=286.359 focused=true presses=1 releases=1 motions=74 keyboard_enters=1 keyboard_leaves=0
+EVENT n=84 unix_ms=1792547993690 elapsed_ms=1439 motion local_x=512.316 local_y=285.340 focused=true presses=1 releases=1 motions=75 keyboard_enters=1 keyboard_leaves=0
+EVENT n=85 unix_ms=1792547993697 elapsed_ms=1446 motion local_x=515.371 local_y=284.324 focused=true presses=1 releases=1 motions=76 keyboard_enters=1 keyboard_leaves=0
+EVENT n=86 unix_ms=1792547993704 elapsed_ms=1453 motion local_x=518.086 local_y=283.305 focused=true presses=1 releases=1 motions=77 keyboard_enters=1 keyboard_leaves=0
+EVENT n=87 unix_ms=1792547993712 elapsed_ms=1461 motion local_x=520.465 local_y=282.625 focused=true presses=1 releases=1 motions=78 keyboard_enters=1 keyboard_leaves=0
+EVENT n=88 unix_ms=1792547993719 elapsed_ms=1468 motion local_x=522.500 local_y=281.945 focused=true presses=1 releases=1 motions=79 keyboard_enters=1 keyboard_leaves=0
+EVENT n=89 unix_ms=1792547993725 elapsed_ms=1474 motion local_x=524.535 local_y=281.609 focused=true presses=1 releases=1 motions=80 keyboard_enters=1 keyboard_leaves=0
+EVENT n=90 unix_ms=1792547993732 elapsed_ms=1481 motion local_x=526.234 local_y=281.270 focused=true presses=1 releases=1 motions=81 keyboard_enters=1 keyboard_leaves=0
+EVENT n=91 unix_ms=1792547993739 elapsed_ms=1488 motion local_x=528.270 local_y=281.270 focused=true presses=1 releases=1 motions=82 keyboard_enters=1 keyboard_leaves=0
+EVENT n=92 unix_ms=1792547993746 elapsed_ms=1495 motion local_x=529.969 local_y=281.270 focused=true presses=1 releases=1 motions=83 keyboard_enters=1 keyboard_leaves=0
+EVENT n=93 unix_ms=1792547993753 elapsed_ms=1502 motion local_x=532.004 local_y=281.270 focused=true presses=1 releases=1 motions=84 keyboard_enters=1 keyboard_leaves=0
+EVENT n=94 unix_ms=1792547993761 elapsed_ms=1510 motion local_x=534.039 local_y=281.270 focused=true presses=1 releases=1 motions=85 keyboard_enters=1 keyboard_leaves=0
+EVENT n=95 unix_ms=1792547993767 elapsed_ms=1515 motion local_x=536.414 local_y=281.609 focused=true presses=1 releases=1 motions=86 keyboard_enters=1 keyboard_leaves=0
+EVENT n=96 unix_ms=1792547993774 elapsed_ms=1522 motion local_x=538.793 local_y=282.625 focused=true presses=1 releases=1 motions=87 keyboard_enters=1 keyboard_leaves=0
+EVENT n=97 unix_ms=1792547993781 elapsed_ms=1529 motion local_x=541.848 local_y=283.984 focused=true presses=1 releases=1 motions=88 keyboard_enters=1 keyboard_leaves=0
+EVENT n=98 unix_ms=1792547993787 elapsed_ms=1536 motion local_x=545.918 local_y=286.359 focused=true presses=1 releases=1 motions=89 keyboard_enters=1 keyboard_leaves=0
+EVENT n=99 unix_ms=1792547993795 elapsed_ms=1543 motion local_x=551.352 local_y=289.754 focused=true presses=1 releases=1 motions=90 keyboard_enters=1 keyboard_leaves=0
+EVENT n=100 unix_ms=1792547993802 elapsed_ms=1550 motion local_x=557.461 local_y=293.828 focused=true presses=1 releases=1 motions=91 keyboard_enters=1 keyboard_leaves=0
+EVENT n=101 unix_ms=1792547993808 elapsed_ms=1557 motion local_x=566.016 local_y=300.328 focused=true presses=1 releases=1 motions=92 keyboard_enters=1 keyboard_leaves=0
+EVENT n=102 unix_ms=1792547993815 elapsed_ms=1564 motion local_x=578.793 local_y=309.621 focused=true presses=1 releases=1 motions=93 keyboard_enters=1 keyboard_leaves=0
+EVENT n=103 unix_ms=1792547993822 elapsed_ms=1571 motion local_x=595.031 local_y=321.031 focused=true presses=1 releases=1 motions=94 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=8 unix_ms=1792547993824 elapsed_ms=1572 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792547993829 compositor_ms=46174917 latest_commit=8
+EVENT n=104 unix_ms=1792547993829 elapsed_ms=1578 motion local_x=613.516 local_y=333.828 focused=true presses=1 releases=1 motions=95 keyboard_enters=1 keyboard_leaves=0
+EVENT n=105 unix_ms=1792547993836 elapsed_ms=1585 motion local_x=633.375 local_y=347.234 focused=true presses=1 releases=1 motions=96 keyboard_enters=1 keyboard_leaves=0
+EVENT n=106 unix_ms=1792547993843 elapsed_ms=1591 motion local_x=656.008 local_y=361.637 focused=true presses=1 releases=1 motions=97 keyboard_enters=1 keyboard_leaves=0
+EVENT n=107 unix_ms=1792547993850 elapsed_ms=1598 motion local_x=677.137 local_y=375.035 focused=true presses=1 releases=1 motions=98 keyboard_enters=1 keyboard_leaves=0
+EVENT n=108 unix_ms=1792547993857 elapsed_ms=1605 motion local_x=698.000 local_y=389.285 focused=true presses=1 releases=1 motions=99 keyboard_enters=1 keyboard_leaves=0
+EVENT n=109 unix_ms=1792547993864 elapsed_ms=1613 motion local_x=716.551 local_y=402.953 focused=true presses=1 releases=1 motions=100 keyboard_enters=1 keyboard_leaves=0
+EVENT n=110 unix_ms=1792547993871 elapsed_ms=1619 motion local_x=735.297 local_y=418.738 focused=true presses=1 releases=1 motions=101 keyboard_enters=1 keyboard_leaves=0
+EVENT n=111 unix_ms=1792547993878 elapsed_ms=1627 motion local_x=751.738 local_y=431.797 focused=true presses=1 releases=1 motions=102 keyboard_enters=1 keyboard_leaves=0
+EVENT n=112 unix_ms=1792547993886 elapsed_ms=1635 motion local_x=765.324 local_y=441.559 focused=true presses=1 releases=1 motions=103 keyboard_enters=1 keyboard_leaves=0
+EVENT n=113 unix_ms=1792547993892 elapsed_ms=1640 motion local_x=777.707 local_y=452.703 focused=true presses=1 releases=1 motions=104 keyboard_enters=1 keyboard_leaves=0
+EVENT n=114 unix_ms=1792547993899 elapsed_ms=1647 motion local_x=787.215 local_y=462.609 focused=true presses=1 releases=1 motions=105 keyboard_enters=1 keyboard_leaves=0
+EVENT n=115 unix_ms=1792547993905 elapsed_ms=1654 motion local_x=795.422 local_y=471.938 focused=true presses=1 releases=1 motions=106 keyboard_enters=1 keyboard_leaves=0
+EVENT n=116 unix_ms=1792547993912 elapsed_ms=1661 motion local_x=800.594 local_y=477.449 focused=true presses=1 releases=1 motions=107 keyboard_enters=1 keyboard_leaves=0
+EVENT n=117 unix_ms=1792547993920 elapsed_ms=1669 motion local_x=803.648 local_y=480.844 focused=true presses=1 releases=1 motions=108 keyboard_enters=1 keyboard_leaves=0
+EVENT n=118 unix_ms=1792547993928 elapsed_ms=1677 motion local_x=805.684 local_y=483.223 focused=true presses=1 releases=1 motions=109 keyboard_enters=1 keyboard_leaves=0
+EVENT n=119 unix_ms=1792547993933 elapsed_ms=1682 motion local_x=806.703 local_y=484.918 focused=true presses=1 releases=1 motions=110 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=9 unix_ms=1792547994080 elapsed_ms=1828 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792547994086 compositor_ms=46175175 latest_commit=9
+EVENT n=120 unix_ms=1792547994197 elapsed_ms=1945 motion local_x=812.473 local_y=483.223 focused=true presses=1 releases=1 motions=111 keyboard_enters=1 keyboard_leaves=0
+EVENT n=121 unix_ms=1792547994204 elapsed_ms=1952 motion local_x=820.277 local_y=480.844 focused=true presses=1 releases=1 motions=112 keyboard_enters=1 keyboard_leaves=0
+EVENT n=122 unix_ms=1792547994212 elapsed_ms=1961 motion local_x=830.164 local_y=478.117 focused=true presses=1 releases=1 motions=113 keyboard_enters=1 keyboard_leaves=0
+EVENT n=123 unix_ms=1792547994217 elapsed_ms=1966 motion local_x=840.750 local_y=475.297 focused=true presses=1 releases=1 motions=114 keyboard_enters=1 keyboard_leaves=0
+EVENT n=124 unix_ms=1792547994224 elapsed_ms=1973 motion local_x=852.238 local_y=472.422 focused=true presses=1 releases=1 motions=115 keyboard_enters=1 keyboard_leaves=0
+EVENT n=125 unix_ms=1792547994231 elapsed_ms=1980 motion local_x=864.328 local_y=469.859 focused=true presses=1 releases=1 motions=116 keyboard_enters=1 keyboard_leaves=0
+EVENT n=126 unix_ms=1792547994238 elapsed_ms=1987 motion local_x=874.754 local_y=467.703 focused=true presses=1 releases=1 motions=117 keyboard_enters=1 keyboard_leaves=0
+EVENT n=127 unix_ms=1792547994245 elapsed_ms=1994 motion local_x=883.629 local_y=465.996 focused=true presses=1 releases=1 motions=118 keyboard_enters=1 keyboard_leaves=0
+EVENT n=128 unix_ms=1792547994253 elapsed_ms=2002 motion local_x=891.773 local_y=464.297 focused=true presses=1 releases=1 motions=119 keyboard_enters=1 keyboard_leaves=0
+EVENT n=129 unix_ms=1792547994259 elapsed_ms=2008 motion local_x=898.902 local_y=462.941 focused=true presses=1 releases=1 motions=120 keyboard_enters=1 keyboard_leaves=0
+EVENT n=130 unix_ms=1792547994266 elapsed_ms=2015 pointer_leave local_x=898.902 local_y=462.941 focused=true presses=1 releases=1 motions=120 keyboard_enters=1 keyboard_leaves=0
+REDRAW commit=10 unix_ms=1792547994333 elapsed_ms=2082 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792547994338 compositor_ms=46175425 latest_commit=10
+REDRAW commit=11 unix_ms=1792547994598 elapsed_ms=2347 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792547994603 compositor_ms=46175684 latest_commit=11
+REDRAW commit=12 unix_ms=1792547994864 elapsed_ms=2613 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792547994871 compositor_ms=46175950 latest_commit=12
+REDRAW commit=13 unix_ms=1792547995133 elapsed_ms=2881 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792547995137 compositor_ms=46176225 latest_commit=13
+EVENT n=131 unix_ms=1792547995338 elapsed_ms=3087 keyboard_leave focused=false presses=1 releases=1 motions=120 keyboard_enters=1 keyboard_leaves=1
+REDRAW commit=14 unix_ms=1792547995391 elapsed_ms=3140 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792547995395 compositor_ms=46176475 latest_commit=14
+REDRAW commit=15 unix_ms=1792547995656 elapsed_ms=3405 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792547995662 compositor_ms=46176750 latest_commit=15
+REDRAW commit=16 unix_ms=1792547995920 elapsed_ms=3669 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792547995928 compositor_ms=46177009 latest_commit=16
+REDRAW commit=17 unix_ms=1792547996180 elapsed_ms=3929 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792547996187 compositor_ms=46177267 latest_commit=17
+EVENT n=132 unix_ms=1792547996208 elapsed_ms=3956 pointer_enter local_x=507.359 local_y=256.648 focused=false presses=1 releases=1 motions=120 keyboard_enters=1 keyboard_leaves=1
+EVENT n=133 unix_ms=1792547996208 elapsed_ms=3956 keyboard_enter focused=true presses=1 releases=1 motions=120 keyboard_enters=2 keyboard_leaves=1
+EVENT n=134 unix_ms=1792547996319 elapsed_ms=4067 motion local_x=507.359 local_y=256.445 focused=true presses=1 releases=1 motions=121 keyboard_enters=2 keyboard_leaves=1
+EVENT n=135 unix_ms=1792547996330 elapsed_ms=4078 motion local_x=122.000 local_y=149.996 focused=true presses=1 releases=1 motions=122 keyboard_enters=2 keyboard_leaves=1
+EVENT n=136 unix_ms=1792547996355 elapsed_ms=4104 keyboard_leave focused=false presses=1 releases=1 motions=122 keyboard_enters=2 keyboard_leaves=2
+EVENT n=137 unix_ms=1792547996355 elapsed_ms=4104 pointer_leave local_x=122.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=2 keyboard_leaves=2
+REDRAW commit=18 unix_ms=1792547996438 elapsed_ms=4187 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792547996446 compositor_ms=46177525 latest_commit=18
+REDRAW commit=19 unix_ms=1792547996706 elapsed_ms=4455 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792547996713 compositor_ms=46177800 latest_commit=19
+REDRAW commit=20 unix_ms=1792547996972 elapsed_ms=4721 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792547996980 compositor_ms=46178059 latest_commit=20
+EVENT n=138 unix_ms=1792547997204 elapsed_ms=4953 pointer_enter local_x=118.164 local_y=141.660 focused=false presses=1 releases=1 motions=122 keyboard_enters=2 keyboard_leaves=2
+EVENT n=139 unix_ms=1792547997204 elapsed_ms=4953 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=3 keyboard_leaves=2
+REDRAW commit=21 unix_ms=1792547997239 elapsed_ms=4987 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792547997260 compositor_ms=46178325 latest_commit=21
+EVENT n=140 unix_ms=1792547997313 elapsed_ms=5062 keyboard_leave focused=false presses=1 releases=1 motions=122 keyboard_enters=3 keyboard_leaves=3
+EVENT n=141 unix_ms=1792547997313 elapsed_ms=5062 pointer_leave local_x=118.164 local_y=141.660 focused=false presses=1 releases=1 motions=122 keyboard_enters=3 keyboard_leaves=3
+REDRAW commit=22 unix_ms=1792547997505 elapsed_ms=5254 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792547997513 compositor_ms=46178592 latest_commit=22
+REDRAW commit=23 unix_ms=1792547997775 elapsed_ms=5524 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792547997780 compositor_ms=46178859 latest_commit=23
+REDRAW commit=24 unix_ms=1792547998043 elapsed_ms=5792 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792547998045 compositor_ms=46179134 latest_commit=24
+EVENT n=142 unix_ms=1792547998190 elapsed_ms=5939 pointer_enter local_x=286.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=3 keyboard_leaves=3
+EVENT n=143 unix_ms=1792547998190 elapsed_ms=5939 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=4 keyboard_leaves=3
+REDRAW commit=25 unix_ms=1792547998310 elapsed_ms=6059 size=900x650 animation_argb=FF00FFFF focused=true
+EVENT n=144 unix_ms=1792547998311 elapsed_ms=6060 keyboard_leave focused=false presses=1 releases=1 motions=122 keyboard_enters=4 keyboard_leaves=4
+EVENT n=145 unix_ms=1792547998311 elapsed_ms=6060 pointer_leave local_x=286.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=4 keyboard_leaves=4
+FRAME_CALLBACK unix_ms=1792547998313 compositor_ms=46179400 latest_commit=25
+REDRAW commit=26 unix_ms=1792547998573 elapsed_ms=6322 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792547998579 compositor_ms=46179667 latest_commit=26
+REDRAW commit=27 unix_ms=1792547998838 elapsed_ms=6587 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792547998845 compositor_ms=46179934 latest_commit=27
+REDRAW commit=28 unix_ms=1792547999104 elapsed_ms=6853 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792547999112 compositor_ms=46180192 latest_commit=28
+EVENT n=146 unix_ms=1792547999187 elapsed_ms=6935 pointer_enter local_x=614.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=4 keyboard_leaves=4
+EVENT n=147 unix_ms=1792547999187 elapsed_ms=6935 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=5 keyboard_leaves=4
+EVENT n=148 unix_ms=1792547999315 elapsed_ms=7063 keyboard_leave focused=false presses=1 releases=1 motions=122 keyboard_enters=5 keyboard_leaves=5
+EVENT n=149 unix_ms=1792547999315 elapsed_ms=7063 pointer_leave local_x=614.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=5 keyboard_leaves=5
+REDRAW commit=29 unix_ms=1792547999373 elapsed_ms=7121 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792547999379 compositor_ms=46180467 latest_commit=29
+REDRAW commit=30 unix_ms=1792547999638 elapsed_ms=7387 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792547999645 compositor_ms=46180725 latest_commit=30
+REDRAW commit=31 unix_ms=1792547999905 elapsed_ms=7653 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792547999914 compositor_ms=46180992 latest_commit=31
+REDRAW commit=32 unix_ms=1792548000162 elapsed_ms=7910 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548000171 compositor_ms=46181259 latest_commit=32
+EVENT n=150 unix_ms=1792548000190 elapsed_ms=7939 pointer_enter local_x=778.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=5 keyboard_leaves=5
+EVENT n=151 unix_ms=1792548000190 elapsed_ms=7939 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=6 keyboard_leaves=5
+EVENT n=152 unix_ms=1792548000328 elapsed_ms=8077 keyboard_leave focused=false presses=1 releases=1 motions=122 keyboard_enters=6 keyboard_leaves=6
+EVENT n=153 unix_ms=1792548000328 elapsed_ms=8077 pointer_leave local_x=778.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=6 keyboard_leaves=6
+REDRAW commit=33 unix_ms=1792548000423 elapsed_ms=8172 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548000429 compositor_ms=46181517 latest_commit=33
+REDRAW commit=34 unix_ms=1792548000689 elapsed_ms=8438 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548000698 compositor_ms=46181784 latest_commit=34
+REDRAW commit=35 unix_ms=1792548000942 elapsed_ms=8691 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548000945 compositor_ms=46182034 latest_commit=35
+REDRAW commit=36 unix_ms=1792548001196 elapsed_ms=8944 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548001203 compositor_ms=46182292 latest_commit=36
+EVENT n=154 unix_ms=1792548001211 elapsed_ms=8960 pointer_enter local_x=50.000 local_y=329.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=6 keyboard_leaves=6
+EVENT n=155 unix_ms=1792548001211 elapsed_ms=8960 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=7 keyboard_leaves=6
+EVENT n=156 unix_ms=1792548001329 elapsed_ms=9078 keyboard_leave focused=false presses=1 releases=1 motions=122 keyboard_enters=7 keyboard_leaves=7
+EVENT n=157 unix_ms=1792548001329 elapsed_ms=9078 pointer_leave local_x=50.000 local_y=329.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=7 keyboard_leaves=7
+REDRAW commit=37 unix_ms=1792548001461 elapsed_ms=9210 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548001470 compositor_ms=46182559 latest_commit=37
+REDRAW commit=38 unix_ms=1792548001730 elapsed_ms=9478 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548001737 compositor_ms=46182817 latest_commit=38
+REDRAW commit=39 unix_ms=1792548001996 elapsed_ms=9745 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548002004 compositor_ms=46183092 latest_commit=39
+EVENT n=158 unix_ms=1792548002204 elapsed_ms=9953 pointer_enter local_x=70.000 local_y=329.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=7 keyboard_leaves=7
+EVENT n=159 unix_ms=1792548002204 elapsed_ms=9953 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=8 keyboard_leaves=7
+REDRAW commit=40 unix_ms=1792548002256 elapsed_ms=10005 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792548002270 compositor_ms=46183334 latest_commit=40
+EVENT n=160 unix_ms=1792548002336 elapsed_ms=10085 keyboard_leave focused=false presses=1 releases=1 motions=122 keyboard_enters=8 keyboard_leaves=8
+EVENT n=161 unix_ms=1792548002336 elapsed_ms=10085 pointer_leave local_x=70.000 local_y=329.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=8 keyboard_leaves=8
+REDRAW commit=41 unix_ms=1792548002518 elapsed_ms=10266 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548002521 compositor_ms=46183600 latest_commit=41
+REDRAW commit=42 unix_ms=1792548002781 elapsed_ms=10530 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548002787 compositor_ms=46183875 latest_commit=42
+REDRAW commit=43 unix_ms=1792548003048 elapsed_ms=10796 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548003055 compositor_ms=46184142 latest_commit=43
+EVENT n=162 unix_ms=1792548003214 elapsed_ms=10963 pointer_enter local_x=450.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=8 keyboard_leaves=8
+EVENT n=163 unix_ms=1792548003214 elapsed_ms=10963 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=9 keyboard_leaves=8
+REDRAW commit=44 unix_ms=1792548003315 elapsed_ms=11064 size=900x650 animation_argb=FF00FFFF focused=true
+FRAME_CALLBACK unix_ms=1792548003327 compositor_ms=46184375 latest_commit=44
+EVENT n=164 unix_ms=1792548003338 elapsed_ms=11087 keyboard_leave focused=false presses=1 releases=1 motions=122 keyboard_enters=9 keyboard_leaves=9
+EVENT n=165 unix_ms=1792548003338 elapsed_ms=11087 pointer_leave local_x=450.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=9 keyboard_leaves=9
+REDRAW commit=45 unix_ms=1792548003581 elapsed_ms=11330 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548003588 compositor_ms=46184667 latest_commit=45
+REDRAW commit=46 unix_ms=1792548003848 elapsed_ms=11597 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548003855 compositor_ms=46184934 latest_commit=46
+REDRAW commit=47 unix_ms=1792548004115 elapsed_ms=11864 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548004120 compositor_ms=46185200 latest_commit=47
+EVENT n=166 unix_ms=1792548004163 elapsed_ms=11912 pointer_enter local_x=450.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=9 keyboard_leaves=9
+EVENT n=167 unix_ms=1792548004163 elapsed_ms=11912 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=10 keyboard_leaves=9
+EVENT n=168 unix_ms=1792548004242 elapsed_ms=11990 key_release KeyEvent { time: 46185333, raw_code: 1, keysym: XK_Escape, utf8: None } focused=true presses=1 releases=1 motions=122 keyboard_enters=10 keyboard_leaves=9
+EVENT n=169 unix_ms=1792548004271 elapsed_ms=12020 keyboard_leave focused=false presses=1 releases=1 motions=122 keyboard_enters=10 keyboard_leaves=10
+EVENT n=170 unix_ms=1792548004271 elapsed_ms=12020 pointer_leave local_x=450.000 local_y=149.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=10 keyboard_leaves=10
+REDRAW commit=48 unix_ms=1792548004371 elapsed_ms=12119 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548004378 compositor_ms=46185467 latest_commit=48
+REDRAW commit=49 unix_ms=1792548004637 elapsed_ms=12386 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548004645 compositor_ms=46185725 latest_commit=49
+REDRAW commit=50 unix_ms=1792548004904 elapsed_ms=12653 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548004911 compositor_ms=46185992 latest_commit=50
+REDRAW commit=51 unix_ms=1792548005171 elapsed_ms=12919 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548005178 compositor_ms=46186267 latest_commit=51
+REDRAW commit=52 unix_ms=1792548005437 elapsed_ms=13186 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548005445 compositor_ms=46186525 latest_commit=52
+REDRAW commit=53 unix_ms=1792548005705 elapsed_ms=13454 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548005712 compositor_ms=46186800 latest_commit=53
+REDRAW commit=54 unix_ms=1792548005972 elapsed_ms=13721 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548005980 compositor_ms=46187067 latest_commit=54
+REDRAW commit=55 unix_ms=1792548006240 elapsed_ms=13988 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548006247 compositor_ms=46187325 latest_commit=55
+REDRAW commit=56 unix_ms=1792548006506 elapsed_ms=14255 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548006512 compositor_ms=46187600 latest_commit=56
+REDRAW commit=57 unix_ms=1792548006771 elapsed_ms=14520 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548006778 compositor_ms=46187867 latest_commit=57
+REDRAW commit=58 unix_ms=1792548007037 elapsed_ms=14786 size=900x650 animation_argb=FFFF00FF focused=false
+FRAME_CALLBACK unix_ms=1792548007046 compositor_ms=46188125 latest_commit=58
+REDRAW commit=59 unix_ms=1792548007295 elapsed_ms=15044 size=900x650 animation_argb=FF00FFFF focused=false
+FRAME_CALLBACK unix_ms=1792548007305 compositor_ms=46188384 latest_commit=59
+EVENT n=171 unix_ms=1792548007340 elapsed_ms=15088 pointer_enter local_x=680.000 local_y=459.996 focused=false presses=1 releases=1 motions=122 keyboard_enters=10 keyboard_leaves=10
+EVENT n=172 unix_ms=1792548007340 elapsed_ms=15088 keyboard_enter focused=true presses=1 releases=1 motions=122 keyboard_enters=11 keyboard_leaves=10
+REDRAW commit=60 unix_ms=1792548007558 elapsed_ms=15306 size=900x650 animation_argb=FFFF00FF focused=true
+FRAME_CALLBACK unix_ms=1792548007561 compositor_ms=46188650 latest_commit=60

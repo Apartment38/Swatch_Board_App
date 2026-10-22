@@ -24,6 +24,39 @@ pub struct PixelPoint {
     pub y: u32,
 }
 
+/// Position an entire lens surface outside a protected source neighborhood.
+/// Coordinates and sizes are in output-local logical units.
+/// Return `None` when the output is too small to avoid recursive capture.
+pub fn place_lens(
+    output: (u32, u32),
+    pointer: PixelPoint,
+    surface: (u32, u32),
+    protected_radius: u32,
+) -> Option<PixelPoint> {
+    let (width, height) = output;
+    let (lens_width, lens_height) = surface;
+    if lens_width == 0 || lens_height == 0 || pointer.x >= width || pointer.y >= height {
+        return None;
+    }
+    let max_x = width.checked_sub(lens_width)?;
+    let max_y = height.checked_sub(lens_height)?;
+    let x = pointer.x.saturating_sub(lens_width / 2).min(max_x);
+    let y = pointer.y.saturating_sub(lens_height / 2).min(max_y);
+    let left = pointer.x.saturating_sub(protected_radius);
+    let top = pointer.y.saturating_sub(protected_radius);
+    let right = pointer.x.saturating_add(protected_radius).saturating_add(1);
+    let bottom = pointer.y.saturating_add(protected_radius).saturating_add(1);
+    if right <= max_x {
+        Some(PixelPoint { x: right, y })
+    } else if let Some(x) = left.checked_sub(lens_width) {
+        Some(PixelPoint { x, y })
+    } else if bottom <= max_y {
+        Some(PixelPoint { x, y: bottom })
+    } else {
+        top.checked_sub(lens_height).map(|y| PixelPoint { x, y })
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OutputTransform {
     Normal,
@@ -52,7 +85,19 @@ impl OutputGeometry {
     /// Map a desktop logical point to the output's captured physical pixel.
     /// The caller must first choose the output containing the point.
     pub fn desktop_to_stream(&self, point: Point) -> Option<PixelPoint> {
-        if !self.scale.is_finite()
+        if ![
+            point.x,
+            point.y,
+            self.logical_origin.x,
+            self.logical_origin.y,
+            self.logical_size.x,
+            self.logical_size.y,
+            self.scale,
+        ]
+        .iter()
+        .all(|value| value.is_finite())
+            || self.logical_size.x <= 0.0
+            || self.logical_size.y <= 0.0
             || self.scale <= 0.0
             || self.stream_width == 0
             || self.stream_height == 0
@@ -261,6 +306,35 @@ mod tests {
             Some(PixelPoint { x: 0, y: 0 })
         );
         assert_eq!(output.desktop_to_stream(Point { x: 0.0, y: 0.0 }), None);
+    }
+
+    #[test]
+    fn rejects_non_finite_desktop_coordinates() {
+        let output = geometry(OutputTransform::Normal, Point { x: 0.0, y: 0.0 });
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(output.desktop_to_stream(Point { x: invalid, y: 0.0 }), None);
+            assert_eq!(output.desktop_to_stream(Point { x: 0.0, y: invalid }), None);
+        }
+    }
+
+    #[test]
+    fn rejects_non_finite_output_geometry() {
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            for field in 0..4 {
+                let mut output = geometry(OutputTransform::Normal, Point { x: 0.0, y: 0.0 });
+                match field {
+                    0 => output.logical_origin.x = invalid,
+                    1 => output.logical_origin.y = invalid,
+                    2 => output.logical_size.x = invalid,
+                    _ => output.logical_size.y = invalid,
+                }
+                assert_eq!(
+                    output.desktop_to_stream(Point { x: 0.0, y: 0.0 }),
+                    None,
+                    "invalid geometry field {field}: {invalid}"
+                );
+            }
+        }
     }
 
     #[test]

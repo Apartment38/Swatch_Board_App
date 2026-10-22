@@ -1,5 +1,5 @@
 [package]
-name = "colorboard-picker"
+name = "swatch-board-picker"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
@@ -7,10 +7,28 @@ rust-version.workspace = true
 
 [dependencies]
 ashpd.workspace = true
-colorboard-picker-core = { path = "../picker-core" }
+swatch-board-picker-core = { path = "../picker-core" }
 pipewire.workspace = true
 smithay-client-toolkit = "=0.21.1"
 wayland-client = "=0.31.15"
 tokio.workspace = true
 zbus.workspace = true
+libc = "=0.2.191"
+futures-util = "=0.3.34"
+
+[dev-dependencies]
+wayland-backend = "=0.3.17"
+wayland-scanner = "=0.31.11"
+
+[[example]]
+name = "phase1a_cancel_probe"
+path = "../../spikes/001-native-cancel/main.rs"
+
+[[example]]
+name = "phase1a_shield_probe"
+path = "../../spikes/002-native-shield/main.rs"
+
+[[example]]
+name = "phase1a_clean_overlay_probe"
+path = "../../spikes/003-clean-overlay/main.rs"
 

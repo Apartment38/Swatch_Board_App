@@ -8,7 +8,7 @@ license = "MIT"
 rust-version = "1.85"
 
 [workspace.dependencies]
-ashpd = { version = "=0.13.13", features = ["screencast"] }
+ashpd = { version = "=0.13.13", features = ["screencast", "global_shortcuts"] }
 pipewire = "=0.10.1"
 tokio = { version = "=1.50.0", features = ["macros", "rt-multi-thread", "sync", "time"] }
 zbus = "=5.19.0"

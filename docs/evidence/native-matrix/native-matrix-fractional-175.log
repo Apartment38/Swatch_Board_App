@@ -1,0 +1,24 @@
+Experimental native backend: not a Phase 1A pass; authorized normal-transform capture outputs
+Connecting to the ScreenCast portal
+Creating the ScreenCast portal session
+Requesting monitor selection and capture authorization
+Starting the authorized ScreenCast streams
+Opening the PipeWire remote
+PipeWire stream 47 changed from Unconnected to Connecting
+PipeWire stream 49 changed from Unconnected to Connecting
+PipeWire stream 47 changed from Connecting to Paused
+PipeWire stream 49 changed from Connecting to Paused
+PipeWire stream 47 negotiated VideoFormat::BGRA 334x251
+Requested PipeWire cursor metadata for stream 47
+PipeWire stream 47 changed from Paused to Streaming
+PipeWire stream 49 negotiated VideoFormat::BGRA 1024x768
+Requested PipeWire cursor metadata for stream 49
+Native experimental selection active: left release confirms presented lens, right release/Escape cancels; no current-scene RGB equality claim
+PipeWire stream 49 changed from Paused to Streaming
+PRESENTATION_CLOCK clock_id=1 required_CLOCK_MONOTONIC=1
+OUTPUT name=Some("Virtual-0") origin=(0, 0) logical=(1024, 768)
+CLEANUP shields=1 lens_destroyed=true pointers_released=true keyboard_objects=0
+WAYLAND_CLEANUP flush=Ok(()) result=Some("portal/Wayland output geometry mismatch")
+GlobalShortcuts session closed
+ScreenCast session closed
+Error: "portal/Wayland output geometry mismatch"

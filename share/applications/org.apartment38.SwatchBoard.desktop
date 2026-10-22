@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Swatch Board
+Comment=Wayland color picker with an experimental native backend
+Exec=swatch-board-picker
+Icon=color-picker
+Terminal=false
+Categories=Graphics;Utility;
+StartupNotify=false
+NoDisplay=true
