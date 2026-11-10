@@ -12,7 +12,7 @@ Read the root `AGENTS.md` before changing the repository. Commit coherent, verif
 
 ## Current milestone
 
-**Phase 1A and Phase 1B acceptance passed.** The Rust-owned presented-sample picker is the default and only backend. No tray history, clipboard, settings, or Board implementation has started.
+**Phase 1A and Phase 1B acceptance passed. Phase 1C is implemented; physical-desktop acceptance remains pending.** No history popup, settings UI, or Board implementation has started.
 
 The picker:
 
@@ -100,7 +100,16 @@ The user then confirmed a visible KDE failure notification with the entry remove
 The temporary entry and acceptance tray were removed. Human-session permission
 dialogs remained manual.
 
-## Next work
+## Phase 1C implementation and verification
 
-Proceed with Phase 1C — history, formatting, and clipboard — from the
-implementation plan. Do not start the Board before Phases 1A–1E jointly pass.
+The tray stores distinct captures in the shared SQLite history, restores the
+last color, emits history signals, and owns the Wayland clipboard. Settings
+and format names are documented in the [README](../README.md); the history API
+is in [ipc.md](ipc.md). A private KWin/Plasma session with a temporary picker
+verified two identical captures, clipboard paste after picker exit, unchanged
+history and clipboard after cancellation, and last-color restoration after tray
+restart. The test used a synthetic picker, not a real capture.
+
+Phase 1C still needs acceptance with the real picker on the physical KDE
+desktop; do not claim that gate passed based on the isolated session.
+Do not start the Board before Phases 1A–1E jointly pass.

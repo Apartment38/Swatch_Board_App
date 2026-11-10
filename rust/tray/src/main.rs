@@ -1,9 +1,12 @@
+mod config;
 #[cfg(test)]
 mod tests;
 mod tray;
 
 use std::{path::PathBuf, process::Stdio, time::Duration};
+use swatch_board_color::{Color, Format};
 use swatch_board_ipc::{INTERFACE, PATH, SERVICE, SwatchBoardProxy};
+use swatch_board_storage::{Capture, CaptureSource, HistoryRepository, Rgba8};
 use tokio::{
     io::AsyncReadExt,
     process::Command,
@@ -12,10 +15,12 @@ use tokio::{
 use zbus::Connection;
 
 const PICK_TIMEOUT: Duration = Duration::from_secs(300);
+type HistoryRow = (String, String, String, String);
 
 enum Request {
     Pick(oneshot::Sender<Result<&'static str, String>>),
     LastColor(oneshot::Sender<String>),
+    History(u32, oneshot::Sender<Result<Vec<HistoryRow>, String>>),
     Quit,
     Complete(Outcome),
 }
@@ -55,6 +60,16 @@ impl Control {
             .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))
     }
 
+    async fn get_history(&self, limit: u32) -> zbus::fdo::Result<Vec<HistoryRow>> {
+        let (tx, rx) = oneshot::channel();
+        self.requests
+            .send(Request::History(limit, tx))
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?;
+        rx.await
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
     fn quit(&self) {
         let _ = self.requests.send(Request::Quit);
     }
@@ -62,8 +77,12 @@ impl Control {
     #[zbus(signal)]
     async fn color_picked(
         emitter: &zbus::object_server::SignalEmitter<'_>,
-        color: &str,
+        id: &str,
+        rgba: &str,
+        timestamp: &str,
     ) -> zbus::Result<()>;
+    #[zbus(signal)]
+    async fn history_changed(emitter: &zbus::object_server::SignalEmitter<'_>) -> zbus::Result<()>;
     #[zbus(signal)]
     async fn color_pick_cancelled(
         emitter: &zbus::object_server::SignalEmitter<'_>,
@@ -173,6 +192,25 @@ fn notify_failure(connection: &Connection, reason: String) {
     });
 }
 
+fn history_row(capture: &Capture) -> HistoryRow {
+    let c = capture.color;
+    let source = match capture.source {
+        CaptureSource::Picker => "picker",
+        CaptureSource::Board => "board",
+    };
+    (
+        capture.id.to_string(),
+        Color::new(c.r, c.g, c.b, c.a).format(Format::HexRgba),
+        capture.captured_at.to_rfc3339(),
+        source.into(),
+    )
+}
+
+fn capture_hex(capture: &Capture) -> String {
+    let c = capture.color;
+    Color::new(c.r, c.g, c.b, c.a).format(Format::HexRgb)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let connection = Connection::session().await?;
@@ -194,14 +232,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         proxy.activate().await.map_err(|_| error)?;
         return Ok(());
     }
-    let tray = tray::start(requests.clone()).await?;
+    let config = config::Config::load()?;
+    let format: Format = config
+        .clipboard_format
+        .parse()
+        .map_err(|error| format!("invalid clipboard format: {error}"))?;
+    let mut history = HistoryRepository::open_default()?;
+    history.set_retention(config.history_limit);
+    let mut last_color = history
+        .last()?
+        .as_ref()
+        .map(capture_hex)
+        .unwrap_or_default();
+    let mut clipboard = swatch_board_clipboard::Clipboard::new();
+    let tray = tray::start(
+        requests.clone(),
+        (!last_color.is_empty()).then(|| last_color.clone()),
+    )
+    .await?;
     let (shutdown, shutdown_rx) = watch::channel(false);
     let mut active = None;
-    let mut last_color = String::new();
+    let mut clipboard_events = tokio::time::interval(Duration::from_secs(1));
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     loop {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => break,
+            _ = clipboard_events.tick() => {
+                for event in clipboard.drain_events() {
+                    if let swatch_board_clipboard::ClipboardEvent::ServingFailed { error, .. } = event {
+                        let reason = format!("Clipboard serving failed: {error}");
+                        eprintln!("{reason}");
+                        tray.update(|item| item.message = Some(reason.clone())).await;
+                        notify_failure(&connection, reason);
+                    }
+                }
+            }
             _ = terminate.recv() => break,
             request = rx.recv() => match request {
                 Some(Request::Pick(reply)) => {
@@ -228,16 +293,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 Some(Request::LastColor(reply)) => { let _ = reply.send(last_color.clone()); }
+                Some(Request::History(limit, reply)) => {
+                    let rows = history.list().map(|captures| captures.iter().take(limit as usize).map(history_row).collect()).map_err(|error| error.to_string());
+                    let _ = reply.send(rows);
+                }
                 Some(Request::Complete(outcome)) => {
                     active = None;
                     match outcome {
                         Outcome::Selected(color) => {
-                            last_color = color;
-                            tray.update(|item| {
-                                item.color = Some(last_color.clone());
-                                item.message = None;
-                            }).await;
-                            emit(&connection, "ColorPicked", &(&last_color,)).await;
+                            let parsed: Color = color.parse().expect("validated picker output");
+                            match history.record(Rgba8 { r: parsed.r, g: parsed.g, b: parsed.b, a: parsed.a }, CaptureSource::Picker) {
+                                Ok(capture) => {
+                                    last_color = color;
+                                    let copy_error = if config.auto_copy { clipboard.copy_text(&parsed.format(format)).err().map(|e| format!("Clipboard copy failed: {e}")) } else { None };
+                                    if let Some(reason) = &copy_error { eprintln!("{reason}"); notify_failure(&connection, reason.clone()); }
+                                    tray.update(|item| {
+                                        item.color = Some(last_color.clone());
+                                        item.message = copy_error;
+                                    }).await;
+                                    let (id, rgba, timestamp, _) = history_row(&capture);
+                                    emit(&connection, "ColorPicked", &(id, rgba, timestamp)).await;
+                                    emit(&connection, "HistoryChanged", &()).await;
+                                }
+                                Err(error) => {
+                                    let reason = format!("Failed to save capture: {error}");
+                                    eprintln!("{reason}");
+                                    tray.update(|item| item.message = Some(reason.clone())).await;
+                                    notify_failure(&connection, reason.clone());
+                                    emit(&connection, "ColorPickFailed", &(reason,)).await;
+                                }
+                            }
                         }
                         Outcome::Cancelled => {
                             tray.update(|item| item.message = Some("Color selection cancelled".into())).await;

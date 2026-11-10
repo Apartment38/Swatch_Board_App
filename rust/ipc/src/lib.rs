@@ -11,10 +11,13 @@ pub trait SwatchBoard {
     fn activate(&self) -> zbus::Result<()>;
     fn pick_color(&self) -> zbus::Result<String>;
     fn get_last_color(&self) -> zbus::Result<String>;
+    fn get_history(&self, limit: u32) -> zbus::Result<Vec<(String, String, String, String)>>;
     fn quit(&self) -> zbus::Result<()>;
 
     #[zbus(signal)]
-    fn color_picked(&self, color: &str) -> zbus::Result<()>;
+    fn color_picked(&self, id: &str, rgba: &str, timestamp: &str) -> zbus::Result<()>;
+    #[zbus(signal)]
+    fn history_changed(&self) -> zbus::Result<()>;
     #[zbus(signal)]
     fn color_pick_cancelled(&self) -> zbus::Result<()>;
     #[zbus(signal)]

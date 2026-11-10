@@ -123,10 +123,11 @@ fn icon(size: i32, color: Option<&str>) -> ksni::Icon {
 
 pub async fn start(
     requests: mpsc::UnboundedSender<Request>,
+    color: Option<String>,
 ) -> Result<ksni::Handle<Item>, ksni::Error> {
     Item {
         requests,
-        color: None,
+        color,
         message: None,
     }
     .spawn()

@@ -35,9 +35,12 @@ build, copy that entry to `~/.local/share/applications/` and change its `Exec`
 to the absolute path of the built `swatch-board-picker`; the portal rejects an
 entry whose executable it cannot find. Remove the development entry when done.
 
-Left-click the tray icon or select **Pick Color**. The current color is kept
-in memory until the tray exits. Palette, Board, and Configure menu entries are
-disabled until their later phases. See the [D-Bus API](docs/ipc.md).
+Left-click the tray icon or select **Pick Color**. Successful captures are
+saved to `${XDG_DATA_HOME:-$HOME/.local/share}/swatch-board/library.sqlite3`,
+including repeated colors. The tray restores the last color on restart and owns
+the copied text independently of the picker process. Palette, Board, and
+Configure menu entries remain disabled until their later phases. See the
+[D-Bus API](docs/ipc.md).
 
 To run the picker directly from a KDE Plasma Wayland desktop session:
 
@@ -48,8 +51,8 @@ cargo run --offline --locked -p swatch-board-picker
 The picker requests screen-capture authorization through KDE's portal. Left
 release confirms the exact center sample from a genuinely presented magnifier
 commit; right release or Escape cancels. Diagnostics go to stderr and the
-selected `#RRGGBB` value to stdout. Clipboard, history, and Board UI are not
-implemented yet.
+selected `#RRGGBB` value to stdout. When run directly the picker does not update
+history or clipboard; use the tray for those actions.
 
 Inspect the CLI without opening a capture session:
 
@@ -61,6 +64,24 @@ Inspect the CLI without opening a capture session:
 The executable requires access to the desktop's session D-Bus and Wayland socket.
 If launched outside the desktop environment, ensure `WAYLAND_DISPLAY` points to
 the actual compositor socket; do not assume a particular socket name.
+
+## History and clipboard settings
+
+Optional `${XDG_CONFIG_HOME:-$HOME/.config}/swatch-board/config.toml`:
+
+```toml
+history_limit = 100
+auto_copy = true
+clipboard_format = "hex"
+```
+
+`history_limit` must be positive. Formats are `hex` (`#RRGGBB`), `hex-rgba`,
+`rgb`, `rgba`, `hsl`, `hsv`, and `cmyk` (approximate, not color-managed).
+Repeated captures remain separate rows; cancel changes neither history nor
+clipboard. Clipboard ownership requires a compositor exposing Wayland data
+control; the tray must remain running unless a clipboard manager retains the
+selection. Invalid settings or incompatible databases produce an error rather
+than silently discarding data.
 
 ## Project references
 
