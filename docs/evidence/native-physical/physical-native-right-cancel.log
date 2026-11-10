@@ -1,0 +1,517 @@
+Experimental native backend: not a Phase 1A pass; authorized monitor capture outputs
+Connecting to the ScreenCast portal
+Creating the ScreenCast portal session
+Requesting monitor selection and capture authorization
+Starting the authorized ScreenCast streams
+Opening the PipeWire remote
+CAPTURE_ROUTE stream=126 origin=(0, 0) portal_logical=(1646, 1029)
+PipeWire stream 126 changed from Unconnected to Connecting
+PipeWire stream 126 changed from Connecting to Paused
+PipeWire stream 126 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 126
+PipeWire stream 126 changed from Paused to Streaming
+Native experimental selection active: left release confirms presented lens, right release/Escape cancels; no current-scene RGB equality claim
+PRESENTATION_CLOCK clock_id=1 required_CLOCK_MONOTONIC=1
+OUTPUT name=Some("eDP-1") origin=(0, 0) logical=(1646, 1029) transform=Normal
+SHIELD_MAPPED output=0 transparent=true full_input=true keyboard=None
+POINTER_ENTER id=14 local=(1032.94921875,847.953125) source=wl_pointer
+LENS_REQUESTED normal_layer=true cursor_role=false keyboard=None empty_input=true buffer=280
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(21) cursor_age_ms=Some(21) video_pts=21263782482782
+LENS_SUBMIT commit=1 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21263782482782 generation=0
+LENS_PRESENTED commit=1 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21263782482782) presented_ns=21263879917000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(0) cursor_age_ms=Some(0) video_pts=21263924149443
+LENS_SUBMIT commit=2 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21263924149443 generation=0
+LENS_PRESENTED commit=2 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21263924149443) presented_ns=21263979922000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(0) cursor_age_ms=Some(0) video_pts=21264032482772
+LENS_SUBMIT commit=3 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21264032482772 generation=0
+LENS_PRESENTED commit=3 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21264032482772) presented_ns=21264088257000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=21264132482768
+LENS_SUBMIT commit=4 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21264132482768 generation=0
+LENS_PRESENTED commit=4 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21264132482768) presented_ns=21264204929000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=21264249149430
+LENS_SUBMIT commit=5 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21264249149430 generation=0
+LENS_PRESENTED commit=5 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21264249149430) presented_ns=21264304933000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(15) cursor_age_ms=Some(15) video_pts=21264340816093
+LENS_SUBMIT commit=6 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21264340816093 generation=0
+LENS_PRESENTED commit=6 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21264340816093) presented_ns=21264413270000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(18) cursor_age_ms=Some(18) video_pts=21264457482755
+LENS_SUBMIT commit=7 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21264457482755 generation=0
+LENS_PRESENTED commit=7 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21264457482755) presented_ns=21264529939000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(1) cursor_age_ms=Some(1) video_pts=21264582482750
+LENS_SUBMIT commit=8 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21264582482750 generation=0
+LENS_PRESENTED commit=8 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21264582482750) presented_ns=21264646607000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21264699149412
+LENS_SUBMIT commit=9 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21264699149412 generation=0
+LENS_PRESENTED commit=9 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21264699149412) presented_ns=21264763280000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(20) cursor_age_ms=Some(20) video_pts=21264782482742
+LENS_SUBMIT commit=10 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21264782482742 generation=0
+LENS_PRESENTED commit=10 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21264782482742) presented_ns=21264863281000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(8) cursor_age_ms=Some(8) video_pts=21264899149404
+LENS_SUBMIT commit=11 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21264899149404 generation=0
+LENS_PRESENTED commit=11 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21264899149404) presented_ns=21264963285000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=21264999149400
+LENS_SUBMIT commit=12 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21264999149400 generation=0
+LENS_PRESENTED commit=12 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21264999149400) presented_ns=21265079955000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(17) cursor_age_ms=Some(17) video_pts=21265099149396
+LENS_SUBMIT commit=13 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21265099149396 generation=0
+LENS_PRESENTED commit=13 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21265099149396) presented_ns=21265179962000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21265215816058
+LENS_SUBMIT commit=14 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21265215816058 generation=0
+LENS_PRESENTED commit=14 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21265215816058) presented_ns=21265288295000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(12) cursor_age_ms=Some(12) video_pts=21265315816054
+LENS_SUBMIT commit=15 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21265315816054 generation=0
+LENS_PRESENTED commit=15 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21265315816054) presented_ns=21265396632000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(16) cursor_age_ms=Some(16) video_pts=21265432482716
+LENS_SUBMIT commit=16 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21265432482716 generation=0
+LENS_PRESENTED commit=16 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21265432482716) presented_ns=21265504968000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=21265557482711
+LENS_SUBMIT commit=17 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21265557482711 generation=0
+LENS_PRESENTED commit=17 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21265557482711) presented_ns=21265613305000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(11) cursor_age_ms=Some(11) video_pts=21265657482707
+LENS_SUBMIT commit=18 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21265657482707 generation=0
+LENS_PRESENTED commit=18 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21265657482707) presented_ns=21265738310000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(3) cursor_age_ms=Some(3) video_pts=21265782482702
+LENS_SUBMIT commit=19 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21265782482702 generation=0
+LENS_PRESENTED commit=19 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21265782482702) presented_ns=21265838315000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(12) cursor_age_ms=Some(12) video_pts=21265865816032
+LENS_SUBMIT commit=20 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21265865816032 generation=0
+LENS_PRESENTED commit=20 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21265865816032) presented_ns=21265946651000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(1) cursor_age_ms=Some(1) video_pts=21265982482694
+LENS_SUBMIT commit=21 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21265982482694 generation=0
+LENS_PRESENTED commit=21 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21265982482694) presented_ns=21266046655000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(3) cursor_age_ms=Some(3) video_pts=21266099149356
+LENS_SUBMIT commit=22 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21266099149356 generation=0
+LENS_PRESENTED commit=22 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21266099149356) presented_ns=21266163326000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(15) cursor_age_ms=Some(15) video_pts=21266190816019
+LENS_SUBMIT commit=23 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21266190816019 generation=0
+LENS_PRESENTED commit=23 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21266190816019) presented_ns=21266263327000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=21266290816015
+LENS_SUBMIT commit=24 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21266290816015 generation=0
+LENS_PRESENTED commit=24 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21266290816015) presented_ns=21266363331000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(21) cursor_age_ms=Some(21) video_pts=21266390816011
+LENS_SUBMIT commit=25 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21266390816011 generation=0
+LENS_PRESENTED commit=25 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21266390816011) presented_ns=21266463335000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(11) cursor_age_ms=Some(11) video_pts=21266507482673
+LENS_SUBMIT commit=26 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21266507482673 generation=0
+LENS_PRESENTED commit=26 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21266507482673) presented_ns=21266571672000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(20) cursor_age_ms=Some(20) video_pts=21266590816003
+LENS_SUBMIT commit=27 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21266590816003 generation=0
+LENS_PRESENTED commit=27 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21266590816003) presented_ns=21266680006000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(18) cursor_age_ms=Some(18) video_pts=21266699149332
+LENS_SUBMIT commit=28 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21266699149332 generation=0
+LENS_PRESENTED commit=28 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21266699149332) presented_ns=21266780009000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(22) cursor_age_ms=Some(22) video_pts=21266815815994
+LENS_SUBMIT commit=29 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21266815815994 generation=0
+LENS_PRESENTED commit=29 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21266815815994) presented_ns=21266905015000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(17) cursor_age_ms=Some(17) video_pts=21266924149323
+LENS_SUBMIT commit=30 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21266924149323 generation=0
+LENS_PRESENTED commit=30 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21266924149323) presented_ns=21267005018000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(20) cursor_age_ms=Some(20) video_pts=21267024149319
+LENS_SUBMIT commit=31 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21267024149319 generation=0
+LENS_PRESENTED commit=31 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21267024149319) presented_ns=21267121686000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(16) cursor_age_ms=Some(16) video_pts=21267149149314
+LENS_SUBMIT commit=32 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21267149149314 generation=0
+LENS_PRESENTED commit=32 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21267149149314) presented_ns=21267230026000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(11) cursor_age_ms=Some(11) video_pts=21267257482643
+LENS_SUBMIT commit=33 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21267257482643 generation=0
+LENS_PRESENTED commit=33 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21267257482643) presented_ns=21267330029000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(13) cursor_age_ms=Some(13) video_pts=21267374149305
+LENS_SUBMIT commit=34 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21267374149305 generation=0
+LENS_PRESENTED commit=34 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21267374149305) presented_ns=21267455034000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(1) cursor_age_ms=Some(1) video_pts=21267490815967
+LENS_SUBMIT commit=35 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21267490815967 generation=0
+LENS_PRESENTED commit=35 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21267490815967) presented_ns=21267555034000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(3) cursor_age_ms=Some(3) video_pts=21267607482629
+LENS_SUBMIT commit=36 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21267607482629 generation=0
+LENS_PRESENTED commit=36 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21267607482629) presented_ns=21267680041000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(17) cursor_age_ms=Some(17) video_pts=21267699149292
+LENS_SUBMIT commit=37 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21267699149292 generation=0
+LENS_PRESENTED commit=37 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21267699149292) presented_ns=21267771707000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(8) cursor_age_ms=Some(8) video_pts=21267815815954
+LENS_SUBMIT commit=38 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21267815815954 generation=0
+LENS_PRESENTED commit=38 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21267815815954) presented_ns=21267871709000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(19) cursor_age_ms=Some(19) video_pts=21267899149284
+LENS_SUBMIT commit=39 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21267899149284 generation=0
+LENS_PRESENTED commit=39 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21267899149284) presented_ns=21267971713000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(2) cursor_age_ms=Some(2) video_pts=21268015815946
+LENS_SUBMIT commit=40 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21268015815946 generation=0
+LENS_PRESENTED commit=40 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21268015815946) presented_ns=21268088382000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(5) cursor_age_ms=Some(5) video_pts=21268124149275
+LENS_SUBMIT commit=41 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21268124149275 generation=0
+LENS_PRESENTED commit=41 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21268124149275) presented_ns=21268196723000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(0) cursor_age_ms=Some(0) video_pts=21268240815937
+LENS_SUBMIT commit=42 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21268240815937 generation=0
+LENS_PRESENTED commit=42 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21268240815937) presented_ns=21268305058000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(12) cursor_age_ms=Some(12) video_pts=21268324149267
+LENS_SUBMIT commit=43 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21268324149267 generation=0
+LENS_PRESENTED commit=43 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21268324149267) presented_ns=21268396726000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(11) cursor_age_ms=Some(11) video_pts=21268449149262
+LENS_SUBMIT commit=44 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21268449149262 generation=0
+LENS_PRESENTED commit=44 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21268449149262) presented_ns=21268521729000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(4) cursor_age_ms=Some(4) video_pts=21268557482591
+LENS_SUBMIT commit=45 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21268557482591 generation=0
+LENS_PRESENTED commit=45 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21268557482591) presented_ns=21268621735000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(14) cursor_age_ms=Some(15) video_pts=21268640815921
+LENS_SUBMIT commit=46 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21268640815921 generation=0
+LENS_PRESENTED commit=46 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21268640815921) presented_ns=21268721739000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(18) cursor_age_ms=Some(18) video_pts=21268757482583
+LENS_SUBMIT commit=47 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21268757482583 generation=0
+LENS_PRESENTED commit=47 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21268757482583) presented_ns=21268838407000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21268857482579
+LENS_SUBMIT commit=48 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21268857482579 generation=0
+LENS_PRESENTED commit=48 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21268857482579) presented_ns=21268946747000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(4) cursor_age_ms=Some(4) video_pts=21268982482574
+LENS_SUBMIT commit=49 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21268982482574 generation=0
+LENS_PRESENTED commit=49 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21268982482574) presented_ns=21269055080000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(3) cursor_age_ms=Some(3) video_pts=21269099149236
+LENS_SUBMIT commit=50 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21269099149236 generation=0
+LENS_PRESENTED commit=50 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21269099149236) presented_ns=21269155084000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(18) cursor_age_ms=Some(18) video_pts=21269182482566
+LENS_SUBMIT commit=51 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21269182482566 generation=0
+LENS_PRESENTED commit=51 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21269182482566) presented_ns=21269255088000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(17) cursor_age_ms=Some(17) video_pts=21269299149228
+LENS_SUBMIT commit=52 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21269299149228 generation=0
+LENS_PRESENTED commit=52 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21269299149228) presented_ns=21269371761000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(20) cursor_age_ms=Some(20) video_pts=21269407482557
+LENS_SUBMIT commit=53 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21269407482557 generation=0
+LENS_PRESENTED commit=53 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21269407482557) presented_ns=21269488431000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(20) cursor_age_ms=Some(20) video_pts=21269524149219
+LENS_SUBMIT commit=54 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21269524149219 generation=0
+LENS_PRESENTED commit=54 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21269524149219) presented_ns=21269613431000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(14) cursor_age_ms=Some(14) video_pts=21269640815881
+LENS_SUBMIT commit=55 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21269640815881 generation=0
+LENS_PRESENTED commit=55 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21269640815881) presented_ns=21269721769000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(13) cursor_age_ms=Some(13) video_pts=21269749149210
+LENS_SUBMIT commit=56 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21269749149210 generation=0
+LENS_PRESENTED commit=56 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21269749149210) presented_ns=21269830104000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(2) cursor_age_ms=Some(2) video_pts=21269865815872
+LENS_SUBMIT commit=57 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21269865815872 generation=0
+LENS_PRESENTED commit=57 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21269865815872) presented_ns=21269930111000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(15) cursor_age_ms=Some(15) video_pts=21269965815868
+LENS_SUBMIT commit=58 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21269965815868 generation=0
+LENS_PRESENTED commit=58 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21269965815868) presented_ns=21270038444000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21270082482530
+LENS_SUBMIT commit=59 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21270082482530 generation=0
+LENS_PRESENTED commit=59 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21270082482530) presented_ns=21270138448000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(1) cursor_age_ms=Some(1) video_pts=21270190815859
+LENS_SUBMIT commit=60 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21270190815859 generation=0
+LENS_PRESENTED commit=60 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21270190815859) presented_ns=21270263454000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(14) cursor_age_ms=Some(14) video_pts=21270290815855
+LENS_SUBMIT commit=61 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21270290815855 generation=0
+LENS_PRESENTED commit=61 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21270290815855) presented_ns=21270371790000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(4) cursor_age_ms=Some(4) video_pts=21270407482517
+LENS_SUBMIT commit=62 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21270407482517 generation=0
+LENS_PRESENTED commit=62 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21270407482517) presented_ns=21270471794000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(17) cursor_age_ms=Some(17) video_pts=21270499149180
+LENS_SUBMIT commit=63 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21270499149180 generation=0
+LENS_PRESENTED commit=63 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21270499149180) presented_ns=21270571798000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(11) cursor_age_ms=Some(11) video_pts=21270624149175
+LENS_SUBMIT commit=64 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21270624149175 generation=0
+LENS_PRESENTED commit=64 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21270624149175) presented_ns=21270680131000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=21270724149171
+LENS_SUBMIT commit=65 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21270724149171 generation=0
+LENS_PRESENTED commit=65 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21270724149171) presented_ns=21270796801000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(21) cursor_age_ms=Some(21) video_pts=21270824149167
+LENS_SUBMIT commit=66 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21270824149167 generation=0
+LENS_PRESENTED commit=66 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21270824149167) presented_ns=21270896808000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(21) cursor_age_ms=Some(21) video_pts=21270940815829
+LENS_SUBMIT commit=67 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21270940815829 generation=0
+LENS_PRESENTED commit=67 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21270940815829) presented_ns=21271013475000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=21271040815825
+LENS_SUBMIT commit=68 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21271040815825 generation=0
+LENS_PRESENTED commit=68 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21271040815825) presented_ns=21271130146000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(18) cursor_age_ms=Some(18) video_pts=21271140815821
+LENS_SUBMIT commit=69 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21271140815821 generation=0
+LENS_PRESENTED commit=69 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21271140815821) presented_ns=21271221815000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21271265815816
+LENS_SUBMIT commit=70 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21271265815816 generation=0
+LENS_PRESENTED commit=70 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21271265815816) presented_ns=21271338486000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(20) cursor_age_ms=Some(20) video_pts=21271365815812
+LENS_SUBMIT commit=71 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21271365815812 generation=0
+LENS_PRESENTED commit=71 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21271365815812) presented_ns=21271446823000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(6) cursor_age_ms=Some(6) video_pts=21271482482474
+LENS_SUBMIT commit=72 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21271482482474 generation=0
+LENS_PRESENTED commit=72 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21271482482474) presented_ns=21271546825000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21271590815803
+LENS_SUBMIT commit=73 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21271590815803 generation=0
+LENS_PRESENTED commit=73 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21271590815803) presented_ns=21271663496000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(22) cursor_age_ms=Some(22) video_pts=21271674149133
+LENS_SUBMIT commit=74 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21271674149133 generation=0
+LENS_PRESENTED commit=74 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21271674149133) presented_ns=21271771833000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(20) cursor_age_ms=Some(20) video_pts=21271799149128
+LENS_SUBMIT commit=75 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21271799149128 generation=0
+LENS_PRESENTED commit=75 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21271799149128) presented_ns=21271871838000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(6) cursor_age_ms=Some(6) video_pts=21271924149123
+LENS_SUBMIT commit=76 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21271924149123 generation=0
+LENS_PRESENTED commit=76 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21271924149123) presented_ns=21271996842000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(17) cursor_age_ms=Some(17) video_pts=21272032482452
+LENS_SUBMIT commit=77 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21272032482452 generation=0
+LENS_PRESENTED commit=77 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21272032482452) presented_ns=21272105177000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(11) cursor_age_ms=Some(11) video_pts=21272132482448
+LENS_SUBMIT commit=78 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21272132482448 generation=0
+LENS_PRESENTED commit=78 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21272132482448) presented_ns=21272213514000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(8) cursor_age_ms=Some(8) video_pts=21272257482443
+LENS_SUBMIT commit=79 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21272257482443 generation=0
+LENS_PRESENTED commit=79 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21272257482443) presented_ns=21272321852000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(22) cursor_age_ms=Some(22) video_pts=21272340815773
+LENS_SUBMIT commit=80 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21272340815773 generation=0
+LENS_PRESENTED commit=80 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21272340815773) presented_ns=21272421852000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(2) cursor_age_ms=Some(2) video_pts=21272474149101
+LENS_SUBMIT commit=81 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21272474149101 generation=0
+LENS_PRESENTED commit=81 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21272474149101) presented_ns=21272538526000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(13) cursor_age_ms=Some(13) video_pts=21272557482431
+LENS_SUBMIT commit=82 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21272557482431 generation=0
+LENS_PRESENTED commit=82 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21272557482431) presented_ns=21272638528000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(17) cursor_age_ms=Some(17) video_pts=21272674149093
+LENS_SUBMIT commit=83 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21272674149093 generation=0
+LENS_PRESENTED commit=83 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21272674149093) presented_ns=21272755199000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21272790815755
+LENS_SUBMIT commit=84 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21272790815755 generation=0
+LENS_PRESENTED commit=84 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21272790815755) presented_ns=21272855203000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=21272907482417
+LENS_SUBMIT commit=85 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21272907482417 generation=0
+LENS_PRESENTED commit=85 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21272907482417) presented_ns=21272980207000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21273015815746
+LENS_SUBMIT commit=86 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21273015815746 generation=0
+LENS_PRESENTED commit=86 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21273015815746) presented_ns=21273080208000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(18) cursor_age_ms=Some(18) video_pts=21273107482409
+LENS_SUBMIT commit=87 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21273107482409 generation=0
+LENS_PRESENTED commit=87 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21273107482409) presented_ns=21273180211000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(22) cursor_age_ms=Some(22) video_pts=21273215815738
+LENS_SUBMIT commit=88 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21273215815738 generation=0
+LENS_PRESENTED commit=88 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21273215815738) presented_ns=21273296883000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=21273332482400
+LENS_SUBMIT commit=89 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21273332482400 generation=0
+LENS_PRESENTED commit=89 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21273332482400) presented_ns=21273396885000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(20) cursor_age_ms=Some(20) video_pts=21273415815730
+LENS_SUBMIT commit=90 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21273415815730 generation=0
+LENS_PRESENTED commit=90 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21273415815730) presented_ns=21273496886000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=21273532482392
+LENS_SUBMIT commit=91 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21273532482392 generation=0
+LENS_PRESENTED commit=91 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21273532482392) presented_ns=21273596891000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21273640815721
+LENS_SUBMIT commit=92 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21273640815721 generation=0
+LENS_PRESENTED commit=92 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21273640815721) presented_ns=21273721895000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(21) cursor_age_ms=Some(21) video_pts=21273740815717
+LENS_SUBMIT commit=93 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21273740815717 generation=0
+LENS_PRESENTED commit=93 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21273740815717) presented_ns=21273821899000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(3) cursor_age_ms=Some(3) video_pts=21273857482379
+LENS_SUBMIT commit=94 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21273857482379 generation=0
+LENS_PRESENTED commit=94 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21273857482379) presented_ns=21273921901000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(8) cursor_age_ms=Some(8) video_pts=21273957482375
+LENS_SUBMIT commit=95 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21273957482375 generation=0
+LENS_PRESENTED commit=95 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21273957482375) presented_ns=21274021904000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(4) cursor_age_ms=Some(4) video_pts=21274074149037
+LENS_SUBMIT commit=96 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21274074149037 generation=0
+LENS_PRESENTED commit=96 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21274074149037) presented_ns=21274130239000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(1) cursor_age_ms=Some(1) video_pts=21274190815699
+LENS_SUBMIT commit=97 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21274190815699 generation=0
+LENS_PRESENTED commit=97 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21274190815699) presented_ns=21274255245000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(8) cursor_age_ms=Some(8) video_pts=21274290815695
+LENS_SUBMIT commit=98 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21274290815695 generation=0
+LENS_PRESENTED commit=98 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21274290815695) presented_ns=21274355249000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(1) cursor_age_ms=Some(1) video_pts=21274407482357
+LENS_SUBMIT commit=99 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21274407482357 generation=0
+LENS_PRESENTED commit=99 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21274407482357) presented_ns=21274471919000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=21274499149020
+LENS_SUBMIT commit=100 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21274499149020 generation=0
+LENS_PRESENTED commit=100 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21274499149020) presented_ns=21274580253000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(2) cursor_age_ms=Some(2) video_pts=21274624149015
+LENS_SUBMIT commit=101 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21274624149015 generation=0
+LENS_PRESENTED commit=101 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21274624149015) presented_ns=21274680259000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=21274715815678
+LENS_SUBMIT commit=102 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21274715815678 generation=0
+LENS_PRESENTED commit=102 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21274715815678) presented_ns=21274788593000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(17) cursor_age_ms=Some(17) video_pts=21274807482341
+LENS_SUBMIT commit=103 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21274807482341 generation=0
+LENS_PRESENTED commit=103 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21274807482341) presented_ns=21274888598000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(0) cursor_age_ms=Some(0) video_pts=21274924149003
+LENS_SUBMIT commit=104 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21274924149003 generation=0
+LENS_PRESENTED commit=104 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21274924149003) presented_ns=21274988602000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(21) cursor_age_ms=Some(21) video_pts=21275024148999
+LENS_SUBMIT commit=105 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21275024148999 generation=0
+LENS_PRESENTED commit=105 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21275024148999) presented_ns=21275105272000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(2) cursor_age_ms=Some(2) video_pts=21275140815661
+LENS_SUBMIT commit=106 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21275140815661 generation=0
+LENS_PRESENTED commit=106 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21275140815661) presented_ns=21275205273000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=21275240815657
+LENS_SUBMIT commit=107 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21275240815657 generation=0
+LENS_PRESENTED commit=107 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21275240815657) presented_ns=21275305276000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(5) cursor_age_ms=Some(5) video_pts=21275357482319
+LENS_SUBMIT commit=108 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21275357482319 generation=0
+LENS_PRESENTED commit=108 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21275357482319) presented_ns=21275421946000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(15) cursor_age_ms=Some(15) video_pts=21275449148982
+LENS_SUBMIT commit=109 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21275449148982 generation=0
+LENS_PRESENTED commit=109 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21275449148982) presented_ns=21275530284000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21275574148977
+LENS_SUBMIT commit=110 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21275574148977 generation=0
+LENS_PRESENTED commit=110 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21275574148977) presented_ns=21275638623000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(13) cursor_age_ms=Some(13) video_pts=21275665815640
+LENS_SUBMIT commit=111 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21275665815640 generation=0
+LENS_PRESENTED commit=111 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21275665815640) presented_ns=21275738625000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(17) cursor_age_ms=Some(17) video_pts=21275757482303
+LENS_SUBMIT commit=112 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21275757482303 generation=0
+LENS_PRESENTED commit=112 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21275757482303) presented_ns=21275838626000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(8) cursor_age_ms=Some(8) video_pts=21275874148965
+LENS_SUBMIT commit=113 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21275874148965 generation=0
+LENS_PRESENTED commit=113 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21275874148965) presented_ns=21275955298000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(16) cursor_age_ms=Some(16) video_pts=21275990815627
+LENS_SUBMIT commit=114 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21275990815627 generation=0
+LENS_PRESENTED commit=114 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21275990815627) presented_ns=21276055299000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(5) cursor_age_ms=Some(5) video_pts=21276099148956
+LENS_SUBMIT commit=115 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21276099148956 generation=0
+LENS_PRESENTED commit=115 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21276099148956) presented_ns=21276155303000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(8) cursor_age_ms=Some(8) video_pts=21276199148952
+LENS_SUBMIT commit=116 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21276199148952 generation=0
+LENS_PRESENTED commit=116 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21276199148952) presented_ns=21276271974000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(21) cursor_age_ms=Some(21) video_pts=21276299148948
+LENS_SUBMIT commit=117 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21276299148948 generation=0
+LENS_PRESENTED commit=117 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21276299148948) presented_ns=21276380310000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(19) cursor_age_ms=Some(19) video_pts=21276407482277
+LENS_SUBMIT commit=118 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21276407482277 generation=0
+LENS_PRESENTED commit=118 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21276407482277) presented_ns=21276488649000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(11) cursor_age_ms=Some(11) video_pts=21276524148939
+LENS_SUBMIT commit=119 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21276524148939 generation=0
+LENS_PRESENTED commit=119 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21276524148939) presented_ns=21276588652000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(11) cursor_age_ms=Some(11) video_pts=21276640815601
+LENS_SUBMIT commit=120 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21276640815601 generation=0
+LENS_PRESENTED commit=120 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21276640815601) presented_ns=21276705321000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(22) cursor_age_ms=Some(22) video_pts=21276724148931
+LENS_SUBMIT commit=121 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21276724148931 generation=0
+LENS_PRESENTED commit=121 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21276724148931) presented_ns=21276805325000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(19) cursor_age_ms=Some(19) video_pts=21276840815593
+LENS_SUBMIT commit=122 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21276840815593 generation=0
+LENS_PRESENTED commit=122 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21276840815593) presented_ns=21276921994000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21276949148922
+LENS_SUBMIT commit=123 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21276949148922 generation=0
+LENS_PRESENTED commit=123 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21276949148922) presented_ns=21277021996000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(11) cursor_age_ms=Some(11) video_pts=21277065815584
+LENS_SUBMIT commit=124 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21277065815584 generation=0
+LENS_PRESENTED commit=124 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21277065815584) presented_ns=21277147002000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(3) cursor_age_ms=Some(3) video_pts=21277182482246
+LENS_SUBMIT commit=125 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21277182482246 generation=0
+LENS_PRESENTED commit=125 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21277182482246) presented_ns=21277238672000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(4) cursor_age_ms=Some(4) video_pts=21277299148908
+LENS_SUBMIT commit=126 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21277299148908 generation=0
+LENS_PRESENTED commit=126 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21277299148908) presented_ns=21277355343000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(18) cursor_age_ms=Some(18) video_pts=21277382482238
+LENS_SUBMIT commit=127 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21277382482238 generation=0
+LENS_PRESENTED commit=127 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21277382482238) presented_ns=21277455343000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(8) cursor_age_ms=Some(8) video_pts=21277499148900
+LENS_SUBMIT commit=128 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21277499148900 generation=0
+LENS_PRESENTED commit=128 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21277499148900) presented_ns=21277555345000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(12) cursor_age_ms=Some(12) video_pts=21277599148896
+LENS_SUBMIT commit=129 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21277599148896 generation=0
+LENS_PRESENTED commit=129 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21277599148896) presented_ns=21277672016000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(1) cursor_age_ms=Some(1) video_pts=21277715815558
+LENS_SUBMIT commit=130 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21277715815558 generation=0
+LENS_PRESENTED commit=130 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21277715815558) presented_ns=21277780354000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(12) cursor_age_ms=Some(12) video_pts=21277799148888
+LENS_SUBMIT commit=131 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21277799148888 generation=0
+LENS_PRESENTED commit=131 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21277799148888) presented_ns=21277880357000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(0) cursor_age_ms=Some(0) video_pts=21277915815550
+LENS_SUBMIT commit=132 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21277915815550 generation=0
+LENS_PRESENTED commit=132 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21277915815550) presented_ns=21277980359000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(3) cursor_age_ms=Some(3) video_pts=21278032482212
+LENS_SUBMIT commit=133 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21278032482212 generation=0
+LENS_PRESENTED commit=133 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21278032482212) presented_ns=21278097033000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(11) cursor_age_ms=Some(11) video_pts=21278124148875
+LENS_SUBMIT commit=134 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21278124148875 generation=0
+LENS_PRESENTED commit=134 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21278124148875) presented_ns=21278197033000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(19) cursor_age_ms=Some(19) video_pts=21278224148871
+LENS_SUBMIT commit=135 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21278224148871 generation=0
+LENS_PRESENTED commit=135 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21278224148871) presented_ns=21278297036000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=21278340815533
+LENS_SUBMIT commit=136 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21278340815533 generation=0
+LENS_PRESENTED commit=136 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21278340815533) presented_ns=21278413709000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(14) cursor_age_ms=Some(14) video_pts=21278440815529
+LENS_SUBMIT commit=137 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21278440815529 generation=0
+LENS_PRESENTED commit=137 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21278440815529) presented_ns=21278522045000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(4) cursor_age_ms=Some(4) video_pts=21278574148857
+LENS_SUBMIT commit=138 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21278574148857 generation=0
+LENS_PRESENTED commit=138 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21278574148857) presented_ns=21278630381000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=21278665815520
+LENS_SUBMIT commit=139 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21278665815520 generation=0
+LENS_PRESENTED commit=139 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21278665815520) presented_ns=21278738720000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(20) cursor_age_ms=Some(20) video_pts=21278765815516
+LENS_SUBMIT commit=140 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21278765815516 generation=0
+LENS_PRESENTED commit=140 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21278765815516) presented_ns=21278838719000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(23) cursor_age_ms=Some(23) video_pts=21278865815512
+LENS_SUBMIT commit=141 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21278865815512 generation=0
+LENS_PRESENTED commit=141 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21278865815512) presented_ns=21278947056000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(13) cursor_age_ms=Some(13) video_pts=21278974148841
+LENS_SUBMIT commit=142 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21278974148841 generation=0
+LENS_PRESENTED commit=142 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21278974148841) presented_ns=21279047060000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(16) cursor_age_ms=Some(16) video_pts=21279074148837
+LENS_SUBMIT commit=143 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21279074148837 generation=0
+LENS_PRESENTED commit=143 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21279074148837) presented_ns=21279155397000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(2) cursor_age_ms=Some(2) video_pts=21279199148832
+LENS_SUBMIT commit=144 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21279199148832 generation=0
+LENS_PRESENTED commit=144 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21279199148832) presented_ns=21279255402000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(1807,1483) color=[11, 12, 18] frame_age_ms=Some(23) cursor_age_ms=Some(23) video_pts=21279299148828
+LENS_SUBMIT commit=145 rect=(1046,767,160,160) source=(1807,1483) color=#0B0C12 pts_ns=21279299148828 generation=0
+LENS_PRESENTED commit=145 color=#0B0C12 source=Some(PixelPoint { x: 1807, y: 1483 }) video_pts=Some(21279299148828) presented_ns=21279372069000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(6) cursor_age_ms=Some(6) video_pts=21279399148824
+LENS_SUBMIT commit=146 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21279399148824 generation=0
+LENS_PRESENTED commit=146 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21279399148824) presented_ns=21279480409000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(1) cursor_age_ms=Some(1) video_pts=21279524148819
+LENS_SUBMIT commit=147 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21279524148819 generation=0
+LENS_PRESENTED commit=147 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21279524148819) presented_ns=21279588746000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(7) cursor_age_ms=Some(7) video_pts=21279615815482
+LENS_SUBMIT commit=148 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21279615815482 generation=0
+LENS_PRESENTED commit=148 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21279615815482) presented_ns=21279680413000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(14) cursor_age_ms=Some(14) video_pts=21279724148811
+LENS_SUBMIT commit=149 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21279724148811 generation=0
+LENS_PRESENTED commit=149 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21279724148811) presented_ns=21279797086000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(15) cursor_age_ms=Some(15) video_pts=21279840815473
+LENS_SUBMIT commit=150 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21279840815473 generation=0
+LENS_PRESENTED commit=150 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21279840815473) presented_ns=21279913754000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(23) cursor_age_ms=Some(23) video_pts=21279940815469
+LENS_SUBMIT commit=151 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21279940815469 generation=0
+LENS_PRESENTED commit=151 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21279940815469) presented_ns=21280013755000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(15) cursor_age_ms=Some(15) video_pts=21280057482131
+LENS_SUBMIT commit=152 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21280057482131 generation=0
+LENS_PRESENTED commit=152 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21280057482131) presented_ns=21280147097000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(23) cursor_age_ms=Some(23) video_pts=21280140815461
+LENS_SUBMIT commit=153 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21280140815461 generation=0
+LENS_PRESENTED commit=153 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21280140815461) presented_ns=21280238762000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=21280265815456
+LENS_SUBMIT commit=154 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21280265815456 generation=0
+LENS_PRESENTED commit=154 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21280265815456) presented_ns=21280330434000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(21) cursor_age_ms=Some(21) video_pts=21280357482119
+LENS_SUBMIT commit=155 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21280357482119 generation=0
+LENS_PRESENTED commit=155 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21280357482119) presented_ns=21280455440000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(19) cursor_age_ms=Some(19) video_pts=21280482482114
+LENS_SUBMIT commit=156 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21280482482114 generation=0
+LENS_PRESENTED commit=156 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21280482482114) presented_ns=21280555443000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(8) cursor_age_ms=Some(8) video_pts=21280599148776
+LENS_SUBMIT commit=157 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21280599148776 generation=0
+LENS_PRESENTED commit=157 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21280599148776) presented_ns=21280663779000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(21) cursor_age_ms=Some(21) video_pts=21280682482106
+LENS_SUBMIT commit=158 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21280682482106 generation=0
+LENS_PRESENTED commit=158 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21280682482106) presented_ns=21280763779000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(20) cursor_age_ms=Some(20) video_pts=21280799148768
+LENS_SUBMIT commit=159 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21280799148768 generation=0
+LENS_PRESENTED commit=159 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21280799148768) presented_ns=21280872119000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(16) cursor_age_ms=Some(16) video_pts=21280915815430
+LENS_SUBMIT commit=160 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21280915815430 generation=0
+LENS_PRESENTED commit=160 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21280915815430) presented_ns=21280988786000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=21281032482092
+LENS_SUBMIT commit=161 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21281032482092 generation=0
+LENS_PRESENTED commit=161 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21281032482092) presented_ns=21281088788000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=21281149148754
+LENS_SUBMIT commit=162 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21281149148754 generation=0
+LENS_PRESENTED commit=162 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21281149148754) presented_ns=21281205461000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(13) cursor_age_ms=Some(13) video_pts=21281257482083
+LENS_SUBMIT commit=163 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21281257482083 generation=0
+LENS_PRESENTED commit=163 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21281257482083) presented_ns=21281330465000 generation=0
+NATIVE_DIAGNOSTIC stream=126 source=(866,594) color=[255, 0, 0] frame_age_ms=Some(14) cursor_age_ms=Some(14) video_pts=21281365815412
+LENS_SUBMIT commit=164 rect=(509,260,160,160) source=(866,594) color=#FF0000 pts_ns=21281365815412 generation=0
+LENS_PRESENTED commit=164 color=#FF0000 source=Some(PixelPoint { x: 866, y: 594 }) video_pts=Some(21281365815412) presented_ns=21281430468000 generation=0
+NATIVE_RELEASE button=273 outcome=Some(Ok(Cancelled)) held={}
+END reason=release_or_error selected=true history=2
+CLEANUP shields=1 lens_destroyed=true pointers_released=true keyboard_objects=0
+WAYLAND_CLEANUP flush=Ok(()) result=None
+GlobalShortcuts session closed
+ScreenCast session closed
+Native color selection cancelled

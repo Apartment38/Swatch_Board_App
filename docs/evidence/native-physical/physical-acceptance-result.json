@@ -1,0 +1,75 @@
+{
+  "target": {
+    "output": "eDP-1",
+    "mode": "2880x1800@120",
+    "logical_normal": "1646x1029",
+    "scale": 1.75,
+    "normal_rotation": 1,
+    "rotated_left_logical": "1029x1646",
+    "rotated_left_stream": "1800x2880"
+  },
+  "static_selection": {
+    "target": "#FF0000",
+    "presented": "#FF0000",
+    "stdout": "#FF0000",
+    "sessions_closed": true
+  },
+  "animated_selection_after_throttle": {
+    "presented": "#FF00FF",
+    "stdout": "#FF00FF",
+    "fixture_presses": 0,
+    "fixture_releases": 0,
+    "sessions_closed": true
+  },
+  "rotated_left_selection_after_throttle": {
+    "target": "#FF0000",
+    "presented": "#FF0000",
+    "stdout": "#FF0000",
+    "fixture_presses": 0,
+    "fixture_releases": 0,
+    "sessions_closed": true,
+    "display_restored": true
+  },
+  "right_cancel": {
+    "outcome": "cancelled",
+    "sessions_closed": true
+  },
+  "escape": {
+    "outcome": "cancelled",
+    "sessions_closed": true,
+    "second_escape_closed_restored_fixture": true
+  },
+  "performance_before_throttle": {
+    "rss_kib": 154400,
+    "pss_kib": 118574,
+    "uss_kib": 87200,
+    "swap_kib": 0,
+    "lifetime_cpu_percent": 73.2
+  },
+  "performance_after_throttle": {
+    "rss_kib": 134136,
+    "pss_kib": 98252,
+    "uss_kib": 66880,
+    "swap_kib": 0,
+    "lifetime_cpu_percent": 12.6,
+    "picker_exited_within_seconds": 2,
+    "sessions_closed": true
+  },
+  "lock_unlock": {
+    "capture_gap_ms": 8098.831,
+    "last_presented_before_lock_ns": 35548245655000,
+    "first_presented_after_unlock_ns": 35556344486000,
+    "first_post_unlock_video_pts_ns": 35556231911084,
+    "first_post_unlock_frame_age_ms": 78,
+    "selected_after_unlock": "#171A26",
+    "fixture_presses": 0,
+    "fixture_releases": 0,
+    "sessions_closed": true
+  },
+  "not_exercised_on_physical_output": {
+    "hotplug": "eDP-1 was the only physical output; real private KWin output removal passed"
+  },
+  "temporary_host_desktop_entry_removed": true,
+  "phase_1a": "passed",
+  "default_backend": "rust_owned_presented_sample"
+}

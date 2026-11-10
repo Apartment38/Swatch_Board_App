@@ -1,18 +1,12 @@
 # Phase 1A live validation and blocking findings
 
-**Gate status: NOT PASSED.** Do not start Phase 1B or the Board.
+**Current gate status: PASSED.** This document preserves the earlier KWin-backed
+validation and blocker evidence. The Rust-owned presented-sample picker that
+resolved those blockers is documented in
+[native integration acceptance](phase-1a-native-integration.md).
 
-**Subsequent user decision:** investigate Rust-owned selection with the actually
-presented sample as authority. [Decision and retained safety gates](decisions/native-selection-authority.md).
-The findings below describe the existing KWin-backed path; no claim is made that
-the new native path is implemented or validated yet.
-
-## Native investigation checkpoint
-
-See [autonomous native probe results](phase-1a-native-probes.md). Pointer shielding,
-right cancellation, idle cleanup and cursor exclusion were demonstrated in a
-private virtual session. Cursor presentation acknowledgments were not; this is
-not a production-native-path pass. The original KWin-backed findings below stand.
+The retained KWin findings below are historical. They remain useful evidence for
+why KWin ColorPicker was removed as the authority and backend.
 
 ## What was built
 
@@ -49,19 +43,14 @@ cargo build --release --offline --workspace --examples
 cargo run --release --offline -p swatch-board-picker -- --diagnostics
 cargo run --release --offline -p swatch-board-picker -- --radius 7 --zoom 10
 
-# Explicit acceptance mode: a single authorized portal session, fresh capture and
-# overlay helpers per round, no persisted restore token. Session closes at the end.
-cargo run --release --offline -p swatch-board-picker -- --diagnostics --repeat 10
-
+# Real-session helpers for controlled acceptance.
 cargo run --release --offline -p swatch-board-picker --example phase1a_fixture
 cargo run --release --offline -p swatch-board-picker --example phase1a_input -- move X Y
 # Input helper actions: left, right, escape, return. Never use it on human-session permission dialogs.
 ```
 
-`--repeat` is bounded to 1..20, defaults to one, and gives an explicit three-second
-preparation interval before its first pick when greater than one. It is a testing
-mode, not a resident tray service. `--radius` is 0..31 and `--zoom` is 4..32 physical
-pixels per source pixel. Human-session KDE consent is never automated. Only the disposable private lab
+`--radius` is 0..31 and `--zoom` is 4..32 physical pixels per source pixel.
+Human-session KDE consent is never automated. Only the disposable private lab
 chooser described in the native checkpoint is automated, after asserting private
 D-Bus/runtime/Wayland identity.
 

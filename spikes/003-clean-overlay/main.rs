@@ -103,7 +103,7 @@ async fn main() -> Result<()> {
     let (stop_tx, stop_rx) = mpsc::channel();
     let worker_feed = feed.clone();
     let worker =
-        std::thread::spawn(move || capture::run(pipewire_fd, streams, worker_feed, stop_rx));
+        std::thread::spawn(move || capture::run(pipewire_fd, streams, worker_feed, stop_rx, None));
     let result = (|| -> Result<()> {
         let first = feed.wait_for_frame(Duration::from_secs(5))?;
         log!(

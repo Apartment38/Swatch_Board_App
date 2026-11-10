@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
     let (stop_tx, stop_rx) = mpsc::channel();
     let capture_feed = feed.clone();
     let worker =
-        std::thread::spawn(move || capture::run(pipewire_fd, streams, capture_feed, stop_rx));
+        std::thread::spawn(move || capture::run(pipewire_fd, streams, capture_feed, stop_rx, None));
     // All paths after successful portal setup converge on explicit cleanup.
     let result = (|| -> Result<()> {
         let first = feed.wait_for_frame(Duration::from_secs(5))?;

@@ -1,89 +1,86 @@
-# Native application integration — partial acceptance
+# Native application integration — resumed acceptance
 
-**Phase 1A remains NOT PASSED. `--native` is opt-in; default KWin path unchanged.**
+**Phase 1A PASSED. The Rust-owned picker is the default and only backend.**
 
-## Independently reproduced integration checks
+The resumed work fixed the backend's remaining known routing and display-transform defects, then exercised the fixes in both a private two-output KWin lab and the actual 2880×1800, 1.75× eDP-1 target. These are real compositor/portal/PipeWire/Wayland integration checks, not unit mocks.
 
-After the integration handoff, the parent ran the real release application in the
-private KWin lab, not merely the prototype example:
+## Resumed implementation
 
-```sh
-target/release/swatch-board-picker --native --radius 5 --zoom 12 --diagnostics
-```
+- Route portal streams to Wayland outputs by unique compositor origin. Portal `size` is retained as stream identity metadata; Wayland logical geometry is authoritative for pointer routing. A size difference is diagnosed rather than rejected because portal size is compositor-coordinate metadata and may differ from the stream or Wayland logical size.
+- Preserve portal position/size identity checks after startup so a changed stream still fails closed.
+- Support transformed outputs. Capture orientation is detected from actual frame/logical dimensions: compositor-oriented frames use normal capture mapping, while raw-oriented frames use the Wayland output transform.
+- Render the native lens's live `#RRGGBB` readout and a two-tone center marker that remains visible over light and dark pixels.
+- Extend the private input helper with bounded left/right button holds for failure-path acceptance.
+- Throttle full-frame RGBA conversion to at most once every 75 ms on the 10 Hz presentation path.
 
-Before subsequent output-routing development, full offline locked all-target
-workspace tests passed: **99 test executions**, including reused capture/portal
-tests in examples. This is a verification snapshot, not a claim that later
-in-progress edits have already passed the same full gate.
+## Live acceptance results
 
-### Integrated Escape lifecycle — passed in this scenario
+| Scenario | Observed result | Evidence |
+|---|---|---|
+| Mixed scale, two outputs | Passed blue-primary → red-secondary → white-primary routing; selected `#FFFFFF`; both transition barriers used destination video newer than their cutoffs; fixture mouse/focus counters did not change; sessions closed. KWin changed the virtual output mode once during capture startup, then it remained stable. | [result](evidence/native-resume/native-matrix-fractional-stable-result.json), [trace](evidence/native-resume/native-matrix-fractional-stable.log), [stdout](evidence/native-resume/native-matrix-fractional-stable.stdout) |
+| Left-rotated secondary output | Passed selection on the transformed output with `#FF0000`; fixture counters did not change; sessions closed. KWin supplied an already compositor-oriented 768×1024 stream for the 768×1024 logical output. | [result](evidence/native-resume/native-matrix-rotated-left-result.json), [trace](evidence/native-resume/native-matrix-rotated-left.log), [stdout](evidence/native-resume/native-matrix-rotated-left.stdout) |
+| Animated presented-sample authority | Passed: the genuinely presented center was `#00FFFF`, stdout was exactly `#00FFFF`, fixture counters did not change, and sessions closed. | [result](evidence/native-resume/native-animated-presented-result.json), [trace](evidence/native-resume/native-animated-presented.log), [stdout](evidence/native-resume/native-animated-presented.stdout) |
+| Geometry failure while left button held | Passed this failure stage: output geometry changed while the synthetic button remained held; picker exited with failure; the later release reached neither fixture; both sessions closed. | [result](evidence/native-resume/native-held-failure-result.json), [picker trace](evidence/native-resume/native-held-failure.log), [input trace](evidence/native-resume/native-held-failure-input.log) |
+| Native marker/readout | Visually observed the two-tone center marker and `#FFFFFF` readout on the live native surface over a white source. | [screenshot](evidence/native-resume/native-readout-visual.png), [trace](evidence/native-resume/native-readout-visual.log) |
 
-- The actual native application registered its own identity, captured Virtual-0,
-  bound bare Escape through GlobalShortcuts, and displayed a blue magnifier with
-  genuine per-commit Presented events.
-- First Escape cancelled native selection, removed both shields and the lens,
-  and explicitly closed GlobalShortcuts and ScreenCast sessions.
-- The fixture remained alive. A second Escape reached it and produced its normal
-  Escape shutdown, demonstrating release of the global binding in this run.
-- During active picking, mouse counts remained 1 press / 1 release; keyboard
-  enter/leave counts remained 3/2 from the post-authorization baseline. Consent
-  dialogs occur before this baseline and are not being misreported as zero focus
-  changes throughout authorization.
+KScreen rejected a requested negative output position with `Position of enabled output Virtual-0 is negative`; KWin normalized the usable virtual layout. Negative-origin and all eight transform mappings remain covered by deterministic geometry tests, but this target compositor could not provide a live negative-origin topology.
 
-See [Escape result](evidence/native-integrated/native-integrated-escape-result.json),
-[application trace](evidence/native-integrated/native-integrated-2.log), and fixture trace.
+## Physical-target acceptance
 
-### Integrated selection plus self-occlusion recovery — passed in this scenario
+The actual target ran Plasma Wayland at 2880×1800@120 Hz, logical 1646×1029,
+1.75× scale. Recorded physical results:
 
-- Blue source `(512,227)` was magnified and genuinely presented.
-- Moving to `(606,227)` entered the old lens footprint. A cursor-free independent
-  screenshot there initially showed blue lens pixels, while the uncovered fixture
-  target was white.
-- The application submitted a transparent mapped hide, received genuine hide
-  presentation, and required new VIDEO PTS beyond the local receipt cutoff.
-- A new off-source white lens received Presented. An independent screenshot of
-  the uncovered source was RGB `(255,255,255)`.
-- Left release printed exactly **`#FFFFFF`** on stdout. Diagnostics remained on
-  stderr. GlobalShortcuts and ScreenCast sessions closed explicitly.
-- Mouse counts stayed 1/1 and keyboard enter/leave stayed 2/1 during picking.
+| Scenario | Observed result |
+|---|---|
+| Controlled static target | Presented and printed exactly `#FF0000`; sessions closed. |
+| Animated target after capture throttling | Last genuinely presented commit and stdout were exactly `#FF00FF`; fixture presses/releases remained 0/0; sessions closed. |
+| Physical left rotation at 1.75× | KScreen reported logical 1029×1646, PipeWire negotiated BGRA 1800×2880, Wayland reported transform `_90`, and the picker presented/printed `#FF0000`; the display was restored to normal 1646×1029 afterward. |
+| Right-click cancellation | Cancelled with both portal sessions closed. |
+| Escape lifecycle | First Escape cancelled and closed both sessions; a second Escape reached and closed the restored fixture, proving the temporary global binding was gone. |
+| Fullscreen/focus/click safety | Fullscreen animated fixture retained zero presses/releases during picker confirmation; normal focus returned after cleanup. |
+| Lock/unlock | Lock suspended presentation for 8098.831 ms. After unlock, the first presented sample used a new video PTS and was 78 ms old; selection resumed, fixture presses/releases remained 0/0, and both sessions closed. |
 
-See [selection result](evidence/native-integrated/native-integrated-select-result.json),
-[application trace](evidence/native-integrated/native-select.log), exact
-[stdout](evidence/native-integrated/native-select.stdout), and before/after PNGs.
-The fixture was later reused during separate output-matrix preparation; acceptance
-JSON records counters at the end of the relevant native test, before that later
-fixture focus change.
+See the [structured result](evidence/native-physical/physical-acceptance-result.json)
+and raw traces in `docs/evidence/native-physical/`.
 
-## Packaging and isolation
+## Performance observations
 
-The application desktop entry is a project packaging artifact:
-`share/applications/org.apartment38.SwatchBoard.desktop`. No host entry was installed.
-The private lab copied that entry into its own XDG data directory and used an
-absolute Exec pointing to the real project release binary. Its original uninstalled
-relative executable was not resolvable on the lab PATH, and app registration
-correctly failed before capture; pointing the private entry to the actual binary
-allowed registration. Normal packaging must install the binary and desktop entry
-consistently. Do not infer that the uninstalled host CLI needs no setup.
+The initial physical capture exposed a proven hotspot: full-frame RGBA conversion ran at the 120 Hz capture rate despite the native lens presenting at 10 Hz.
 
-Only private consent dialogs were automated. The initial private bare-Escape
-approval was visually inspected before activation; a later session reused the
-private application's stored assignment. No real desktop shortcut settings,
-permissions, or display settings were altered by these integrated tests.
+| Run | PSS (KiB) | USS (KiB) | Lifetime CPU |
+|---|---:|---:|---:|
+| Physical, before throttle | 118,574 | 87,200 | 73.2% |
+| Physical, 75 ms throttle | 98,252 | 66,880 | 12.6% |
+| Earlier private two-output lab | 28,767 | 18,444 | 3.4% |
 
-## Outstanding release gates
+Right-click cancellation removed the optimized physical process within two seconds and closed both sessions. Post-change animated and rotated exact-selection runs passed. These are recorded observations, not invented budgets or idle-tray measurements.
 
-- Multi-authorized-output routing and transition barriers; a dedicated worker is
-  implementing this and the parent will run the matrix after handoff.
-- Fractional-scale, negative-origin and transformed-output live coverage.
-- Animated-content selection versus the genuinely presented lens commit.
-- Failure cleanup with buttons held: bounded exit is not proof of click safety.
-- Full combined cancellation/failure/resource-cleanup matrix after final edits.
-- Final native UI/readout/performance and default-backend decision. No automatic
-  promotion to default or Phase 1B has occurred.
+## Existing integrated acceptance retained
 
-A fullscreen-output option has been added to the native fixture to prepare the
-matrix. Its parser was observed failing then passing; its example test, strict
-Clippy and release build passed. An actual `--fullscreen-output Virtual-1` run
-configured 1024×768 fullscreen on the second virtual output and observed pointer
-local `(450,150)` after global `(1474,150)`. This validates fixture placement,
-**not** native multi-output sampling yet.
+Earlier integrated native evidence already covers successful exact static selection and self-occlusion recovery, right-click cancellation, Escape lifecycle and shortcut release, focus/click preservation, explicit portal closure, and normal two-output transitions. See `docs/evidence/native-integrated/` and `docs/evidence/native-matrix/`.
+
+## Controlled failure matrix
+
+The private KWin lab now covers the remaining fault-injection paths:
+
+- Escape cancelled a genuine portal chooser request before capture; retrying immediately authorized capture and right-click cleanup closed both sessions.
+- Pausing private KWin for four seconds caused `stale capture image`; both shields and both sessions cleaned up after KWin resumed.
+- Terminating the private PipeWire server produced the expected stream-disconnected failure, removed both shields, closed GlobalShortcuts, and recognized the portal-destroyed ScreenCast object as already closed.
+- Disabling private `Virtual-1` during active selection failed closed on output/layer removal and closed both sessions.
+- Authorization completion to the first genuinely presented lens commit was 63.865 ms in the private 1024×768 run. The permanent diagnostic records the authorization monotonic timestamp so later physical runs can measure the same interval without consent time.
+
+See the [structured result](evidence/native-failure-matrix/failure-matrix-result.json)
+and raw traces in `docs/evidence/native-failure-matrix/`.
+
+
+## Phase 1A decision
+
+The physical fractional, transformed, fullscreen, static, animated, confirmation,
+cancellation, focus, click-safety, cleanup, and lock/unlock checks pass. The
+private multi-output, hotplug, portal denial/restoration, slow-frame, and
+backend-loss checks pass. Physical hotplug could not be attempted because eDP-1
+was the only physical output; the real private KWin output-removal case passed.
+
+The Rust-owned backend is now the default and only picker implementation.
+`--native`, `--repeat`, and the obsolete KWin ColorPicker path were removed.
+Phase 1A passes; no Phase 1B work has started.

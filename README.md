@@ -3,15 +3,13 @@
 Build beautiful palettes with swatches.
 
 Swatch Board is a Rust-only KDE Plasma Wayland color utility. The current
-implementation is the **Phase 1A live magnifying picker prototype**, not the
-finished tray service or Board editor. The Phase 1A live-desktop acceptance gate
-has **not** passed; later phases must not start until it does. The current blocker
-is a demonstrated animated-content mismatch between the displayed magnifier frame
-and KWin's later sample, plus the lack of remote cancellation for an interrupted
-KWin selection. See [live validation and decisions](docs/phase-1a-live-validation.md).
-The user-approved next investigation is
-[Rust-owned displayed-sample selection](docs/decisions/native-selection-authority.md);
-its safety and live acceptance checks remain open.
+implementation is the **Phase 1A live magnifying picker**, not the finished tray
+service or Board editor. Phase 1A passed on the actual 2880×1800, 1.75× KDE
+Plasma Wayland target and in a private multi-output fault-injection lab. The
+Rust-owned picker is now the only backend; the obsolete KWin ColorPicker path
+and its animated-content mismatch were removed. See
+[Phase 1A status](docs/phase-1a-status.md) and
+[native integration acceptance](docs/phase-1a-native-integration.md).
 
 ## Build and test
 
@@ -34,11 +32,10 @@ From a KDE Plasma Wayland desktop session:
 cargo run --offline --locked -p swatch-board-picker
 ```
 
-The picker requests screen-capture authorization through KDE's portal, starts a
-live pointer-transparent magnifier, and delegates selection to KWin. Left click
-selects; right click or Escape cancels through KWin. These are the intended
-controls; see the handoff for which live acceptance checks remain outstanding.
-The prototype logs results to stderr; clipboard, history, tray, and Board UI are
+The picker requests screen-capture authorization through KDE's portal. Left
+release confirms the exact center sample from a genuinely presented magnifier
+commit; right release or Escape cancels. Diagnostics go to stderr and the
+selected `#RRGGBB` value to stdout. Clipboard, history, tray, and Board UI are
 not implemented yet.
 
 Inspect the CLI without opening a capture session:

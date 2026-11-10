@@ -12,6 +12,26 @@ pub struct CaptureSession {
     pub streams: Vec<Stream>,
     pub pipewire_fd: OwnedFd,
 }
+pub fn session_is_already_closed(error: &ashpd::Error) -> bool {
+    fn zbus_object_missing(error: &zbus::Error) -> bool {
+        match error {
+            zbus::Error::FDO(error) => {
+                matches!(error.as_ref(), zbus::fdo::Error::UnknownObject(_))
+            }
+            zbus::Error::MethodError(_, detail, _) => detail
+                .as_deref()
+                .is_some_and(|detail| detail.starts_with("Object does not exist at path ")),
+            _ => false,
+        }
+    }
+
+    match error {
+        ashpd::Error::Portal(ashpd::PortalError::ZBus(error)) | ashpd::Error::Zbus(error) => {
+            zbus_object_missing(error)
+        }
+        _ => false,
+    }
+}
 
 fn validate_streams(streams: &[Stream]) -> Result<(), Box<dyn std::error::Error>> {
     if streams.is_empty() {
@@ -78,7 +98,13 @@ pub async fn begin_capture() -> Result<CaptureSession, Box<dyn std::error::Error
         Ok((streams, pipewire_fd))
     }
     .await;
-    let (streams, pipewire_fd) = close_on_error(setup, || session.close()).await?;
+    let (streams, pipewire_fd) = close_on_error(setup, || async {
+        match session.close().await {
+            Err(error) if session_is_already_closed(&error) => Ok(()),
+            result => result,
+        }
+    })
+    .await?;
 
     Ok(CaptureSession {
         portal,
@@ -101,6 +127,17 @@ mod tests {
                 .to_string()
                 .contains("no streams")
         );
+    }
+
+    #[test]
+    fn missing_session_object_is_already_closed() {
+        let missing = ashpd::Error::Portal(ashpd::PortalError::ZBus(zbus::Error::FDO(Box::new(
+            zbus::fdo::Error::UnknownObject("Object does not exist".into()),
+        ))));
+        assert!(session_is_already_closed(&missing));
+        assert!(!session_is_already_closed(&ashpd::Error::Portal(
+            ashpd::PortalError::Failed("close failed".into()),
+        )));
     }
 
     #[tokio::test]

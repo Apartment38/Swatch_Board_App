@@ -1,0 +1,4 @@
+fake-input version=6 action=HoldButton(272, 4); requests are not proof of compositor authorization or delivery
+button_down button=272 hold_seconds=4
+button_up button=272
+requests flushed and compositor roundtrip completed; verify fixture/picker logs for effect

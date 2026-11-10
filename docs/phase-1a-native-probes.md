@@ -1,6 +1,6 @@
 # Phase 1A — native investigation checkpoint
 
-**Gate: NOT PASSED. Production still uses the KWin-backed path.**
+**Historical probe checkpoint. The completed native path now passes Phase 1A and is the only backend.**
 
 ## Autonomous test environment
 

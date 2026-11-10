@@ -1,0 +1,50 @@
+Experimental native backend: not a Phase 1A pass; authorized normal-transform capture outputs
+Connecting to the ScreenCast portal
+Creating the ScreenCast portal session
+Requesting monitor selection and capture authorization
+Starting the authorized ScreenCast streams
+Opening the PipeWire remote
+CAPTURE_ROUTE stream=50 origin=(0, 0) portal_logical=(1024, 768)
+CAPTURE_ROUTE stream=46 origin=(1024, 0) portal_logical=(1024, 768)
+PipeWire stream 50 changed from Unconnected to Connecting
+PipeWire stream 46 changed from Unconnected to Connecting
+PipeWire stream 50 changed from Connecting to Paused
+PipeWire stream 46 changed from Connecting to Paused
+PipeWire stream 50 negotiated VideoFormat::BGRA 1024x768
+Requested PipeWire cursor metadata for stream 50
+PipeWire stream 50 changed from Paused to Streaming
+PipeWire stream 46 negotiated VideoFormat::BGRA 1024x768
+Requested PipeWire cursor metadata for stream 46
+PipeWire stream 46 changed from Paused to Streaming
+Native experimental selection active: left release confirms presented lens, right release/Escape cancels; no current-scene RGB equality claim
+PRESENTATION_CLOCK clock_id=1 required_CLOCK_MONOTONIC=1
+OUTPUT name=Some("Virtual-0") origin=(0, 0) logical=(1024, 768) transform=Normal
+OUTPUT name=Some("Virtual-1") origin=(1024, 0) logical=(1024, 768) transform=Normal
+SHIELD_MAPPED output=0 transparent=true full_input=true keyboard=None
+SHIELD_MAPPED output=1 transparent=true full_input=true keyboard=None
+POINTER_ENTER id=16 local=(732,734) source=wl_pointer
+LENS_REQUESTED normal_layer=true cursor_role=false keyboard=None empty_input=true buffer=160
+NATIVE_DIAGNOSTIC stream=50 source=(732,734) color=[84, 98, 105] frame_age_ms=Some(0) cursor_age_ms=Some(0) video_pts=3430266529456
+LENS_SUBMIT commit=1 rect=(746,608,160,160) source=(732,734) color=#546269 pts_ns=3430266529456 generation=0
+LENS_PRESENTED commit=1 color=#546269 source=Some(PixelPoint { x: 732, y: 734 }) video_pts=Some(3430266529456) presented_ns=3430299862788 generation=0
+NATIVE_DIAGNOSTIC stream=50 source=(512,227) color=[33, 33, 255] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=3430366529452
+LENS_SUBMIT commit=2 rect=(526,147,160,160) source=(512,227) color=#2121FF pts_ns=3430366529452 generation=0
+LENS_PRESENTED commit=2 color=#2121FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(3430366529452) presented_ns=3430399862784 generation=0
+NATIVE_DIAGNOSTIC stream=50 source=(512,227) color=[0, 0, 255] frame_age_ms=Some(47) cursor_age_ms=Some(47) video_pts=3430433196116
+LENS_SUBMIT commit=3 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=3430433196116 generation=0
+LENS_PRESENTED commit=3 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(3430433196116) presented_ns=3430499862780 generation=0
+NATIVE_DIAGNOSTIC stream=50 source=(512,227) color=[0, 0, 255] frame_age_ms=Some(90) cursor_age_ms=Some(90) video_pts=3430499862780
+LENS_SUBMIT commit=4 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=3430499862780 generation=0
+LENS_PRESENTED commit=4 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(3430499862780) presented_ns=3430616529442 generation=0
+NATIVE_DIAGNOSTIC stream=50 source=(512,227) color=[0, 0, 255] frame_age_ms=Some(102) cursor_age_ms=Some(102) video_pts=3430616529442
+LENS_SUBMIT commit=5 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=3430616529442 generation=0
+LENS_PRESENTED commit=5 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(3430616529442) presented_ns=3430733196104 generation=0
+FAIL_CLOSED output changed
+WARNING bounded timeout/error with buttons held: click safety NOT established held={(16, 272)}
+END reason=release_or_error selected=false history=2
+WARNING CLEANUP held_buttons={(16, 272)}; bounded exit is not proof of click safety
+CLEANUP shields=2 lens_destroyed=true pointers_released=true keyboard_objects=0
+WAYLAND_CLEANUP flush=Ok(()) result=Some("output changed")
+GlobalShortcuts session closed
+ScreenCast session closed
+Error: "output changed"

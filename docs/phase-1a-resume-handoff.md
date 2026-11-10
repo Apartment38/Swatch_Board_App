@@ -1,4 +1,15 @@
-# Swatch Board — stopped-work handoff
+# Swatch Board — resumed-work handoff
+
+> **Completed:** Work resumed after checkpoint `f2d436e`. Mixed-scale routing,
+> transformed capture mapping, animated presented authority, held-button failure,
+> readout/marker, physical 1.75×/rotated/lock acceptance, and the private failure
+> matrix now pass. Observed active-capture CPU fell from 73.2% to 12.6% after
+> frame-conversion throttling. The Rust-owned picker is the default and only
+> backend; the obsolete KWin ColorPicker path was removed. Phase 1A passed. See
+> [native integration acceptance](phase-1a-native-integration.md).
+
+The stopped-work history below explains the checkpoint; its pause and unfinished
+state are no longer current instructions.
 
 ## User direction and boundary
 
@@ -13,12 +24,11 @@ All task-created files/configuration remain inside the project. The one previous
 authorized temporary host desktop entry was removed earlier; no new host entry was
 installed. Never automate the human desktop's permission dialogs.
 
-## Release status
+## Current release status
 
-**Phase 1A is NOT PASSED.** Do not start Phase 1B, tray or Board work.
-The default backend is still KWin ColorPicker. The new Rust-owned backend requires
-explicit `--native`. Approval to investigate displayed-sample authority was not
-approval to weaken presentation/input/cleanup gates or silently promote the backend.
+**Phase 1A PASSED.** The Rust-owned presented-sample implementation is the
+default and only backend. `--native`, `--repeat`, and the obsolete KWin
+ColorPicker implementation were removed. No Phase 1B work has started.
 
 ## Implemented
 
@@ -27,13 +37,13 @@ approval to weaken presentation/input/cleanup gates or silently promote the back
   `swatch-board-agent-implementation-plan.md`.
 - Latest-only authorized capture feed, cursor-only timing preservation, geometry
   checks, viewporter rendering, bounded dispatch, explicit portal/session cleanup,
-  actual presentation feedback and fail-closed legacy accuracy comparison.
-- Opt-in native normal-layer magnifier and separate full-pointer-input, no-keyboard
+  and actual presentation feedback.
+- Native normal-layer magnifier and separate full-pointer-input, no-keyboard
   shields. Selection is tied to an exact genuinely presented sample, not a queued
-  buffer or frame callback. Native output is `#RRGGBB` on stdout; diagnostics stderr.
+  buffer or frame callback. Output is `#RRGGBB` on stdout; diagnostics use stderr.
 - Bare Escape through GlobalShortcuts, subscription before binding, trigger checks,
   explicit session closure, paired mouse-release handling, typed cancellation and
-  actual errors for no-sample left selection. Native repeats other than 1 are rejected.
+  actual errors for no-sample left selection.
 - Self-occlusion guard tracks all distinct submitted lens footprints. It invalidates
   selection, presents a transparent non-null buffer while mapped, and requires fresh
   VIDEO PTS strictly later than local CLOCK_MONOTONIC receipt of that hide event.

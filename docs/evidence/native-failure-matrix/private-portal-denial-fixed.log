@@ -1,0 +1,6 @@
+Experimental native backend: not a Phase 1A pass; authorized monitor capture outputs
+Connecting to the ScreenCast portal
+Creating the ScreenCast portal session
+Requesting monitor selection and capture authorization
+Starting the authorized ScreenCast streams
+Error: "native ScreenCast setup failed: Portal request was cancelled; check manual portal authorization and that org.apartment38.SwatchBoard.desktop is installed by normal packaging (project artifact: share/applications/org.apartment38.SwatchBoard.desktop)"

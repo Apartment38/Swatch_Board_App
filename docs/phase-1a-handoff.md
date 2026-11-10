@@ -1,9 +1,10 @@
 # Phase 1A handoff
 
-> **Work stopped by user request.** The authoritative current checkpoint is
-> [the stopped-work resume handoff](phase-1a-resume-handoff.md). It includes native
-> integration, the successful two-output test, and the unresolved mixed-scale lab
-> failure. The older checkpoints below are historical. Do not resume automatically.
+> **Historical checkpoint.** Phase 1A later passed and the Rust-owned picker
+> replaced the KWin-backed path. The authoritative current status is
+> [the resumed-work handoff](phase-1a-resume-handoff.md). The older checkpoints
+> below explain the investigation sequence; their stop/block instructions are no
+> longer current.
 
 ## Native investigation checkpoint
 

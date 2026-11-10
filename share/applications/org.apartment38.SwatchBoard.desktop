@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Swatch Board
-Comment=Wayland color picker with an experimental native backend
+Comment=Live Wayland magnifying color picker
 Exec=swatch-board-picker
 Icon=color-picker
 Terminal=false

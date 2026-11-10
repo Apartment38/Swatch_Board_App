@@ -1,9 +1,10 @@
-//! Experimental Rust-owned selection. Displayed lens authority, not current-scene equality.
-//! Authorized NORMAL-transform capture streams routed by pointer shield output.
-//! All known outputs shielded; unauthorized/ambiguous outputs rejected. Active deadline 120s,
-//! presentation deadline 2s, clean-video deadline 3s. Success/cancel waits for all
-//! observed button releases. On failure/timeout with buttons held, bounded cleanup
-//! is NOT proof of click safety; that acceptance case remains unproven.
+//! Rust-owned selection with compositor-presented lens authority.
+//! Authorized monitor streams are routed by pointer shield output; KWin's ScreenCast frames
+//! may already be compositor-oriented, while raw transformed frames remain supported.
+//! All known outputs are shielded; unauthorized/ambiguous outputs are rejected. Active deadline
+//! 120s, presentation deadline 2s, clean-video deadline 3s. Success/cancel waits for all observed
+//! button releases. A live geometry-failure case kept a held-button release off both fixtures;
+//! untested failure stages still fail closed rather than claiming click safety.
 use crate::native_guard::Sample;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
@@ -58,7 +59,10 @@ fn validate_trigger(trigger: &str) -> std::result::Result<(), String> {
 struct CaptureRoute {
     id: u32,
     origin: (i32, i32),
+    portal_logical: (i32, i32),
     logical: (i32, i32),
+    display_transform: OutputTransform,
+    capture_transform: Option<OutputTransform>,
     physical: Option<(u32, u32)>,
 }
 fn route_for_output(
@@ -76,33 +80,53 @@ fn route_for_output(
     if matching.next().is_some() {
         return Err("ambiguous authorized output streams".into());
     }
-    // KDE's fractional logical sizes can round down while xdg-output rounds up.
-    // Wayland owns coordinate geometry; permit only this bounded startup rounding.
-    if route.logical.0 <= 0
-        || route.logical.1 <= 0
+    if route.portal_logical.0 <= 0
+        || route.portal_logical.1 <= 0
         || logical.0 <= 0
         || logical.1 <= 0
-        || (i64::from(route.logical.0) - i64::from(logical.0)).abs() > 1
-        || (i64::from(route.logical.1) - i64::from(logical.1)).abs() > 1
     {
-        return Err("portal/Wayland output geometry mismatch".into());
+        return Err("invalid portal/Wayland output geometry".into());
     }
-    if route.logical != logical {
+    if route.portal_logical != logical {
         eprintln!(
-            "PORTAL_GEOMETRY_ROUNDING stream={} portal={:?} wayland={logical:?}; using Wayland coordinates",
-            route.id, route.logical
+            "PORTAL_GEOMETRY_DIFFERENCE stream={} portal={:?} wayland={logical:?}; using Wayland coordinates",
+            route.id, route.portal_logical
         );
     }
     Ok(Some(index))
 }
 
+fn raw_dimensions(physical: (u32, u32), transform: OutputTransform) -> (u32, u32) {
+    match transform {
+        OutputTransform::Rotate90
+        | OutputTransform::Rotate270
+        | OutputTransform::Flipped90
+        | OutputTransform::Flipped270 => (physical.1, physical.0),
+        _ => physical,
+    }
+}
+
+fn output_transform(transform: wl_output::Transform) -> OutputTransform {
+    match transform {
+        wl_output::Transform::Normal => OutputTransform::Normal,
+        wl_output::Transform::_90 => OutputTransform::Rotate90,
+        wl_output::Transform::_180 => OutputTransform::Rotate180,
+        wl_output::Transform::_270 => OutputTransform::Rotate270,
+        wl_output::Transform::Flipped => OutputTransform::Flipped,
+        wl_output::Transform::Flipped90 => OutputTransform::Flipped90,
+        wl_output::Transform::Flipped180 => OutputTransform::Flipped180,
+        wl_output::Transform::Flipped270 => OutputTransform::Flipped270,
+        _ => unreachable!("wl_output transform enum exhausted"),
+    }
+}
 fn lens_geometry(
     logical: (i32, i32),
     physical: (u32, u32),
+    transform: OutputTransform,
     radius: u32,
     zoom: u32,
 ) -> Result<(u32, u32)> {
-    let (w, h) = physical;
+    let (w, h) = raw_dimensions(physical, transform);
     if logical.0 <= 0 || logical.1 <= 0 || w == 0 || h == 0 || w > 16384 || h > 16384 {
         return Err("unsupported capture dimensions".into());
     }
@@ -127,37 +151,66 @@ fn lens_geometry(
     }
     Ok((logical_side, buffer_side))
 }
+fn choose_capture_transform(
+    logical: (i32, i32),
+    physical: (u32, u32),
+    display_transform: OutputTransform,
+    radius: u32,
+    zoom: u32,
+) -> Result<OutputTransform> {
+    if lens_geometry(logical, physical, OutputTransform::Normal, radius, zoom).is_ok() {
+        return Ok(OutputTransform::Normal);
+    }
+    lens_geometry(logical, physical, display_transform, radius, zoom)?;
+    Ok(display_transform)
+}
+fn untransformed_point(
+    point: PixelPoint,
+    physical: (u32, u32),
+    transform: OutputTransform,
+) -> Option<PixelPoint> {
+    if point.x >= physical.0 || point.y >= physical.1 {
+        return None;
+    }
+    let (raw_w, raw_h) = raw_dimensions(physical, transform);
+    let (x, y) = match transform {
+        OutputTransform::Normal => (point.x, point.y),
+        OutputTransform::Rotate90 => (point.y, raw_h.checked_sub(point.x + 1)?),
+        OutputTransform::Rotate180 => (
+            raw_w.checked_sub(point.x + 1)?,
+            raw_h.checked_sub(point.y + 1)?,
+        ),
+        OutputTransform::Rotate270 => (raw_w.checked_sub(point.y + 1)?, point.x),
+        OutputTransform::Flipped => (raw_w.checked_sub(point.x + 1)?, point.y),
+        OutputTransform::Flipped90 => (
+            raw_w.checked_sub(point.y + 1)?,
+            raw_h.checked_sub(point.x + 1)?,
+        ),
+        OutputTransform::Flipped180 => (point.x, raw_h.checked_sub(point.y + 1)?),
+        OutputTransform::Flipped270 => (point.y, point.x),
+    };
+    (x < raw_w && y < raw_h).then_some(PixelPoint { x, y })
+}
 fn source_rect(
     origin: (i32, i32),
     logical: (i32, i32),
     physical: (u32, u32),
     point: PixelPoint,
+    transform: OutputTransform,
     radius: u32,
 ) -> Option<Rect> {
-    let sx = logical.0 as f64 / physical.0 as f64;
-    let sy = logical.1 as f64 / physical.1 as f64;
+    let point = untransformed_point(point, physical, transform)?;
+    let (raw_w, raw_h) = raw_dimensions(physical, transform);
+    let sx = logical.0 as f64 / raw_w as f64;
+    let sy = logical.1 as f64 / raw_h as f64;
     let x0 = i32::try_from((point.x.saturating_sub(radius) as f64 * sx).floor() as i64 - 2).ok()?;
     let y0 = i32::try_from((point.y.saturating_sub(radius) as f64 * sy).floor() as i64 - 2).ok()?;
     let x1 = i32::try_from(
-        (point
-            .x
-            .saturating_add(radius)
-            .saturating_add(1)
-            .min(physical.0) as f64
-            * sx)
-            .ceil() as i64
-            + 2,
+        (point.x.saturating_add(radius).saturating_add(1).min(raw_w) as f64 * sx).ceil() as i64 + 2,
     )
     .ok()?;
     let y1 = i32::try_from(
-        (point
-            .y
-            .saturating_add(radius)
-            .saturating_add(1)
-            .min(physical.1) as f64
-            * sy)
-            .ceil() as i64
-            + 2,
+        (point.y.saturating_add(radius).saturating_add(1).min(raw_h) as f64 * sy).ceil() as i64 + 2,
     )
     .ok()?;
     global_rect(origin, (x0, y0), (x1.checked_sub(x0)?, y1.checked_sub(y0)?))
@@ -180,32 +233,40 @@ fn global_rect(origin: (i32, i32), local: (i32, i32), size: (i32, i32)) -> Optio
 mod routing_tests {
     use super::*;
     #[test]
-    fn portal_fractional_rounding_uses_wayland_geometry_with_one_pixel_bound() {
+    fn portal_geometry_difference_uses_wayland_geometry() {
         let routes = vec![CaptureRoute {
             id: 9,
             origin: (1024, 0),
+            portal_logical: (585, 439),
             logical: (585, 439),
+            display_transform: OutputTransform::Normal,
+            capture_transform: Some(OutputTransform::Normal),
             physical: Some((585, 439)),
         }];
         assert_eq!(
-            route_for_output(&routes, (1024, 0), (586, 439)).unwrap(),
+            route_for_output(&routes, (1024, 0), (335, 251)).unwrap(),
             Some(0)
         );
-        assert!(route_for_output(&routes, (1024, 0), (587, 439)).is_err());
-        assert!(route_for_output(&routes, (1024, 0), (0, 439)).is_err());
+        assert!(route_for_output(&routes, (1024, 0), (0, 251)).is_err());
     }
     fn routes() -> Vec<CaptureRoute> {
         vec![
             CaptureRoute {
                 id: 40,
                 origin: (0, 0),
+                portal_logical: (1024, 768),
                 logical: (1024, 768),
+                display_transform: OutputTransform::Normal,
+                capture_transform: None,
                 physical: None,
             },
             CaptureRoute {
                 id: 3,
                 origin: (-1024, -100),
+                portal_logical: (1024, 768),
                 logical: (1024, 768),
+                display_transform: OutputTransform::Normal,
+                capture_transform: None,
                 physical: None,
             },
         ]
@@ -274,9 +335,23 @@ mod routing_tests {
     }
     #[test]
     fn protected_neighborhood_and_pixels_use_target_scale_with_negative_origin() {
-        let point = logical_pixel((100.5, 50.5), (1024, 768), (1792, 1344)).unwrap();
+        let point = logical_pixel(
+            (100.5, 50.5),
+            (1024, 768),
+            (1792, 1344),
+            OutputTransform::Normal,
+        )
+        .unwrap();
         assert_eq!(point, PixelPoint { x: 175, y: 88 });
-        let rect = source_rect((-1024, -200), (1024, 768), (1792, 1344), point, 5).unwrap();
+        let rect = source_rect(
+            (-1024, -200),
+            (1024, 768),
+            (1792, 1344),
+            point,
+            OutputTransform::Normal,
+            5,
+        )
+        .unwrap();
         assert_eq!(
             rect,
             Rect {
@@ -286,18 +361,42 @@ mod routing_tests {
                 h: 11
             }
         );
+        let rotated = logical_pixel(
+            (100.5, 50.5),
+            (1024, 768),
+            (1344, 1792),
+            OutputTransform::Rotate90,
+        )
+        .unwrap();
+        assert_eq!(rotated, PixelPoint { x: 1255, y: 175 });
+        assert_eq!(
+            source_rect(
+                (-1024, -200),
+                (1024, 768),
+                (1344, 1792),
+                rotated,
+                OutputTransform::Rotate90,
+                5,
+            )
+            .unwrap(),
+            rect
+        );
         let edge = source_rect(
             (-1024, -200),
             (1024, 768),
             (1792, 1344),
             PixelPoint { x: 0, y: 0 },
+            OutputTransform::Normal,
             5,
         )
         .unwrap();
         assert_eq!((edge.x, edge.y), (-1026, -202));
-        assert!(logical_pixel((-0.1, 0.), (1024, 768), (1792, 1344)).is_none());
-        assert!(logical_pixel((1024., 0.), (1024, 768), (1792, 1344)).is_none());
-        assert!(logical_pixel((f64::NAN, 0.), (1024, 768), (1792, 1344)).is_none());
+        for position in [(-0.1, 0.), (1024., 0.), (f64::NAN, 0.)] {
+            assert!(
+                logical_pixel(position, (1024, 768), (1792, 1344), OutputTransform::Normal)
+                    .is_none()
+            );
+        }
     }
     #[test]
     fn lens_geometry_uses_actual_target_frame_at_fractional_scales() {
@@ -309,16 +408,26 @@ mod routing_tests {
             ((2048, 1536), (160, 320)),
         ] {
             assert_eq!(
-                lens_geometry((1024, 768), physical, 5, 12).unwrap(),
+                lens_geometry((1024, 768), physical, OutputTransform::Normal, 5, 12,).unwrap(),
                 expected
             );
         }
-        assert!(lens_geometry((585, 439), (1024, 768), 5, 12).is_ok());
-        assert!(lens_geometry((1024, 768), (1024, 1000), 5, 12).is_err());
-        assert!(lens_geometry((0, 768), (1024, 768), 5, 12).is_err());
-        assert!(lens_geometry((1024, 768), (0, 768), 5, 12).is_err());
-        assert!(lens_geometry((1024, 768), (20000, 768), 5, 12).is_err());
-        assert!(lens_geometry((1024, 768), (1024, 768), u32::MAX, 12).is_err());
+        assert!(lens_geometry((585, 439), (1024, 768), OutputTransform::Normal, 5, 12).is_ok());
+        assert!(lens_geometry((1024, 768), (768, 1024), OutputTransform::Rotate90, 5, 12).is_ok());
+        assert!(lens_geometry((1024, 768), (1024, 1000), OutputTransform::Normal, 5, 12).is_err());
+        assert!(lens_geometry((0, 768), (1024, 768), OutputTransform::Normal, 5, 12).is_err());
+        assert!(lens_geometry((1024, 768), (0, 768), OutputTransform::Normal, 5, 12).is_err());
+        assert!(lens_geometry((1024, 768), (20000, 768), OutputTransform::Normal, 5, 12).is_err());
+        assert!(
+            lens_geometry(
+                (1024, 768),
+                (1024, 768),
+                OutputTransform::Normal,
+                u32::MAX,
+                12
+            )
+            .is_err()
+        );
         assert_eq!(
             global_rect((-1024, -200), (20, 30), (160, 160)).unwrap(),
             Rect {
@@ -339,7 +448,10 @@ mod routing_tests {
         );
         assert_eq!(route_for_output(&r, (0, 0), (1024, 768)).unwrap(), Some(0));
         assert_eq!(route_for_output(&r, (1024, 0), (1024, 768)).unwrap(), None);
-        assert!(route_for_output(&r, (-1024, -100), (1000, 768)).is_err());
+        assert_eq!(
+            route_for_output(&r, (-1024, -100), (1000, 768)).unwrap(),
+            Some(1)
+        );
         let mut duplicate = r.clone();
         duplicate.push(r[1].clone());
         assert!(route_for_output(&duplicate, (-1024, -100), (1024, 768)).is_err());
@@ -426,7 +538,9 @@ use std::{
     sync::mpsc,
     time::{Duration, Instant},
 };
-use swatch_board_picker_core::{PixelPoint, place_lens, render_magnifier};
+use swatch_board_picker_core::{
+    OutputGeometry, OutputTransform, PixelPoint, Point, Rgba8, place_lens, render_magnifier,
+};
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle, WEnum,
     globals::registry_queue_init,
@@ -491,19 +605,17 @@ mod closure_tests {
 const SHORTCUT_ID: &str = "cancel-native-pick";
 
 /// No normal window or keyboard object. Authorization precedes all input shields.
-/// Native multi-output routing remains experimental until the live matrix passes.
 pub async fn pick(options: PickerOptions) -> Result<Outcome> {
-    if options.repeats != 1 {
-        return Err("experimental --native requires --repeat 1".into());
-    }
-    ashpd::register_host_app("org.apartment38.SwatchBoard".parse()?).await
-        .map_err(|error| format!("native app identity registration failed: {error}; install share/applications/org.apartment38.SwatchBoard.desktop through normal packaging before using --native"))?;
+    ashpd::register_host_app("org.apartment38.SwatchBoard".parse()?)
+        .await
+        .map_err(|error| format!("app identity registration failed: {error}; install share/applications/org.apartment38.SwatchBoard.desktop through normal packaging"))?;
     let capture = portal::begin_capture().await.map_err(|error| format!(
-        "native ScreenCast setup failed: {error}; check manual portal authorization and that org.apartment38.SwatchBoard.desktop is installed by normal packaging (project artifact: share/applications/org.apartment38.SwatchBoard.desktop)"
+        "ScreenCast setup failed: {error}; check manual portal authorization and that org.apartment38.SwatchBoard.desktop is installed by normal packaging (project artifact: share/applications/org.apartment38.SwatchBoard.desktop)"
     ))?;
+    eprintln!("NATIVE_STARTUP_AUTHORIZED monotonic_ns={}", monotonic_ns()?);
     let result = async {
         let shortcuts = ashpd::desktop::global_shortcuts::GlobalShortcuts::new().await.map_err(|error| format!(
-            "native GlobalShortcuts unavailable: {error}; this experimental path requires portal support and the packaged org.apartment38.SwatchBoard.desktop entry"
+            "GlobalShortcuts unavailable: {error}; this path requires portal support and the packaged org.apartment38.SwatchBoard.desktop entry"
         ))?;
         let session = shortcuts.create_session(Default::default()).await.map_err(|error| format!(
             "native GlobalShortcuts session failed: {error}; ensure org.apartment38.SwatchBoard.desktop is installed and authorize cancellation manually"
@@ -555,19 +667,27 @@ pub async fn pick(options: PickerOptions) -> Result<Outcome> {
             result.map_err(Into::into)
         }.await;
         close_after(result, async {
-            session.close().await.map_err(|e| format!("GlobalShortcuts session close failed: {e}"))?;
-            eprintln!("GlobalShortcuts session closed");
+            match session.close().await {
+                Ok(()) => eprintln!("GlobalShortcuts session closed"),
+                Err(error) if crate::portal::session_is_already_closed(&error) => {
+                    eprintln!("GlobalShortcuts session already closed")
+                }
+                Err(error) => {
+                    return Err(format!("GlobalShortcuts session close failed: {error}"))
+                }
+            }
             Ok(())
         }).await
     }.await;
     close_after(result, async {
-        capture
-            .session
-            .close()
-            .await
-            .map_err(|e| format!("ScreenCast session close failed: {e}"))?;
+        match capture.session.close().await {
+            Ok(()) => eprintln!("ScreenCast session closed"),
+            Err(error) if crate::portal::session_is_already_closed(&error) => {
+                eprintln!("ScreenCast session already closed")
+            }
+            Err(error) => return Err(format!("ScreenCast session close failed: {error}")),
+        }
         drop(capture.portal);
-        eprintln!("ScreenCast session closed");
         Ok(())
     })
     .await
@@ -591,23 +711,42 @@ fn native_worker(
                 if !ids.insert(id) {
                     return Err("duplicate authorized stream ID".into());
                 }
+                let logical = s.size().ok_or("authorized stream missing logical size")?;
+                if logical.0 <= 0 || logical.1 <= 0 || logical.0 > 65536 || logical.1 > 65536 {
+                    return Err("unsupported authorized stream geometry".into());
+                }
                 Ok(CaptureRoute {
                     id,
                     origin: s.position().ok_or("authorized stream missing position")?,
-                    logical: s.size().ok_or("authorized stream missing logical size")?,
+                    portal_logical: logical,
+                    logical,
+                    display_transform: OutputTransform::Normal,
+                    capture_transform: None,
                     physical: None,
                 })
             })
             .collect()
     })()
     .map_err(|e| e.to_string())?;
+    for route in &routes {
+        eprintln!(
+            "CAPTURE_ROUTE stream={} origin={:?} portal_logical={:?}",
+            route.id, route.origin, route.portal_logical
+        );
+    }
     let feed = capture::CaptureFeed::new();
     let capture_feed = feed.clone();
     let (capture_stop, capture_rx) = mpsc::channel();
     let capture_thread = std::thread::Builder::new()
         .name("swatch-native-pipewire".into())
         .spawn(move || {
-            let result = capture::run(fd, streams, capture_feed.clone(), capture_rx);
+            let result = capture::run(
+                fd,
+                streams,
+                capture_feed.clone(),
+                capture_rx,
+                Some(Duration::from_millis(75)),
+            );
             capture_feed.close(Some(
                 result
                     .as_ref()
@@ -637,7 +776,7 @@ fn native_worker(
             Err(mpsc::TryRecvError::Disconnected) => return Err("native coordinator disconnected".into()),
             Err(mpsc::TryRecvError::Empty) => {}
         }
-        eprintln!("Native experimental selection active: left release confirms presented lens, right release/Escape cancels; no current-scene RGB equality claim");
+        eprintln!("Selection active: left release confirms the presented lens; right release/Escape cancels");
         run_overlay(feed, routes, stop, options)
     })().map_err(|e| e.to_string());
     let _ = capture_stop.send(());
@@ -819,6 +958,80 @@ fn run_overlay(
     }
 }
 
+fn paint_color_value(canvas: &mut [u8], color: Rgba8, surface_size: u32) {
+    fn hex(value: u8) -> u8 {
+        match value {
+            0..=9 => b'0' + value,
+            _ => b'A' + value - 10,
+        }
+    }
+    let value = [
+        b'#',
+        hex(color.r >> 4),
+        hex(color.r & 0x0f),
+        hex(color.g >> 4),
+        hex(color.g & 0x0f),
+        hex(color.b >> 4),
+        hex(color.b & 0x0f),
+    ];
+    let scale = 2usize;
+    let advance = 4 * scale;
+    let text_width = value.len() * advance;
+    let Some(start_x) = (surface_size as usize)
+        .checked_sub(text_width)
+        .map(|width| width / 2)
+    else {
+        return;
+    };
+    let start_y = surface_size as usize - 14;
+    for y in start_y.saturating_sub(2)..(start_y + 5 * scale + 2).min(surface_size as usize) {
+        for x in start_x.saturating_sub(2)..(start_x + text_width + 2).min(surface_size as usize) {
+            let offset = (y * surface_size as usize + x) * 4;
+            canvas[offset..offset + 4].copy_from_slice(&[0, 0, 0, 255]);
+        }
+    }
+    for (index, character) in value.iter().copied().enumerate() {
+        for (row, bits) in glyph(character as char).iter().enumerate() {
+            for column in 0..3 {
+                if bits & (1 << (2 - column)) == 0 {
+                    continue;
+                }
+                for dy in 0..scale {
+                    for dx in 0..scale {
+                        let x = start_x + index * advance + column * scale + dx;
+                        let y = start_y + row * scale + dy;
+                        let offset = (y * surface_size as usize + x) * 4;
+                        canvas[offset..offset + 4].copy_from_slice(&[255, 255, 255, 255]);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn glyph(character: char) -> [u8; 5] {
+    match character {
+        '#' => [0b101, 0b111, 0b101, 0b111, 0b101],
+        '0' => [0b111, 0b101, 0b101, 0b101, 0b111],
+        '1' => [0b010, 0b110, 0b010, 0b010, 0b111],
+        '2' => [0b111, 0b001, 0b111, 0b100, 0b111],
+        '3' => [0b111, 0b001, 0b111, 0b001, 0b111],
+        '4' => [0b101, 0b101, 0b111, 0b001, 0b001],
+        '5' => [0b111, 0b100, 0b111, 0b001, 0b111],
+        '6' => [0b111, 0b100, 0b111, 0b101, 0b111],
+        '7' => [0b111, 0b001, 0b010, 0b010, 0b010],
+        '8' => [0b111, 0b101, 0b111, 0b101, 0b111],
+        '9' => [0b111, 0b101, 0b111, 0b001, 0b111],
+        'A' => [0b010, 0b101, 0b111, 0b101, 0b101],
+        'B' => [0b110, 0b101, 0b110, 0b101, 0b110],
+        'C' => [0b011, 0b100, 0b100, 0b100, 0b011],
+        'D' => [0b110, 0b101, 0b101, 0b101, 0b110],
+        'E' => [0b111, 0b100, 0b110, 0b100, 0b111],
+        'F' => [0b111, 0b100, 0b110, 0b100, 0b100],
+        _ => [0; 5],
+    }
+}
+
 impl App {
     // Called in the pointer callback as well as tick: events in one dispatch batch
     // cannot confirm a sample invalidated by motion before the next timer tick.
@@ -875,13 +1088,17 @@ impl App {
                 return Ok(());
             }
             let physical = route.physical.ok_or("missing active capture geometry")?;
-            let point = logical_pixel(self.position, shield.size, physical)
+            let transform = route
+                .capture_transform
+                .ok_or("missing active capture transform")?;
+            let point = logical_pixel(self.position, shield.size, physical, transform)
                 .ok_or("invalid shield pointer position")?;
             let protected = source_rect(
                 shield.origin,
                 shield.size,
                 physical,
                 point,
+                transform,
                 self.options.radius,
             )
             .ok_or("protected source geometry overflow")?;
@@ -927,16 +1144,16 @@ impl App {
             }
             let route = route_for_output(&self.routes, origin, size)?;
             if let Some(route) = route {
-                if info.transform != wl_output::Transform::Normal {
-                    return Err("transformed authorized output unsupported".into());
-                }
                 if !matches.insert(route) {
                     return Err("authorized stream matches ambiguous outputs".into());
                 }
+                self.routes[route].logical = size;
+                self.routes[route].display_transform = output_transform(info.transform);
             }
             log!(
-                "OUTPUT name={:?} origin={origin:?} logical={size:?}",
-                info.name
+                "OUTPUT name={:?} origin={origin:?} logical={size:?} transform={:?}",
+                info.name,
+                info.transform
             );
             let surface = self.compositor.create_surface(qh);
             let viewport = self.viewporter.get_viewport(&surface, qh, ());
@@ -976,8 +1193,16 @@ impl App {
         physical: (u32, u32),
     ) -> Result<()> {
         let s = &self.shields[index];
-        let (logical_side, buffer_side) =
-            lens_geometry(s.size, physical, self.options.radius, self.options.zoom)?;
+        let transform = self.routes[s.route.ok_or("lens output is unauthorized")?]
+            .capture_transform
+            .ok_or("lens capture transform is unavailable")?;
+        let (logical_side, buffer_side) = lens_geometry(
+            s.size,
+            physical,
+            transform,
+            self.options.radius,
+            self.options.zoom,
+        )?;
         let surface = self.compositor.create_surface(qh);
         let viewport = self.viewporter.get_viewport(&surface, qh, ());
         viewport.set_destination(logical_side as i32, logical_side as i32);
@@ -1032,16 +1257,21 @@ impl App {
                 .iter_mut()
                 .find(|r| r.id == f.stream_id)
                 .ok_or("unauthorized capture frame")?;
-            if f.stream_position != route.origin || f.stream_logical_size != route.logical {
+            if f.stream_position != route.origin || f.stream_logical_size != route.portal_logical {
                 return Err("capture geometry/identity changed".into());
             }
             let physical = (f.frame.width, f.frame.height);
-            lens_geometry(
+            let transform = choose_capture_transform(
                 route.logical,
                 physical,
+                route.display_transform,
                 self.options.radius,
                 self.options.zoom,
             )?;
+            if route.capture_transform.is_some_and(|old| old != transform) {
+                return Err("capture orientation changed".into());
+            }
+            route.capture_transform = Some(transform);
             if route.physical.is_some_and(|old| old != physical) {
                 return Err("capture dimensions changed".into());
             }
@@ -1095,15 +1325,21 @@ impl App {
             return Ok(());
         }
         let s = &self.shields[index];
-        let point = logical_pixel(self.position, s.size, (f.frame.width, f.frame.height))
+        let transform = self.routes[route_index]
+            .capture_transform
+            .ok_or("capture transform is unavailable")?;
+        let physical = (f.frame.width, f.frame.height);
+        let point = logical_pixel(self.position, s.size, physical, transform)
             .ok_or("invalid shield pointer position")?;
-        let sx = s.size.0 as f64 / f.frame.width as f64;
-        let sy = s.size.1 as f64 / f.frame.height as f64;
+        let (raw_w, raw_h) = raw_dimensions(physical, transform);
+        let sx = s.size.0 as f64 / raw_w as f64;
+        let sy = s.size.1 as f64 / raw_h as f64;
         let protected = source_rect(
             s.origin,
             s.size,
-            (f.frame.width, f.frame.height),
+            physical,
             point,
+            transform,
             self.options.radius,
         )
         .ok_or("protected source geometry overflow")?;
@@ -1228,18 +1464,21 @@ impl App {
             // Thin center-pixel outline; do not overwrite its actual center color.
             let cx = ox + self.options.radius as usize * self.options.zoom as usize;
             let cy = oy + self.options.radius as usize * self.options.zoom as usize;
-            for y in 0..self.options.zoom as usize {
-                for x in 0..self.options.zoom as usize {
-                    if x == 0
-                        || y == 0
-                        || x == self.options.zoom as usize - 1
-                        || y == self.options.zoom as usize - 1
-                    {
-                        let i = ((cy + y) * side + cx + x) * 4;
-                        canvas[i..i + 4].copy_from_slice(&[255; 4]);
-                    }
+            let zoom = self.options.zoom as usize;
+            for y in 0..zoom {
+                for x in 0..zoom {
+                    let edge = x.min(y).min(zoom - 1 - x).min(zoom - 1 - y);
+                    let level = match edge {
+                        0 => 255,
+                        1 if zoom >= 6 => 0,
+                        _ => continue,
+                    };
+                    let i = ((cy + y) * side + cx + x) * 4;
+                    canvas[i..i + 4].copy_from_slice(&[level, level, level, 255]);
                 }
             }
+            let center = m.pixels[m.center.y as usize * m.width as usize + m.center.x as usize];
+            paint_color_value(canvas, center, lens.buffer_side);
         }
         if let Some(p) = pos {
             lens.layer.set_margin(p.y as i32, 0, 0, p.x as i32);
@@ -1292,21 +1531,34 @@ impl App {
     }
 }
 
-fn logical_pixel(p: (f64, f64), logical: (i32, i32), physical: (u32, u32)) -> Option<PixelPoint> {
-    if !p.0.is_finite()
-        || !p.1.is_finite()
-        || logical.0 <= 0
-        || logical.1 <= 0
-        || p.0 < 0.
-        || p.1 < 0.
-        || p.0 >= logical.0 as f64
-        || p.1 >= logical.1 as f64
-    {
+fn logical_pixel(
+    p: (f64, f64),
+    logical: (i32, i32),
+    physical: (u32, u32),
+    transform: OutputTransform,
+) -> Option<PixelPoint> {
+    if logical.0 <= 0 || logical.1 <= 0 {
         return None;
     }
-    let x = (p.0 * physical.0 as f64 / logical.0 as f64).floor() as u32;
-    let y = (p.1 * physical.1 as f64 / logical.1 as f64).floor() as u32;
-    (x < physical.0 && y < physical.1).then_some(PixelPoint { x, y })
+    let (raw_w, raw_h) = raw_dimensions(physical, transform);
+    let sx = raw_w as f64 / logical.0 as f64;
+    let sy = raw_h as f64 / logical.1 as f64;
+    let tolerance = 1. / logical.0 as f64 + 1. / logical.1 as f64;
+    if (sx - sy).abs() > tolerance {
+        return None;
+    }
+    OutputGeometry {
+        logical_origin: Point { x: 0., y: 0. },
+        logical_size: Point {
+            x: logical.0 as f64,
+            y: logical.1 as f64,
+        },
+        scale: sx.max(sy),
+        stream_width: physical.0,
+        stream_height: physical.1,
+        transform,
+    }
+    .desktop_to_stream(Point { x: p.0, y: p.1 })
 }
 impl Dispatch<wl_pointer::WlPointer, ()> for App {
     fn event(

@@ -5,7 +5,7 @@ use std::{
         Arc, Condvar, Mutex,
         mpsc::{Receiver, TryRecvError},
     },
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 use ashpd::desktop::screencast::Stream;
@@ -129,6 +129,8 @@ struct StreamState {
     feed: CaptureFeed,
     connected: bool,
     latest: Option<CapturedFrame>,
+    minimum_image_interval: Option<Duration>,
+    last_image_decode: Option<Instant>,
 }
 
 fn cursor_pointer(
@@ -148,6 +150,13 @@ fn cursor_pointer(
 }
 
 impl StreamState {
+    fn image_decode_due(&self, now: Instant) -> bool {
+        self.last_image_decode.is_none_or(|last| {
+            self.minimum_image_interval
+                .is_none_or(|minimum| now.duration_since(last) >= minimum)
+        })
+    }
+
     fn publish_update(
         &mut self,
         image: Option<RgbaFrame>,
@@ -212,9 +221,16 @@ pub fn run(
     portal_streams: Vec<Stream>,
     feed: CaptureFeed,
     stop: Receiver<()>,
+    minimum_image_interval: Option<Duration>,
 ) -> Result<(), String> {
-    let result =
-        run_inner(fd, portal_streams, feed.clone(), stop).map_err(|error| error.to_string());
+    let result = run_inner(
+        fd,
+        portal_streams,
+        feed.clone(),
+        stop,
+        minimum_image_interval,
+    )
+    .map_err(|error| error.to_string());
     feed.close(result.as_ref().err().cloned());
     result
 }
@@ -224,6 +240,7 @@ fn run_inner(
     portal_streams: Vec<Stream>,
     feed: CaptureFeed,
     stop: Receiver<()>,
+    minimum_image_interval: Option<Duration>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     feed.authorize(portal_streams.iter().map(Stream::pipe_wire_node_id));
     if portal_streams.is_empty() {
@@ -259,6 +276,8 @@ fn run_inner(
             feed: feed.clone(),
             connected: false,
             latest: None,
+            minimum_image_interval,
+            last_image_decode: None,
         };
         let stream = pw::stream::StreamRc::new(
             core.clone(),
@@ -331,6 +350,8 @@ fn run_inner(
                 let Some(mut buffer) = stream.dequeue_buffer() else {
                     return;
                 };
+                let decode_started = Instant::now();
+                let decode_image = data.image_decode_due(decode_started);
                 let frame = if let Some(plane) = buffer.datas_mut().first_mut() {
                     let chunk = plane.chunk();
                     let offset = chunk.offset() as usize;
@@ -339,8 +360,8 @@ fn run_inner(
                     if chunk.flags().contains(spa::buffer::ChunkFlags::CORRUPTED) {
                         return;
                     }
-                    if size == 0 {
-                        None // PipeWire can send cursor-only buffers.
+                    if size == 0 || !decode_image {
+                        None // PipeWire can send cursor-only buffers; throttled video reuses pixels.
                     } else {
                         let Some(plane_data) = plane.data() else {
                             return;
@@ -360,6 +381,7 @@ fn run_inner(
                         ) else {
                             return;
                         };
+                        data.last_image_decode = Some(decode_started);
                         Some(image)
                     }
                 } else {
@@ -692,6 +714,28 @@ mod tests {
     }
 
     #[test]
+    fn image_throttle_decodes_first_frame_and_frames_at_the_interval() {
+        let feed = CaptureFeed::new();
+        let now = Instant::now();
+        let mut state = StreamState {
+            stream_id: 1,
+            stream_position: (0, 0),
+            stream_logical_size: (1, 1),
+            format: Default::default(),
+            cursor_meta_requested: false,
+            feed,
+            connected: false,
+            latest: None,
+            minimum_image_interval: Some(Duration::from_millis(75)),
+            last_image_decode: None,
+        };
+        assert!(state.image_decode_due(now));
+        state.last_image_decode = Some(now);
+        assert!(!state.image_decode_due(now + Duration::from_millis(74)));
+        assert!(state.image_decode_due(now + Duration::from_millis(75)));
+    }
+
+    #[test]
     fn cursor_only_update_reuses_image_without_refreshing_video_age() {
         let feed = CaptureFeed::new();
         let mut state = StreamState {
@@ -703,6 +747,8 @@ mod tests {
             feed: feed.clone(),
             connected: false,
             latest: None,
+            minimum_image_interval: None,
+            last_image_decode: None,
         };
         let first_time = SystemTime::UNIX_EPOCH + Duration::from_secs(1);
         let later = first_time + Duration::from_secs(5);

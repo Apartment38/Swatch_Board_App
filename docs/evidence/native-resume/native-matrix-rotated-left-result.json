@@ -1,0 +1,37 @@
+{
+  "case": "native-matrix-rotated-left",
+  "exit": 0,
+  "stdout": "#FF0000",
+  "counts_before": [
+    {
+      "presses": 10,
+      "releases": 10,
+      "keyboard_enters": 9,
+      "keyboard_leaves": 8
+    },
+    {
+      "presses": 0,
+      "releases": 0,
+      "keyboard_enters": 1,
+      "keyboard_leaves": 1
+    }
+  ],
+  "counts_after": [
+    {
+      "presses": 10,
+      "releases": 10,
+      "keyboard_enters": 9,
+      "keyboard_leaves": 8
+    },
+    {
+      "presses": 0,
+      "releases": 0,
+      "keyboard_enters": 1,
+      "keyboard_leaves": 1
+    }
+  ],
+  "pre_capture_output": "\u001b[01;32mOutput: \u001b[0;0m1 Virtual-1 f30acd9c-2d66-4f3c-a6d4-2861e065789c\n\t\u001b[01;32menabled\u001b[0;0m\n\t\u001b[01;32mconnected\u001b[0;0m\n\t\u001b[01;32mpriority 2\u001b[0;0m\n\t\u001b[01;33mUnknown\u001b[0;0m\n\t\u001b[01;33mreplication source:\u001b[0;0m0\n\t\u001b[01;34mModes: \u001b[0;0m 1:\u001b[01;32m1024x768@60.00*\u001b[0;0m! \n\u001b[01;33m\tCustom modes:\u001b[0;0m None\n\u001b[01;33m\tGeometry: \u001b[0;0m1024,0 768x1024\n\u001b[01;33m\tScale: \u001b[0;0m1\n\u001b[01;33m\tRotation: \u001b[0;0m2\n\u001b[01;33m\tOverscan: \u001b[0;0m0\n\u001b[01;33m\tVrr: \u001b[0;0mincapable\n\u001b[01;33m\tRgbRange: \u001b[0;0munknown\n\u001b[01;33m\tHDR: \u001b[0;0mincapable\n\u001b[01;33m\tWide Color Gamut: \u001b[0;0mincapable\n\u001b[01;33m\tICC profile: \u001b[0;0mincapable\n\u001b[01;33m\tColor profile source: \u001b[0;0mincapable\n\u001b[01;33m\tBrightness control: \u001b[0;0munsupported\n\u001b[01;33m\tColor resolution: unknown\n\u001b[01;33m\tAllow EDR: \u001b[0;0munsupported\n\u001b[01;33m\tSharpness control: \u001b[0;0munsupported\n\u001b[01;33m\tAutomatic brightness: \u001b[0;0munsupported\n\u001b[01;33m\tAuto Rotate Policy: \u001b[0;0mincapable\n\u001b[01;33m\tAdaptive backlight modulation: \u001b[0;0munsupported\n\u001b[01;32mOutput: \u001b[0;0m2 Virtual-0 9a52cc78-d30e-4091-a7c0-0e6bc0c50067\n\t\u001b[01;32menabled\u001b[0;0m\n\t\u001b[01;32mconnected\u001b[0;0m\n\t\u001b[01;32mpriority 1\u001b[0;0m\n\t\u001b[01;33mUnknown\u001b[0;0m\n\t\u001b[01;33mreplication source:\u001b[0;0m0\n\t\u001b[01;34mModes: \u001b[0;0m 2:\u001b[01;32m1024x768@60.00*\u001b[0;0m! \n\u001b[01;33m\tCustom modes:\u001b[0;0m None\n\u001b[01;33m\tGeometry: \u001b[0;0m0,0 1024x768\n\u001b[01;33m\tScale: \u001b[0;0m1\n\u001b[01;33m\tRotation: \u001b[0;0m1\n\u001b[01;33m\tOverscan: \u001b[0;0m0\n\u001b[01;33m\tVrr: \u001b[0;0mincapable\n\u001b[01;33m\tRgbRange: \u001b[0;0munknown\n\u001b[01;33m\tHDR: \u001b[0;0mincapable\n\u001b[01;33m\tWide Color Gamut: \u001b[0;0mincapable\n\u001b[01;33m\tICC profile: \u001b[0;0mincapable\n\u001b[01;33m\tColor profile source: \u001b[0;0mincapable\n\u001b[01;33m\tBrightness control: \u001b[0;0munsupported\n\u001b[01;33m\tColor resolution: unknown\n\u001b[01;33m\tAllow EDR: \u001b[0;0munsupported\n\u001b[01;33m\tSharpness control: \u001b[0;0munsupported\n\u001b[01;33m\tAutomatic brightness: \u001b[0;0munsupported\n\u001b[01;33m\tAuto Rotate Policy: \u001b[0;0mincapable\n\u001b[01;33m\tAdaptive backlight modulation: \u001b[0;0munsupported\n",
+  "capture_output_stable": true,
+  "sessions_closed": true,
+  "gate": "partial_not_phase1a"
+}

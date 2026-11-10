@@ -50,6 +50,7 @@ impl Dispatch<OrgKdeKwinFakeInput, ()> for State {
 enum Action {
     Move(f64, f64),
     Button(u32),
+    HoldButton(u32, u64),
     Key(u32),
     Hold(u64),
 }
@@ -57,7 +58,7 @@ fn parse(args: &[String]) -> Result<Action, Box<dyn Error>> {
     let usage = || {
         io::Error::new(
             io::ErrorKind::InvalidInput,
-            "usage: phase1a_input move X Y | left | right | escape | return | hold SECONDS (1..3600; test device only)",
+            "usage: phase1a_input move X Y | left | right | hold-left SECONDS | hold-right SECONDS | escape | return | hold SECONDS (1..3600; test device only)",
         )
     };
     match args {
@@ -67,6 +68,16 @@ fn parse(args: &[String]) -> Result<Action, Box<dyn Error>> {
                 return Err(usage().into());
             }
             Ok(Action::Hold(seconds))
+        }
+        [command, seconds] if matches!(command.as_str(), "hold-left" | "hold-right") => {
+            let seconds: u64 = seconds.parse()?;
+            if !(1..=30).contains(&seconds) {
+                return Err(usage().into());
+            }
+            Ok(Action::HoldButton(
+                if command == "hold-left" { 0x110 } else { 0x111 },
+                seconds,
+            ))
         }
         [command, x, y] if command == "move" => {
             let (x, y): (f64, f64) = (x.parse()?, y.parse()?);
@@ -115,6 +126,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             std::thread::sleep(Duration::from_millis(60));
             input.button(button, 0);
         }
+        Action::HoldButton(button, seconds) => {
+            input.button(button, 1);
+            queue.roundtrip(&mut state)?;
+            eprintln!("button_down button={button} hold_seconds={seconds}");
+            std::thread::sleep(Duration::from_secs(seconds));
+            input.button(button, 0);
+            eprintln!("button_up button={button}");
+        }
         Action::Key(key) => {
             input.keyboard_key(key, 1);
             queue.roundtrip(&mut state)?;
@@ -139,6 +158,9 @@ mod tests {
     #[test]
     fn persistent_test_device_duration_is_bounded() {
         assert!(parse(&["hold".into(), "60".into()]).is_ok());
+        assert!(parse(&["hold-left".into(), "3".into()]).is_ok());
+        assert!(parse(&["hold-right".into(), "30".into()]).is_ok());
+        assert!(parse(&["hold-left".into(), "31".into()]).is_err());
         for seconds in ["0", "3601", "-1", "NaN"] {
             assert!(parse(&["hold".into(), seconds.into()]).is_err());
         }
