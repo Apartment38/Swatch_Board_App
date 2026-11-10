@@ -2,12 +2,10 @@
 
 Build beautiful palettes with swatches.
 
-Swatch Board is a Rust-only KDE Plasma Wayland color utility. The current
-implementation is the **Phase 1A live magnifying picker**, not the finished tray
-service or Board editor. Phase 1A passed on the actual 2880×1800, 1.75× KDE
-Plasma Wayland target and in a private multi-output fault-injection lab. The
-Rust-owned picker is now the only backend; the obsolete KWin ColorPicker path
-and its animated-content mismatch were removed. See
+Swatch Board is a Rust-only KDE Plasma Wayland color utility. Phase 1A's live
+magnifying picker passed on the target desktop. Phase 1B adds a lightweight tray
+and asynchronous picker orchestration; its real-desktop acceptance gate remains
+open until focus, repeated invocation, and cleanup are verified. See
 [Phase 1A status](docs/phase-1a-status.md) and
 [native integration acceptance](docs/phase-1a-native-integration.md).
 
@@ -24,9 +22,20 @@ Offline commands require the pinned dependencies to be cached already. A first
 build on a fresh machine needs network access and the native PipeWire/SPA and
 Wayland development packages, plus the libclang tooling used by their bindings.
 
-## Run the picker
+## Run the tray
 
-From a KDE Plasma Wayland desktop session:
+To start the tray, build both executables and run them from the same directory:
+
+```sh
+cargo build --offline --locked -p swatch-board-picker -p swatch-board-tray
+./target/debug/swatch-board-tray
+```
+
+Left-click the tray icon or select **Pick Color**. The current color is kept
+in memory until the tray exits. Palette, Board, and Configure menu entries are
+disabled until their later phases. See the [D-Bus API](docs/ipc.md).
+
+To run the picker directly from a KDE Plasma Wayland desktop session:
 
 ```sh
 cargo run --offline --locked -p swatch-board-picker
@@ -35,8 +44,8 @@ cargo run --offline --locked -p swatch-board-picker
 The picker requests screen-capture authorization through KDE's portal. Left
 release confirms the exact center sample from a genuinely presented magnifier
 commit; right release or Escape cancels. Diagnostics go to stderr and the
-selected `#RRGGBB` value to stdout. Clipboard, history, tray, and Board UI are
-not implemented yet.
+selected `#RRGGBB` value to stdout. Clipboard, history, and Board UI are not
+implemented yet.
 
 Inspect the CLI without opening a capture session:
 
@@ -60,7 +69,6 @@ the actual compositor socket; do not assume a particular socket name.
   verbatim under its original filename; its former product names and superseded
   designs are archival, not current implementation instructions.
 
-Current Cargo packages are `swatch-board-picker` and `swatch-board-picker-core`;
-the library import is `swatch_board_picker_core`. The former binary/package names
-are no longer supported. Old build artifacts can remain in `target/`; use the
-new executable above.
+The workspace also contains the lightweight `swatch-board-tray` and
+`swatch-board-ipc` packages. The former binary/package names are no longer
+supported.

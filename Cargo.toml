@@ -1,5 +1,5 @@
 [workspace]
-members = ["rust/picker-core", "rust/picker"]
+members = ["rust/ipc", "rust/picker-core", "rust/picker", "rust/tray"]
 resolver = "2"
 
 [workspace.package]
@@ -12,4 +12,5 @@ ashpd = { version = "=0.13.13", features = ["screencast", "global_shortcuts"] }
 pipewire = "=0.10.1"
 tokio = { version = "=1.50.0", features = ["macros", "rt-multi-thread", "sync", "time"] }
 zbus = "=5.19.0"
+ksni = "=0.3.7"
 

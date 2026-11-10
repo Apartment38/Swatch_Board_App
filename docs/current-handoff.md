@@ -12,7 +12,7 @@ Read the root `AGENTS.md` before changing the repository. Commit coherent, verif
 
 ## Current milestone
 
-**Phase 1A passed.** The Rust-owned presented-sample picker is the default and only backend. No Phase 1B, tray, history, clipboard, settings, or Board implementation has started.
+**Phase 1A passed. Phase 1B is in progress, not accepted.** The Rust-owned presented-sample picker is the default and only backend. No tray history, clipboard, settings, or Board implementation has started.
 
 The picker:
 
@@ -71,14 +71,24 @@ Observed result: 100 tests passed across 9 suites; formatting, Clippy, release b
 - Desktop-control access used for lock/unlock acceptance was released.
 - Human-session permission dialogs must remain manual.
 
-## Next work
+## Current work: Phase 1B
 
-Proceed with **Phase 1B — minimal Rust tray and orchestration** from `swatch-board-agent-implementation-plan.md`:
+The lightweight `swatch-board-tray` and `swatch-board-ipc` packages provide
+single-instance D-Bus control, asynchronous picker supervision, selected-color
+state, and a StatusNotifierItem. The versioned API is documented in
+[`ipc.md`](ipc.md). Palette, Board, and Configure menu entries are disabled until
+their later phases; no history or clipboard is initialized.
 
-1. Establish the minimal Rust tray process without initializing capture or Board/editor stacks while idle.
-2. Add asynchronous picker launch and enforce one active pick at a time.
-3. Add versioned D-Bus control methods/events and selected-color state.
-4. Surface picker cancellation, failure, timeout, and crash outcomes without blocking tray events.
-5. Verify focus preservation, repeated invocation, single-instance behavior, and helper cleanup on the real KDE Plasma Wayland target.
+The tray has been exercised against the real session bus using a temporary
+picker process: a second tray invocation exited, concurrent picks returned
+`busy`, a completed pick updated the last color, and another pick could start
+before quit. Automated supervision tests cover cancellation, invalid output,
+crashes, timeout, and child reaping.
 
-Respect phase order. Do not start history/clipboard work before the Phase 1B gate passes, and do not start the Board before Phases 1A–1E jointly pass.
+**The Phase 1B gate remains open.** The desktop-control backend reported no
+screen capture capability, so the actual visible tray, unrelated-window focus
+preservation, repeated real picker interaction, and physical helper cleanup have
+not been verified. Complete those checks on the KDE Plasma Wayland target before
+starting Phase 1C. Human-session permission dialogs remain manual.
+
+Do not start the Board before Phases 1A–1E jointly pass.
