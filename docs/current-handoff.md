@@ -12,7 +12,7 @@ Read the root `AGENTS.md` before changing the repository. Commit coherent, verif
 
 ## Current milestone
 
-**Phase 1A and Phase 1B acceptance passed. Phase 1C is implemented; physical-desktop acceptance remains pending.** No history popup, settings UI, or Board implementation has started.
+**Phase 1A, Phase 1B, and Phase 1C acceptance passed.** No history popup, settings UI, or Board implementation has started.
 
 The picker:
 
@@ -110,6 +110,21 @@ verified two identical captures, clipboard paste after picker exit, unchanged
 history and clipboard after cancellation, and last-color restoration after tray
 restart. The test used a synthetic picker, not a real capture.
 
-Phase 1C still needs acceptance with the real picker on the physical KDE
-desktop; do not claim that gate passed based on the isolated session.
-Do not start the Board before Phases 1A–1E jointly pass.
+### Physical KDE acceptance
+
+On the real KDE Wayland desktop, with separate empty acceptance data, the user
+picked the same color twice, cancelled a third pick with right-click, and
+pasted `#171925`. Both real picker runs recorded presented samples of
+`#171925` and closed their ScreenCast and GlobalShortcuts sessions; the
+cancelled run closed both sessions as well. `GetHistory(10)` returned two
+distinct picker captures, both `#171925FF`; cancellation added no third row.
+The desktop clipboard also read `#171925`. After quitting and restarting the
+tray, `GetLastColor` returned `#171925` and both history rows remained.
+
+Malformed TOML and a non-SQLite database were each tested separately against
+the real tray startup: both exited with status 1 and a descriptive error.
+The temporary application entry and acceptance tray were removed. Test data
+remains under the ignored `target/phase1c-physical` and `target/phase1c-errors`
+directories; normal user history was not used.
+
+Proceed to Phase 1D. Do not start the Board before Phases 1A–1E jointly pass.
