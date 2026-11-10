@@ -3,10 +3,8 @@
 Build beautiful palettes with swatches.
 
 Swatch Board is a Rust-only KDE Plasma Wayland color utility. Phase 1A's live
-magnifying picker passed on the target desktop. Phase 1B adds a lightweight tray
-and asynchronous picker orchestration; its real-desktop acceptance gate remains
-open until focus, repeated invocation, and cleanup are verified. See
-[Phase 1A status](docs/phase-1a-status.md) and
+magnifying picker and Phase 1B's tray orchestration have been exercised on the
+target desktop. See [Phase 1A status](docs/phase-1a-status.md) and
 [native integration acceptance](docs/phase-1a-native-integration.md).
 
 ## Build and test
@@ -30,6 +28,12 @@ To start the tray, build both executables and run them from the same directory:
 cargo build --offline --locked -p swatch-board-picker -p swatch-board-tray
 ./target/debug/swatch-board-tray
 ```
+
+The picker also requires `share/applications/org.apartment38.SwatchBoard.desktop`
+to be installed in an XDG applications directory. For an uninstalled development
+build, copy that entry to `~/.local/share/applications/` and change its `Exec`
+to the absolute path of the built `swatch-board-picker`; the portal rejects an
+entry whose executable it cannot find. Remove the development entry when done.
 
 Left-click the tray icon or select **Pick Color**. The current color is kept
 in memory until the tray exits. Palette, Board, and Configure menu entries are

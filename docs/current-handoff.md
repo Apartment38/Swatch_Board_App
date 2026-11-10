@@ -12,7 +12,7 @@ Read the root `AGENTS.md` before changing the repository. Commit coherent, verif
 
 ## Current milestone
 
-**Phase 1A passed. Phase 1B is in progress, not accepted.** The Rust-owned presented-sample picker is the default and only backend. No tray history, clipboard, settings, or Board implementation has started.
+**Phase 1A and Phase 1B acceptance passed.** The Rust-owned presented-sample picker is the default and only backend. No tray history, clipboard, settings, or Board implementation has started.
 
 The picker:
 
@@ -71,7 +71,7 @@ Observed result: 100 tests passed across 9 suites; formatting, Clippy, release b
 - Desktop-control access used for lock/unlock acceptance was released.
 - Human-session permission dialogs must remain manual.
 
-## Current work: Phase 1B
+## Phase 1B acceptance
 
 The lightweight `swatch-board-tray` and `swatch-board-ipc` packages provide
 single-instance D-Bus control, asynchronous picker supervision, selected-color
@@ -85,10 +85,22 @@ picker process: a second tray invocation exited, concurrent picks returned
 before quit. Automated supervision tests cover cancellation, invalid output,
 crashes, timeout, and child reaping.
 
-**The Phase 1B gate remains open.** The desktop-control backend reported no
-screen capture capability, so the actual visible tray, unrelated-window focus
-preservation, repeated real picker interaction, and physical helper cleanup have
-not been verified. Complete those checks on the KDE Plasma Wayland target before
-starting Phase 1C. Human-session permission dialogs remain manual.
+On the actual KDE Plasma Wayland desktop, the user confirmed the specified menu
+and its phase-appropriate disabled entries, repeated selection, cancellation,
+focus preservation, indicator updates, left-click activation, and Quit. Picker
+diagnostics recorded three selections and a right-click cancellation, each
+closing the ScreenCast and GlobalShortcuts sessions. After cancellation,
+`GetLastColor` returned `#171A26`, matching the last selection, and no picker
+process remained. The user confirmed a subsequent left-click pick/cancel and
+tray Quit.
 
-Do not start the Board before Phases 1A–1E jointly pass.
+An uninstalled development desktop entry initially made the portal reject the
+picker. Using an absolute picker path in a temporary user entry fixed registration.
+The user then confirmed a visible KDE failure notification with the entry removed.
+The temporary entry and acceptance tray were removed. Human-session permission
+dialogs remained manual.
+
+## Next work
+
+Proceed with Phase 1C — history, formatting, and clipboard — from the
+implementation plan. Do not start the Board before Phases 1A–1E jointly pass.

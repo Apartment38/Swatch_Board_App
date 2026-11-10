@@ -144,6 +144,35 @@ async fn emit(
     }
 }
 
+fn notify_failure(connection: &Connection, reason: String) {
+    let connection = connection.clone();
+    tokio::spawn(async move {
+        let hints: std::collections::HashMap<&str, zbus::zvariant::Value<'_>> =
+            std::collections::HashMap::new();
+        let result = connection
+            .call_method(
+                Some("org.freedesktop.Notifications"),
+                "/org/freedesktop/Notifications",
+                Some("org.freedesktop.Notifications"),
+                "Notify",
+                &(
+                    "Swatch Board",
+                    0u32,
+                    "dialog-error",
+                    "Color picking failed",
+                    reason.as_str(),
+                    Vec::<&str>::new(),
+                    hints,
+                    -1i32,
+                ),
+            )
+            .await;
+        if let Err(error) = result {
+            eprintln!("Failed to show picker error notification: {error}");
+        }
+    });
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let connection = Connection::session().await?;
@@ -192,6 +221,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let reason = format!("failed to launch picker: {error}");
                             eprintln!("{reason}");
                             tray.update(|item| item.message = Some(reason.clone())).await;
+                            notify_failure(&connection, reason.clone());
                             let _ = reply.send(Err(reason.clone()));
                             emit(&connection, "ColorPickFailed", &(reason,)).await;
                         }
@@ -216,6 +246,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Outcome::Failed(reason) => {
                             eprintln!("{reason}");
                             tray.update(|item| item.message = Some(reason.clone())).await;
+                            notify_failure(&connection, reason.clone());
                             emit(&connection, "ColorPickFailed", &(reason,)).await;
                         }
                         Outcome::Shutdown => {}
