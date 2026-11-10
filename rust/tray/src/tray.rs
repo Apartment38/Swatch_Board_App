@@ -52,7 +52,10 @@ impl Tray for Item {
             .into(),
             StandardItem {
                 label: "Show Palette".into(),
-                enabled: false,
+                activate: Box::new(|item: &mut Self| {
+                    let (reply, _) = oneshot::channel();
+                    let _ = item.requests.send(Request::ShowHistory(reply));
+                }),
                 ..Default::default()
             }
             .into(),

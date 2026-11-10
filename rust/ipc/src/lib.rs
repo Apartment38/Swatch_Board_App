@@ -12,6 +12,8 @@ pub trait SwatchBoard {
     fn pick_color(&self) -> zbus::Result<String>;
     fn get_last_color(&self) -> zbus::Result<String>;
     fn get_history(&self, limit: u32) -> zbus::Result<Vec<(String, String, String, String)>>;
+    fn show_history(&self) -> zbus::Result<String>;
+    fn copy_history(&self, id: &str) -> zbus::Result<String>;
     fn quit(&self) -> zbus::Result<()>;
 
     #[zbus(signal)]

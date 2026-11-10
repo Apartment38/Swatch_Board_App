@@ -12,7 +12,7 @@ Read the root `AGENTS.md` before changing the repository. Commit coherent, verif
 
 ## Current milestone
 
-**Phase 1A, Phase 1B, and Phase 1C acceptance passed.** No history popup, settings UI, or Board implementation has started.
+**Phase 1A, Phase 1B, Phase 1C, and Phase 1D acceptance passed.** Settings UI and Board have not started.
 
 The picker:
 
@@ -76,8 +76,8 @@ Observed result: 100 tests passed across 9 suites; formatting, Clippy, release b
 The lightweight `swatch-board-tray` and `swatch-board-ipc` packages provide
 single-instance D-Bus control, asynchronous picker supervision, selected-color
 state, and a StatusNotifierItem. The versioned API is documented in
-[`ipc.md`](ipc.md). Palette, Board, and Configure menu entries are disabled until
-their later phases; no history or clipboard is initialized.
+[`ipc.md`](ipc.md). At the Phase 1B checkpoint, Palette, Board, and Configure
+were disabled and history and clipboard were not yet initialized.
 
 The tray has been exercised against the real session bus using a temporary
 picker process: a second tray invocation exited, concurrent picks returned
@@ -127,4 +127,33 @@ The temporary application entry and acceptance tray were removed. Test data
 remains under the ignored `target/phase1c-physical` and `target/phase1c-errors`
 directories; normal user history was not used.
 
-Proceed to Phase 1D. Do not start the Board before Phases 1A–1E jointly pass.
+## Phase 1D acceptance
+
+The tray launches a transient layer-shell history popup, brokers UUID-based
+copying, and retains clipboard ownership. The popup supports configurable
+display limit, grid size, scrolling, keyboard navigation, repeat activation,
+Escape, click-away, and dismissal with a desktop notification after copying.
+The compositor supplies the cursor shape where available.
+
+On the real KDE Wayland desktop with isolated synthetic history, the user
+confirmed centering, scrolling, copying/pasting, dismissal, notification, and
+the KWin-matched pointer. Twenty rows remained after copying. Only one physical
+output was available; screen capture was unavailable to the automation backend,
+so those physical visual observations are user-reported.
+
+In a separate private KWin session, two enabled 1024×768 virtual outputs were
+arranged side by side. A screenshot confirmed that a popup invoked with the
+pointer on the second output was centered there; a click on the first output
+dismissed it, and repeat activation toggled the next popup closed. In another
+private KWin session with keyboard but no pointer capability, `Virtual-1` was
+the configured primary output and a screenshot confirmed the popup centered on
+it. The helper queries `kscreen-doctor -j` only when pointer routing is
+unavailable and fails explicitly if the primary output cannot be determined.
+Both private trays and compositors were stopped. Screenshots remain in the
+ignored `target/phase1d-private-multiscreen.png` and
+`target/phase1d-private-primary.png`; they are not physical multi-monitor tests.
+
+Offline workspace tests passed 123 tests across 17 suites; formatting and strict
+workspace Clippy passed.
+
+Do not start the Board before Phases 1A–1E jointly pass.

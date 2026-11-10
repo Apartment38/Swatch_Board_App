@@ -21,6 +21,8 @@ enum Request {
     Pick(oneshot::Sender<Result<&'static str, String>>),
     LastColor(oneshot::Sender<String>),
     History(u32, oneshot::Sender<Result<Vec<HistoryRow>, String>>),
+    ShowHistory(oneshot::Sender<Result<&'static str, String>>),
+    CopyHistory(String, oneshot::Sender<Result<String, String>>),
     Quit,
     Complete(Outcome),
 }
@@ -70,6 +72,27 @@ impl Control {
             .map_err(zbus::fdo::Error::Failed)
     }
 
+    async fn show_history(&self) -> zbus::fdo::Result<String> {
+        let (tx, rx) = oneshot::channel();
+        self.requests
+            .send(Request::ShowHistory(tx))
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?;
+        rx.await
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?
+            .map(str::to_owned)
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn copy_history(&self, id: &str) -> zbus::fdo::Result<String> {
+        let (tx, rx) = oneshot::channel();
+        self.requests
+            .send(Request::CopyHistory(id.to_owned(), tx))
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?;
+        rx.await
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
     fn quit(&self) {
         let _ = self.requests.send(Request::Quit);
     }
@@ -100,6 +123,25 @@ fn picker_path() -> PathBuf {
         .and_then(|p| p.parent().map(|p| p.join("swatch-board-picker")))
         .filter(|p| p.is_file())
         .unwrap_or_else(|| PathBuf::from("swatch-board-picker"))
+}
+
+fn history_path() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.join("swatch-board-history")))
+        .filter(|p| p.is_file())
+        .unwrap_or_else(|| PathBuf::from("swatch-board-history"))
+}
+
+async fn close_history(child: &mut tokio::process::Child) -> Result<(), String> {
+    match child.try_wait() {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => child
+            .kill()
+            .await
+            .map_err(|error| format!("failed to close history popup: {error}")),
+        Err(error) => Err(format!("failed waiting for history popup: {error}")),
+    }
 }
 
 async fn supervise(
@@ -192,6 +234,35 @@ fn notify_failure(connection: &Connection, reason: String) {
     });
 }
 
+fn notify_copy(connection: &Connection, text: String) {
+    let connection = connection.clone();
+    tokio::spawn(async move {
+        let hints: std::collections::HashMap<&str, zbus::zvariant::Value<'_>> =
+            std::collections::HashMap::new();
+        if let Err(error) = connection
+            .call_method(
+                Some("org.freedesktop.Notifications"),
+                "/org/freedesktop/Notifications",
+                Some("org.freedesktop.Notifications"),
+                "Notify",
+                &(
+                    "Swatch Board",
+                    0u32,
+                    "edit-copy",
+                    "Color copied",
+                    text.as_str(),
+                    Vec::<&str>::new(),
+                    hints,
+                    -1i32,
+                ),
+            )
+            .await
+        {
+            eprintln!("Failed to show copy notification: {error}");
+        }
+    });
+}
+
 fn history_row(capture: &Capture) -> HistoryRow {
     let c = capture.color;
     let source = match capture.source {
@@ -252,6 +323,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     let (shutdown, shutdown_rx) = watch::channel(false);
     let mut active = None;
+    let mut history_child: Option<tokio::process::Child> = None;
     let mut clipboard_events = tokio::time::interval(Duration::from_secs(1));
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     loop {
@@ -268,9 +340,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             _ = terminate.recv() => break,
+            result = async {
+                match history_child.as_mut() {
+                    Some(child) => child.wait().await,
+                    None => std::future::pending().await,
+                }
+            } => {
+                history_child = None;
+                match result {
+                    Ok(status) if !status.success() => eprintln!("history popup exited abnormally: {status}"),
+                    Err(error) => eprintln!("failed waiting for history popup: {error}"),
+                    _ => {}
+                }
+            },
             request = rx.recv() => match request {
                 Some(Request::Pick(reply)) => {
                     if active.is_some() { let _ = reply.send(Ok("busy")); continue; }
+                    if let Some(child) = history_child.as_mut() {
+                        if let Err(reason) = close_history(child).await {
+                            let _ = reply.send(Err(reason));
+                            continue;
+                        }
+                        history_child = None;
+                    }
                     match Command::new(picker_path()).stdout(Stdio::piped()).kill_on_drop(true).spawn() {
                         Ok(child) => {
                             let tx = requests.clone();
@@ -296,6 +388,64 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(Request::History(limit, reply)) => {
                     let rows = history.list().map(|captures| captures.iter().take(limit as usize).map(history_row).collect()).map_err(|error| error.to_string());
                     let _ = reply.send(rows);
+                }
+                Some(Request::ShowHistory(reply)) => {
+                    if active.is_some() {
+                        let _ = reply.send(Ok("busy"));
+                        continue;
+                    }
+                    if let Some(child) = history_child.as_mut() {
+                        match child.try_wait() {
+                            Ok(Some(_)) => history_child = None,
+                            Ok(None) => {
+                                let result = close_history(child).await.map(|_| "closed");
+                                if result.is_ok() {
+                                    history_child = None;
+                                }
+                                let _ = reply.send(result);
+                                continue;
+                            }
+                            Err(error) => {
+                                let _ = reply.send(Err(format!("failed waiting for history popup: {error}")));
+                                continue;
+                            }
+                        }
+                    }
+                    match Command::new(history_path())
+                        .arg("--display-limit").arg(config.history_display_limit.to_string())
+                        .arg("--columns").arg(config.history_columns.to_string())
+                        .arg("--rows").arg(config.history_rows.to_string())
+                        .kill_on_drop(true)
+                        .spawn()
+                    {
+                        Ok(child) => {
+                            history_child = Some(child);
+                            let _ = reply.send(Ok("started"));
+                        }
+                        Err(error) => {
+                            let reason = format!("failed to launch history popup: {error}");
+                            eprintln!("{reason}");
+                            let _ = reply.send(Err(reason));
+                        }
+                    }
+                }
+                Some(Request::CopyHistory(id, reply)) => {
+                    let result = history.list()
+                        .map_err(|error| error.to_string())
+                        .and_then(|captures| captures.into_iter()
+                            .find(|capture| capture.id.to_string() == id)
+                            .ok_or_else(|| "history capture not found".to_owned()))
+                        .and_then(|capture| {
+                            let c = capture.color;
+                            let text = Color::new(c.r, c.g, c.b, c.a).format(format);
+                            clipboard.copy_text(&text)
+                                .map_err(|error| format!("Clipboard copy failed: {error}"))?;
+                            Ok(text)
+                        });
+                    if let Ok(text) = &result {
+                        notify_copy(&connection, text.clone());
+                    }
+                    let _ = reply.send(result);
                 }
                 Some(Request::Complete(outcome)) => {
                     active = None;
@@ -342,6 +492,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     let _ = shutdown.send(true);
+    if let Some(mut child) = history_child {
+        let _ = close_history(&mut child).await;
+    }
     if let Some(task) = active {
         let _ = task.await;
     }
