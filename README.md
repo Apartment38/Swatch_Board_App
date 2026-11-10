@@ -54,7 +54,7 @@ the actual compositor socket; do not assume a particular socket name.
 - [Implementation plan](swatch-board-agent-implementation-plan.md)
 - [Phase 1A status](docs/phase-1a-status.md)
 - [Live validation and blockers](docs/phase-1a-live-validation.md)
-- [Developer handoff](docs/phase-1a-handoff.md)
+- [Current developer handoff](docs/current-handoff.md)
 - [Known-color fixture](docs/phase-1a-color-fixture.html)
 - [Historical conversation export](colorboard-conversation-export.md) — preserved
   verbatim under its original filename; its former product names and superseded
