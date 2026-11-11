@@ -25,6 +25,8 @@ enum Request {
     ShowHistory(oneshot::Sender<Result<&'static str, String>>),
     CopyHistory(String, oneshot::Sender<Result<String, String>>),
     Configure(oneshot::Sender<Result<&'static str, String>>),
+    OpenBoard,
+    BoardFailed(String),
     ReloadConfig(oneshot::Sender<Result<String, String>>),
     ShortcutStatus(oneshot::Sender<String>),
     RebindShortcuts(oneshot::Sender<Result<String, String>>),
@@ -186,6 +188,14 @@ fn config_path() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("swatch-board-config"))
 }
 
+fn board_path() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.join("swatch-board")))
+        .filter(|p| p.is_file())
+        .unwrap_or_else(|| PathBuf::from("swatch-board"))
+}
+
 async fn close_history(child: &mut tokio::process::Child) -> Result<(), String> {
     match child.try_wait() {
         Ok(Some(_)) => Ok(()),
@@ -273,7 +283,7 @@ fn notify_failure(connection: &Connection, reason: String) {
                     "Swatch Board",
                     0u32,
                     "dialog-error",
-                    "Color picking failed",
+                    "Swatch Board error",
                     reason.as_str(),
                     Vec::<&str>::new(),
                     hints,
@@ -282,7 +292,7 @@ fn notify_failure(connection: &Connection, reason: String) {
             )
             .await;
         if let Err(error) = result {
-            eprintln!("Failed to show picker error notification: {error}");
+            eprintln!("Failed to show error notification: {error}");
         }
     });
 }
@@ -536,6 +546,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Err(error) => { let _ = reply.send(Err(format!("failed to launch settings: {error}"))); }
                         }
                     }
+                }
+                Some(Request::OpenBoard) => {
+                    match Command::new(board_path()).spawn() {
+                        Ok(mut child) => {
+                            let requests = requests.clone();
+                            tokio::spawn(async move {
+                                let reason = match child.wait().await {
+                                    Ok(status) if status.success() => None,
+                                    Ok(status) => Some(format!("Board exited abnormally: {status}")),
+                                    Err(error) => Some(format!("failed waiting for Board: {error}")),
+                                };
+                                if let Some(reason) = reason {
+                                    let _ = requests.send(Request::BoardFailed(reason));
+                                }
+                            });
+                            tray.update(|item| item.message = None).await;
+                        }
+                        Err(error) => {
+                            let _ = requests.send(Request::BoardFailed(format!("failed to launch Board: {error}")));
+                        }
+                    }
+                }
+                Some(Request::BoardFailed(reason)) => {
+                    eprintln!("{reason}");
+                    tray.update(|item| item.message = Some(reason.clone())).await;
+                    notify_failure(&connection, reason);
                 }
                 Some(Request::ReloadConfig(reply)) => {
                     let result = match config::Config::load() {

@@ -61,7 +61,9 @@ impl Tray for Item {
             .into(),
             StandardItem {
                 label: "Open Board".into(),
-                enabled: false,
+                activate: Box::new(|item: &mut Self| {
+                    let _ = item.requests.send(Request::OpenBoard);
+                }),
                 ..Default::default()
             }
             .into(),

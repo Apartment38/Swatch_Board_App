@@ -14,7 +14,8 @@ Read the root `AGENTS.md` before changing the repository. Commit coherent, verif
 
 **Phase 1A–1E jointly passed on the actual KDE Plasma Wayland target, with the
 user-approved replacement for the unsafe physical KWin restart test described
-below.** Board has not started and is the next phase.
+below.** Phase 2 Board shell also passed physical Board/picker acceptance.
+Phase 3 Color Mixer is next; it has not started.
 
 **Phase 1E is accepted under that revised gate.** The settings utility, typed
 configuration, shortcut portal worker, KDE shortcut reassignment, autostart
@@ -301,4 +302,61 @@ Offline workspace tests passed 123 tests across 17 suites; formatting and strict
 workspace Clippy passed.
 
 Phases 1A–1E jointly passed with the explicitly revised compositor-recovery
-gate above. Board implementation may now begin.
+gate above.
+
+## Phase 2 Board shell
+
+`swatch-board` is an independently launched eframe process. Open Board is enabled
+in the tray and the installer includes its executable and desktop launcher. Tabs
+are Color Mixer, Palette Editor, and Theme Generator, with shared scrollable
+history. Functional tab tools remain assigned to Phases 3–5.
+
+The Board loads shared settings and SQLite history without a tray, subscribes to
+tray changes, refreshes history on reconnect, and reloads settings while open.
+Its independent D-Bus name handles second-launch activation. Settings launches
+independently; closing Board exits its process and does not terminate the tray.
+Selected tab and native window geometry persist through eframe storage.
+
+The pinned winit Wayland backend ignores visibility and focus commands and
+cannot unminimize a window. Board therefore closes/recreates its native window
+for explicit activation and for the optional hide-during-pick preference. Before
+a hidden pick, its exit callback commits a NULL buffer to the borrowed Wayland
+surface and roundtrips; only after that unmap does it ask the tray to pick.
+It retains the Board service and state while awaiting completion, and recreates
+the window after selection, cancellation, failure, or tray loss. No private KDE
+window-management protocol or KWin script is used.
+
+An isolated D-Bus worker scenario passed standalone load, duplicate activation,
+no-tray rejection, authoritative history refresh on signals/connect/reconnect,
+settings reload, completion-before-method-reply, cancellation, picker error,
+and tray disappearance while picking.
+
+In a private KWin Wayland desktop, the actual Board and tray with a synthetic
+picker verified hiding before selection, cancellation, and failure; restoration
+in the same process; a saved `#247AC3` capture in the strip; history in all tabs;
+second-launch activation; independent Board survival after tray Quit; and the
+Settings link without a tray. Normal window close exited the Board process,
+removed its D-Bus name, and left no Board window. These are not physical-picker
+or physical-desktop acceptance results. Isolated screenshots/logs remain under
+ignored `target/phase2-lab/`.
+
+On the physical KDE Wayland desktop, the user approved the Phase 2 acceptance
+run and confirmed picking from Board, hide/restore, the matching clipboard value
+`#1B3242`, shared history in every tab, right-click cancellation without a new
+capture, and normal close/reopen through the tray with history and tab preserved.
+The original Board process exited with status 0. `GetLastColor` returned
+`#1B3242`; `GetHistory(10)` contained two captures, `#644744FF` and `#1B3242FF`.
+Picker logs recorded those two genuine presented selections, a right-click
+cancellation, and a later cancelled screen-sharing request reported as failure.
+Both successful picker runs and the right-click cancellation closed their
+ScreenCast and GlobalShortcuts sessions. Physical visual observations are
+user-reported because desktop capture remains unavailable to automation.
+
+Formatting, strict Board/tray all-targets Clippy, five existing tray supervision
+tests, debug Board/tray build, staged installation, and Board desktop-file
+validation passed (the validator emitted only a multiple-main-category hint).
+The throwaway integration and lab scripts were removed. Private services and
+physical acceptance processes were stopped, temporary desktop registrations
+were removed, and the user confirmed removing the temporary C/H shortcut
+assignments. Test data and logs remain under ignored `target/phase2-physical/`;
+normal user history was not used.

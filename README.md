@@ -2,10 +2,10 @@
 
 Build beautiful palettes with swatches.
 
-Swatch Board is a Rust-only KDE Plasma Wayland color utility. Phase 1A's live
-magnifying picker and Phase 1B's tray orchestration have been exercised on the
-target desktop. See [Phase 1A status](docs/phase-1a-status.md) and
-[native integration acceptance](docs/phase-1a-native-integration.md).
+Swatch Board is a Rust-only KDE Plasma Wayland color utility. The picker,
+tray, history, settings, and on-demand Board shell have passed target-desktop
+acceptance. Board editor tools are the next phases. See the
+[current handoff](docs/current-handoff.md) for verification and limitations.
 
 ## Build and test
 
@@ -25,7 +25,7 @@ Wayland development packages, plus the libclang tooling used by their bindings.
 To start the tray, build the executables and run them from the same directory:
 
 ```sh
-cargo build --locked -p swatch-board-picker -p swatch-board-tray -p swatch-board-history -p swatch-board-config
+cargo build --locked -p swatch-board-picker -p swatch-board-tray -p swatch-board-history -p swatch-board-config -p swatch-board
 ./target/debug/swatch-board-tray
 ```
 
@@ -42,7 +42,8 @@ the copied text independently of the picker process. **Show Palette** opens the
 history popup; selecting a swatch copies it without creating another capture,
 closes the popup, and shows a notification. Repeat the action, press Escape, or
 click outside to close without copying. **Configure** opens a separate settings
-window; closing it exits that process. Board remains disabled. See the [D-Bus API](docs/ipc.md).
+window; closing it exits that process. **Open Board** launches the separate Board
+window. See the [D-Bus API](docs/ipc.md).
 
 When the pointer's output cannot be determined, the popup queries KDE's
 `kscreen-doctor` for the configured primary output. That executable must be
@@ -114,10 +115,29 @@ The assignment is asynchronous and not atomic: inspect shortcut status for
 failures or partial changes. Concurrent desktop shortcut edits can race the
 conflict check. KDE's system shortcut settings also provide an explicit fallback
 when the portal is unavailable. Autostart uses one per-user XDG desktop entry.
-The Board hide preference is saved for the later Board phase.
+The Board applies the hide preference to picks started from its own window.
 
 For a staged installation, build release binaries and use
 `PREFIX=/usr DESTDIR=/tmp/swatch-board-stage bash packaging/install.sh`.
+
+## Run the Board
+
+```sh
+cargo run --offline --locked -p swatch-board
+```
+
+The Board opens independently of the tray. Its tabs are **Color Mixer**,
+**Palette Editor**, and **Theme Generator**, with a horizontal history strip in
+every tab. This phase implements the shared shell, not the editor functionality.
+History comes from the shared SQLite library and refreshes on tray signals and
+reconnection. Settings reload while the Board is open.
+
+**Pick Color** requires the tray; **Settings** also works without it. When
+`hide_board_while_picking` is enabled, the Board closes its native window before
+requesting a pick and recreates it after selection, cancellation, or failure.
+It does not activate a window during the pick. Reopening preserves the selected
+tab and saved window geometry. Normal close exits the Board process; tray Quit
+does not close the Board. A second launch activates the existing Board instance.
 
 ## Project references
 

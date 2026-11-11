@@ -15,4 +15,13 @@ Service `org.apartment38.SwatchBoard1`, object `/org/apartment38/SwatchBoard1`, 
 - `Quit()`: shut down and reap any active picker and history popup.
 - `ColorPicked(s id, s rgba, s timestamp)`, `HistoryChanged()`, `ColorPickCancelled()`, `ColorPickFailed(s reason)`: transient notifications. A committed capture emits `ColorPicked` and then `HistoryChanged`. Clipboard failures are reported separately as tray notifications and do not undo committed captures. Cancellation does not alter history or clipboard.
 
-At most one picker is active; `busy` never queues another. The asynchronous picker has a five-minute deadline. Cancellation is a successful exit with empty stdout; selection is a successful exit with exactly one `#RRGGBB` line. Invalid output, launch failure, timeout, abnormal exit, and storage failure preserve the previous color. Exit, timeout, and shutdown reap the child. Signals are transient; clients should reload authoritative history on startup or reconnect. Board operations belong to later phases.
+At most one picker is active; `busy` never queues another. The asynchronous picker has a five-minute deadline. Cancellation is a successful exit with empty stdout; selection is a successful exit with exactly one `#RRGGBB` line. Invalid output, launch failure, timeout, abnormal exit, and storage failure preserve the previous color. Exit, timeout, and shutdown reap the child. Signals are transient; clients should reload authoritative history on startup or reconnect.
+
+## Board instance
+
+The on-demand Board owns `org.apartment38.SwatchBoard.Board1`, object
+`/org/apartment38/SwatchBoard/Board1`, interface
+`org.apartment38.SwatchBoard.Board1`. `Activate()` requests window activation;
+it is ignored while the Board is awaiting a picker outcome to avoid stealing
+focus during capture. Launching a second Board invokes this method and exits.
+This service exists independently of the tray and disappears when Board closes.
