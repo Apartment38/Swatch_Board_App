@@ -1,4 +1,5 @@
 mod config;
+mod shortcuts;
 #[cfg(test)]
 mod tests;
 mod tray;
@@ -23,6 +24,10 @@ enum Request {
     History(u32, oneshot::Sender<Result<Vec<HistoryRow>, String>>),
     ShowHistory(oneshot::Sender<Result<&'static str, String>>),
     CopyHistory(String, oneshot::Sender<Result<String, String>>),
+    Configure(oneshot::Sender<Result<&'static str, String>>),
+    ReloadConfig(oneshot::Sender<Result<String, String>>),
+    ShortcutStatus(oneshot::Sender<String>),
+    RebindShortcuts(oneshot::Sender<Result<String, String>>),
     Quit,
     Complete(Outcome),
 }
@@ -93,6 +98,46 @@ impl Control {
             .map_err(zbus::fdo::Error::Failed)
     }
 
+    async fn configure(&self) -> zbus::fdo::Result<String> {
+        let (tx, rx) = oneshot::channel();
+        self.requests
+            .send(Request::Configure(tx))
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?;
+        rx.await
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?
+            .map(str::to_owned)
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn reload_config(&self) -> zbus::fdo::Result<String> {
+        let (tx, rx) = oneshot::channel();
+        self.requests
+            .send(Request::ReloadConfig(tx))
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?;
+        rx.await
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn shortcut_status(&self) -> zbus::fdo::Result<String> {
+        let (tx, rx) = oneshot::channel();
+        self.requests
+            .send(Request::ShortcutStatus(tx))
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?;
+        rx.await
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))
+    }
+
+    async fn rebind_shortcuts(&self) -> zbus::fdo::Result<String> {
+        let (tx, rx) = oneshot::channel();
+        self.requests
+            .send(Request::RebindShortcuts(tx))
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?;
+        rx.await
+            .map_err(|_| zbus::fdo::Error::Failed("tray is shutting down".into()))?
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
     fn quit(&self) {
         let _ = self.requests.send(Request::Quit);
     }
@@ -131,6 +176,14 @@ fn history_path() -> PathBuf {
         .and_then(|p| p.parent().map(|p| p.join("swatch-board-history")))
         .filter(|p| p.is_file())
         .unwrap_or_else(|| PathBuf::from("swatch-board-history"))
+}
+
+fn config_path() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.join("swatch-board-config")))
+        .filter(|p| p.is_file())
+        .unwrap_or_else(|| PathBuf::from("swatch-board-config"))
 }
 
 async fn close_history(child: &mut tokio::process::Child) -> Result<(), String> {
@@ -303,8 +356,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         proxy.activate().await.map_err(|_| error)?;
         return Ok(());
     }
-    let config = config::Config::load()?;
-    let format: Format = config
+    let mut config = config::Config::load()?;
+    let mut format: Format = config
         .clipboard_format
         .parse()
         .map_err(|error| format!("invalid clipboard format: {error}"))?;
@@ -323,11 +376,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
     let (shutdown, shutdown_rx) = watch::channel(false);
     let mut active = None;
+    let (shortcut_events, mut shortcut_rx) = mpsc::unbounded_channel();
+    let mut shortcuts = shortcuts::Shortcuts::start(
+        config.pick_shortcut.clone(),
+        config.history_shortcut.clone(),
+        shortcut_events,
+    );
+    let mut config_child: Option<tokio::process::Child> = None;
     let mut history_child: Option<tokio::process::Child> = None;
     let mut clipboard_events = tokio::time::interval(Duration::from_secs(1));
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     loop {
         tokio::select! {
+            action = shortcut_rx.recv() => {
+                match action {
+                    Some(shortcuts::Action::Pick) => { let (reply, _) = oneshot::channel(); let _ = requests.send(Request::Pick(reply)); }
+                    Some(shortcuts::Action::History) => { let (reply, _) = oneshot::channel(); let _ = requests.send(Request::ShowHistory(reply)); }
+                    None => {}
+                }
+            },
             _ = tokio::signal::ctrl_c() => break,
             _ = clipboard_events.tick() => {
                 for event in clipboard.drain_events() {
@@ -353,6 +420,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => {}
                 }
             },
+            result = async {
+                match config_child.as_mut() {
+                    Some(child) => child.wait().await,
+                    None => std::future::pending().await,
+                }
+            } => {
+                config_child = None;
+                match result {
+                    Ok(status) if !status.success() => eprintln!("settings exited abnormally: {status}"),
+                    Err(error) => eprintln!("failed waiting for settings: {error}"),
+                    _ => {}
+                }
+            },
             request = rx.recv() => match request {
                 Some(Request::Pick(reply)) => {
                     if active.is_some() { let _ = reply.send(Ok("busy")); continue; }
@@ -363,7 +443,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         history_child = None;
                     }
-                    match Command::new(picker_path()).stdout(Stdio::piped()).kill_on_drop(true).spawn() {
+                    match Command::new(picker_path()).arg("--radius").arg(config.magnifier_radius.to_string()).arg("--zoom").arg(config.magnifier_zoom.to_string()).stdout(Stdio::piped()).kill_on_drop(true).spawn() {
                         Ok(child) => {
                             let tx = requests.clone();
                             let stop = shutdown_rx.clone();
@@ -447,6 +527,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     let _ = reply.send(result);
                 }
+                Some(Request::Configure(reply)) => {
+                    if config_child.is_some() {
+                        let _ = reply.send(Ok("already-open"));
+                    } else {
+                        match Command::new(config_path()).kill_on_drop(true).spawn() {
+                            Ok(child) => { config_child = Some(child); let _ = reply.send(Ok("started")); }
+                            Err(error) => { let _ = reply.send(Err(format!("failed to launch settings: {error}"))); }
+                        }
+                    }
+                }
+                Some(Request::ReloadConfig(reply)) => {
+                    let result = match config::Config::load() {
+                        Ok(new) => match new.clipboard_format.parse::<Format>() {
+                            Ok(new_format) => {
+                                history.set_retention(new.history_limit);
+                                format = new_format;
+                                config = new;
+                                shortcuts.rebind(config.pick_shortcut.clone(), config.history_shortcut.clone()).await.map(|()| "applied".to_owned())
+                            }
+                            Err(error) => Err(error.to_string()),
+                        },
+                        Err(error) => Err(error.to_string()),
+                    };
+                    let _ = reply.send(result);
+                }
+                Some(Request::ShortcutStatus(reply)) => { let _ = reply.send(shortcuts.status()); }
+                Some(Request::RebindShortcuts(reply)) => {
+                    let result = shortcuts.rebind(config.pick_shortcut.clone(), config.history_shortcut.clone()).await.map(|()| shortcuts.status());
+                    let _ = reply.send(result);
+                }
                 Some(Request::Complete(outcome)) => {
                     active = None;
                     match outcome {
@@ -492,6 +602,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     let _ = shutdown.send(true);
+    shortcuts.shutdown().await;
+    if let Some(mut child) = config_child {
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+    }
     if let Some(mut child) = history_child {
         let _ = close_history(&mut child).await;
     }

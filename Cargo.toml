@@ -1,5 +1,5 @@
 [workspace]
-members = ["rust/clipboard", "rust/color", "rust/history", "rust/ipc", "rust/picker-core", "rust/picker", "rust/storage", "rust/tray"]
+members = ["rust/clipboard", "rust/color", "rust/config-core", "rust/config", "rust/history", "rust/ipc", "rust/picker-core", "rust/picker", "rust/storage", "rust/tray"]
 resolver = "2"
 
 [workspace.package]

@@ -14,6 +14,10 @@ pub trait SwatchBoard {
     fn get_history(&self, limit: u32) -> zbus::Result<Vec<(String, String, String, String)>>;
     fn show_history(&self) -> zbus::Result<String>;
     fn copy_history(&self, id: &str) -> zbus::Result<String>;
+    fn configure(&self) -> zbus::Result<String>;
+    fn reload_config(&self) -> zbus::Result<String>;
+    fn shortcut_status(&self) -> zbus::Result<String>;
+    fn rebind_shortcuts(&self) -> zbus::Result<String>;
     fn quit(&self) -> zbus::Result<()>;
 
     #[zbus(signal)]

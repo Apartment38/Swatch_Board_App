@@ -67,7 +67,10 @@ impl Tray for Item {
             .into(),
             StandardItem {
                 label: "Configure".into(),
-                enabled: false,
+                activate: Box::new(|item: &mut Self| {
+                    let (reply, _) = oneshot::channel();
+                    let _ = item.requests.send(Request::Configure(reply));
+                }),
                 ..Default::default()
             }
             .into(),

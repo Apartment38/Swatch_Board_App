@@ -25,7 +25,7 @@ Wayland development packages, plus the libclang tooling used by their bindings.
 To start the tray, build the executables and run them from the same directory:
 
 ```sh
-cargo build --offline --locked -p swatch-board-picker -p swatch-board-tray -p swatch-board-history
+cargo build --locked -p swatch-board-picker -p swatch-board-tray -p swatch-board-history -p swatch-board-config
 ./target/debug/swatch-board-tray
 ```
 
@@ -41,8 +41,8 @@ including repeated colors. The tray restores the last color on restart and owns
 the copied text independently of the picker process. **Show Palette** opens the
 history popup; selecting a swatch copies it without creating another capture,
 closes the popup, and shows a notification. Repeat the action, press Escape, or
-click outside to close without copying. Board and Configure remain disabled
-until their later phases. See the [D-Bus API](docs/ipc.md).
+click outside to close without copying. **Configure** opens a separate settings
+window; closing it exits that process. Board remains disabled. See the [D-Bus API](docs/ipc.md).
 
 When the pointer's output cannot be determined, the popup queries KDE's
 `kscreen-doctor` for the configured primary output. That executable must be
@@ -85,6 +85,13 @@ history_columns = 4
 history_rows = 3
 auto_copy = true
 clipboard_format = "hex"
+magnifier_radius = 7
+magnifier_zoom = 10
+pick_shortcut = "Meta+Shift+C"
+history_shortcut = "Meta+Shift+H"
+hide_board_while_picking = false
+autostart = false
+version = 1
 ```
 
 `history_limit` must be positive. `history_display_limit` is 1–10000; popup
@@ -96,6 +103,21 @@ clipboard. Clipboard ownership requires a compositor exposing Wayland data
 control; the tray must remain running unless a clipboard manager retains the
 selection. Invalid settings or incompatible databases produce an error rather
 than silently discarding data.
+
+Configure validates settings and applies changes to the running tray. Magnifier
+radius is 0–31 and zoom is 4–32. Global shortcuts require desktop portal
+authorization. On KDE, Save requests assignment of the saved shortcuts to the
+existing portal actions; both actions must already be assigned. Unassigned or
+revoked shortcuts must first be enabled in KDE System Settings. Conflicting
+shortcuts are rejected; use a free intermediate binding to swap two shortcuts.
+The assignment is asynchronous and not atomic: inspect shortcut status for
+failures or partial changes. Concurrent desktop shortcut edits can race the
+conflict check. KDE's system shortcut settings also provide an explicit fallback
+when the portal is unavailable. Autostart uses one per-user XDG desktop entry.
+The Board hide preference is saved for the later Board phase.
+
+For a staged installation, build release binaries and use
+`PREFIX=/usr DESTDIR=/tmp/swatch-board-stage bash packaging/install.sh`.
 
 ## Project references
 

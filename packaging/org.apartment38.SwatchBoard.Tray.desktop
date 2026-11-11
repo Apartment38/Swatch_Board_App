@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Swatch Board
+Comment=Pick colors and manage your palette
+Exec=swatch-board-tray
+Icon=org.apartment38.SwatchBoard
+Terminal=false
+Categories=Graphics;Utility;
+StartupNotify=false

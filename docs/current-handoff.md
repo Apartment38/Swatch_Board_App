@@ -12,7 +12,136 @@ Read the root `AGENTS.md` before changing the repository. Commit coherent, verif
 
 ## Current milestone
 
-**Phase 1A, Phase 1B, Phase 1C, and Phase 1D acceptance passed.** Settings UI and Board have not started.
+**Phase 1A, Phase 1B, Phase 1C, and Phase 1D acceptance passed.** Board has not started.
+
+**Phase 1E is in progress, not accepted.** The settings utility, typed
+configuration, shortcut portal worker, KDE shortcut reassignment, autostart
+and staged installer have been implemented. An isolated session-bus scenario
+verified single-instance startup, settings reload, invalid-setting rejection,
+and picker arguments using a synthetic picker and StatusNotifierWatcher.
+
+On actual KDE Wayland, the user confirmed the settings window's controls,
+scrolling, save/reload, and duplicate-shortcut validation. The portal assigned
+Meta+Shift+C and Meta+Shift+H; the user confirmed both actions worked. A portal
+restart initially broke recovery; using a fresh registered D-Bus connection per
+portal session fixed it, and the user confirmed history shortcut recovery after
+a second portal restart. Suspend/resume and the history shortcut also passed.
+
+Restarting `plasma-kwin_wayland.service` ended the graphical session; the user
+could not log back in and had to reboot. Do not repeat that disruptive test.
+The previous-boot user journal recorded that the restarted compositor chose a
+Wayland backend because `WAYLAND_DISPLAY` was set; on later shutdown its service
+timed out and was killed. These logs do not establish the cause of the login
+failure. The physical restart must not be repeated as routine verification.
+The user approved replacing the unsafe physical KWin restart gate with the
+already recorded private KWin restart/recovery plus a normal physical logout
+and login performed manually. The logout/login and full physical Phase 1A–1E
+joint acceptance remain open. Automation cannot capture this desktop. Board
+must not begin until the revised gate passes.
+
+The debug tray's isolated idle sample reported PSS 14,983 KiB and private
+clean plus dirty memory 14,956 KiB. The main thread accumulated 2.35 ms CPU
+and 10 scheduled runs over approximately 10 seconds; this is not a total
+process wakeup measurement or a release-build baseline.
+
+In a private two-output KWin virtual session, disabling and re-enabling one
+output left the tray reachable. A separate private KWin restart replaced the
+compositor process, restored both virtual outputs, and left the release tray's
+D-Bus service reachable. Shortcut authorization in that session was not approved,
+so this does not establish shortcut recovery after KWin restart or physical
+hotplug.
+
+Physical hotplug was exercised with eDP-1 and HDMI-A-1. An initial crossing
+failed on a stale cached image; waiting for fresh target video under the
+existing clean-frame deadline addressed that path. A second crossing failed
+closed because a presentation timestamp was ahead of receipt. The picker now
+defers such presented feedback until its reported time, retaining bounded
+timeouts and requiring post-hide video after the delayed barrier. The user
+confirmed crossing both directions and cancellation on the corrected build;
+logs showed deferred visible and hide feedback and subsequent clean frames.
+Unplugging HDMI-A-1 during an active pick closed it fail-closed; the logs showed
+output loss, shield cleanup, and closure of both portal sessions. The user
+confirmed the built-in desktop remained usable and a new pick worked. After
+HDMI-A-1 was reconnected, both displays were enabled and the user confirmed
+another pick worked on both and cancelled. Both displays were left enabled.
+The tray and temporary entries were removed, and the user removed the test
+shortcuts. This covers the observed hotplug scenarios, not every failure stage.
+
+On the real desktop, the user confirmed the portal configuration dialog opened
+and manually changed the assignments to Meta+Shift+J/K; History then worked.
+Saving different preferences opened KDE's shortcut settings but did not
+automatically apply them. The portal treats preferences as suggestions:
+the [KDE portal implementation](https://github.com/KDE/xdg-desktop-portal-kde/blob/Plasma/6.8/src/globalshortcuts.cpp)
+rebinds returning IDs without an approval dialog and `ConfigureShortcuts` opens
+KDE System Settings.
+
+The user approved a KDE-specific reassignment policy for explicit Save/retry:
+after successful portal binding, both existing actions must already have assigned
+keys. The tray uses KGlobalAccel to change those actions, checks conflicts, and
+reads back both results. This API is not a portal permission check or an atomic
+transaction; concurrent shortcut edits can race the checks, and partial failure
+is reported. Unassigned or denied actions are never enabled by this path.
+
+With isolated settings and history on the real desktop, the user approved
+Meta+Shift+C/H in KDE's portal, saved Meta+Shift+J/K in Settings, and confirmed
+that both reassigned shortcuts worked; the picker was cancelled. Portal status
+and KGlobalAccel readback reported J/K. The user then confirmed that trying to
+swap the two bindings reported a conflict and left both unchanged, and restored
+J/K preferences. The temporary tray and desktop entries were removed; the user
+removed the temporary KDE assignments, and J/K were verified available.
+Replacing existing IDs with new IDs would cause KDE to offer a prefilled
+approval dialog, but KDE also removes omitted old actions and can accept only
+part of a request. Keeping both old and new IDs avoids immediate removal but can
+leave duplicate persistent actions after interruption; the portal exposes no
+transactional rollback or machine-readable key sequence for restoring prior
+user assignments. No such workaround was applied.
+
+The release tray in the private session used 7,871 KiB PSS and 7,840 KiB private
+clean plus dirty memory; over 10.002 seconds its stable threads accumulated
+zero whole CPU ticks (100 ticks/second) and 43 scheduled runs. A release picker
+awaiting portal consent used 5,001 KiB PSS. On the actual desktop with an
+approved live magnifier, the release picker used 98,201 KiB PSS and 66,804 KiB
+private memory; its stable threads accumulated 264 CPU ticks and 1,354 scheduled
+runs over 10.001 seconds. Scheduled runs are not wakeups.
+
+A separate release-picker startup on the physical KDE session took 6,560.123 ms
+from harness launch to the first `LENS_PRESENTED` log. That includes the user's
+screen-capture approval: authorization completed at 6,487.224 ms, and the first
+presentation was logged 72.899 ms later. This is one observation, not a
+distribution, and is not a tray-to-pick startup measurement. The user cancelled
+the picker; it exited successfully and its temporary desktop entry was removed.
+No external monitor was available for the earlier physical hotplug test.
+
+On the actual KDE desktop, the release tray's stable nine threads used 8,421 KiB
+PSS and 8,392 KiB private memory. During a 20.001-second idle interval they
+accumulated 6.331 ms CPU time, 100 scheduled runs, 99 voluntary and one
+involuntary context switch. These scheduler counts are not wakeup counts.
+A tray-initiated picker reached its first presented frame 18,171.955 ms after
+the D-Bus request, including manual authorization; the authorization log arrived
+at 18,099.865 ms, 72.090 ms before the presented-frame log. This single
+observation is not a latency distribution. The user cancelled the picker, the
+tray exited successfully, and the user removed its test shortcuts. The
+temporary picker and tray entries and measurement harness were removed.
+For a subsequent physical idle sample, the user temporarily enabled kernel
+scheduler statistics. The release tray's five stable sampled threads recorded
+138 `nr_wakeups` over 30.236 seconds (4.56 wakeups/second), with 8,426 KiB PSS
+and 8,396 KiB private memory. Thread membership was sampled every 250 ms and
+start times matched, so very short-lived threads between samples cannot be
+excluded. The user restored `kernel.sched_schedstats` to 0, verified afterward,
+and removed the acceptance shortcut assignments and temporary desktop entry.
+There is no comparable release-tray wakeup baseline from before Phase 1E, so
+these measurements do not establish a wakeup regression.
+
+The latest full offline workspace/all-targets run passed 129 tests across 19
+suites; strict workspace Clippy, formatting, release build, staged installation,
+desktop-file validation (category hints only), and staged picker version passed.
+The isolated settings reload scenario also passed after the shortcut change.
+
+The acceptance tray was stopped; its temporary picker and tray desktop entries
+were removed. The user removed the two KDE shortcut assignments created by the
+acceptance test. The isolated settings and history remain under ignored
+`target/phase1e-physical/`. An isolated autostart scenario verified that saving
+the preference creates the entry and disabling it removes the entry.
 
 The picker:
 
