@@ -58,8 +58,10 @@ cargo run --offline --locked -p swatch-board-picker
 The picker requests screen-capture authorization through KDE's portal. Left
 release confirms the exact center sample from a genuinely presented magnifier
 commit; right release or Escape cancels. Diagnostics go to stderr and the
-selected `#RRGGBB` value to stdout. When run directly the picker does not update
-history or clipboard; use the tray for those actions.
+selected `#RRGGBB` value to stdout. When moving between outputs, the picker waits
+for fresh target video and for the reported presentation time before using a
+sample; timeouts and output loss fail closed. When run directly the picker does
+not update history or clipboard; use the tray for those actions.
 
 Inspect the CLI without opening a capture session:
 

@@ -31,6 +31,17 @@ No Phase 1B, tray, or Board work has started.
 - Active physical capture dropped from 73.2% to 12.6% observed lifetime CPU after native-only frame-conversion throttling; post-change animated and rotated runs passed.
 - Authorization completion to first presented readiness measured 63.865 ms in the private lab, excluding consent time.
 
-KScreen rejected negative output coordinates; negative origins and all eight transforms retain deterministic geometry coverage. Physical hotplug was unsafe with eDP-1 as the only physical output, so real private KWin output removal supplied that live fault case.
+KScreen rejected negative output coordinates; negative origins and all eight transforms retain deterministic geometry coverage. Earlier physical hotplug was unsafe with eDP-1 as the only physical output; private KWin output removal supplied that fault case.
+
+A later physical eDP-1/HDMI-A-1 test exposed stale cached target frames and
+presentation feedback timestamps slightly ahead of local receipt. The picker
+now waits under its existing clean-frame deadline for fresh target video and
+defers future-dated presented feedback until the reported time, without
+authorizing an earlier sample or hide barrier. The user confirmed crossings
+in both directions and cancellation; logs showed deferred visible and hide
+feedback followed by clean frames. Unplugging HDMI-A-1 during an active pick
+failed closed and released shields and portal sessions; the user confirmed
+the remaining desktop was usable and a subsequent pick worked. After
+reconnection, the user confirmed picking and cancellation on both displays.
 
 See [native integration acceptance](phase-1a-native-integration.md), [physical evidence](evidence/native-physical/physical-acceptance-result.json), and [failure-matrix evidence](evidence/native-failure-matrix/failure-matrix-result.json).

@@ -46,6 +46,22 @@ fn finish_outcome(
         .and_then(|r| r.map_err(Into::into))
 }
 
+// A target output can still have an old cached image when the pointer arrives.
+// During a hide transition, wait for fresh video under the existing hide deadline;
+// never present or select that cached image.
+fn frame_is_ready(
+    age: Duration,
+    awaiting_clean_frame: bool,
+) -> std::result::Result<bool, &'static str> {
+    if age <= Duration::from_secs(2) {
+        Ok(true)
+    } else if awaiting_clean_frame {
+        Ok(false)
+    } else {
+        Err("stale capture image")
+    }
+}
+
 fn validate_trigger(trigger: &str) -> std::result::Result<(), String> {
     if matches!(trigger.trim(), "Esc" | "Escape") {
         Ok(())
@@ -497,6 +513,93 @@ mod authority_tests {
             assert!(validate_trigger(trigger).is_err(), "accepted {trigger}");
         }
     }
+
+    #[test]
+    fn stale_target_waits_only_during_clean_frame_transition() {
+        let stale = Duration::from_secs(3);
+        assert_eq!(frame_is_ready(stale, true), Ok(false));
+        assert_eq!(frame_is_ready(Duration::from_millis(100), true), Ok(true));
+        assert_eq!(frame_is_ready(stale, false), Err("stale capture image"));
+    }
+
+    #[test]
+    fn future_feedback_does_not_authorize_a_sample_before_its_timestamp() {
+        let mut guard = Guard::default();
+        let sample = Sample {
+            stream_id: 1,
+            source: (4, 5),
+            color: [1, 2, 3],
+            video_pts: 50,
+        };
+        guard.expect_stream(1);
+        let ticket = guard
+            .visible(
+                Rect {
+                    x: 0,
+                    y: 0,
+                    w: 10,
+                    h: 10,
+                },
+                sample,
+            )
+            .unwrap();
+        let mut queue = vec![(
+            Feedback {
+                ticket,
+                source: None,
+                video_pts: Some(50),
+            },
+            100,
+        )];
+        assert!(take_due_feedback(&mut queue, 99).is_none());
+        assert_eq!(guard.sample(), None);
+        let (feedback, timestamp) = take_due_feedback(&mut queue, 100).unwrap();
+        assert!(
+            guard
+                .presented_after_receipt(feedback.ticket, timestamp, 100)
+                .unwrap()
+        );
+        assert_eq!(guard.sample(), Some(sample));
+    }
+
+    #[test]
+    fn future_hide_feedback_cannot_clear_contamination_early() {
+        let mut guard = Guard::default();
+        let sample = Sample {
+            stream_id: 1,
+            source: (4, 5),
+            color: [1, 2, 3],
+            video_pts: 50,
+        };
+        guard.expect_stream(1);
+        let rect = Rect {
+            x: 0,
+            y: 0,
+            w: 10,
+            h: 10,
+        };
+        guard.visible(rect, sample).unwrap();
+        let hide = guard.hide().unwrap();
+        let mut queue = vec![(
+            Feedback {
+                ticket: hide,
+                source: None,
+                video_pts: None,
+            },
+            100,
+        )];
+        assert!(take_due_feedback(&mut queue, 99).is_none());
+        assert!(!guard.clean_stream_frame(1, Some(101)).unwrap());
+        assert!(guard.contaminated(rect));
+        let (feedback, timestamp) = take_due_feedback(&mut queue, 110).unwrap();
+        assert!(
+            guard
+                .presented_after_receipt(feedback.ticket, timestamp, 110)
+                .unwrap()
+        );
+        assert!(!guard.clean_stream_frame(1, Some(110)).unwrap());
+        assert!(guard.clean_stream_frame(1, Some(111)).unwrap());
+    }
 }
 
 use crate::{
@@ -812,6 +915,13 @@ struct Feedback {
     source: Option<PixelPoint>,
     video_pts: Option<u64>,
 }
+
+fn take_due_feedback(queue: &mut Vec<(Feedback, u64)>, now_ns: u64) -> Option<(Feedback, u64)> {
+    queue
+        .iter()
+        .position(|(_, timestamp)| *timestamp <= now_ns)
+        .map(|index| queue.swap_remove(index))
+}
 struct App {
     registry: RegistryState,
     outputs: OutputState,
@@ -838,6 +948,7 @@ struct App {
     options: PickerOptions,
     guard: Guard,
     pending: Option<(u64, Instant)>,
+    deferred_feedback: Vec<(Feedback, u64)>,
     hide_started: Option<Instant>,
     last_submit: Instant,
     quit: bool,
@@ -881,6 +992,7 @@ fn run_overlay(
         options,
         guard: Guard::default(),
         pending: None,
+        deferred_feedback: Vec::new(),
         hide_started: None,
         last_submit: Instant::now() - Duration::from_secs(1),
         quit: false,
@@ -1033,6 +1145,56 @@ fn glyph(character: char) -> [u8; 5] {
 }
 
 impl App {
+    // Feedback may describe display-path latency with a timestamp later than
+    // receipt. Do not authorize the sample or hide barrier before that time.
+    fn accept_presentation(&mut self, data: &Feedback, ns: u64, receipt_ns: u64) {
+        if self.pending.is_some_and(|(c, _)| c == data.ticket.commit) {
+            self.pending = None;
+        }
+        match self
+            .guard
+            .presented_after_receipt(data.ticket, ns, receipt_ns)
+        {
+            Ok(true) => {
+                if let Some(sample) = data.ticket.sample {
+                    let c = sample.color;
+                    log!(
+                        "LENS_PRESENTED commit={} color=#{:02X}{:02X}{:02X} source={:?} video_pts={:?} presented_ns={ns} generation={}",
+                        data.ticket.commit,
+                        c[0],
+                        c[1],
+                        c[2],
+                        data.source,
+                        data.video_pts,
+                        data.ticket.generation
+                    );
+                } else {
+                    log!(
+                        "GUARD_HIDE_PRESENTED barrier_ns={receipt_ns} presented_ns={ns} commit={} generation={}",
+                        data.ticket.commit,
+                        data.ticket.generation
+                    );
+                }
+            }
+            Ok(false) => log!(
+                "PRESENTATION_IGNORED commit={} stale_generation_or_hidden=true",
+                data.ticket.commit
+            ),
+            Err(error) => self.fail(error),
+        }
+    }
+
+    fn process_deferred_feedback(&mut self, now_ns: u64) {
+        while let Some((data, presented_ns)) =
+            take_due_feedback(&mut self.deferred_feedback, now_ns)
+        {
+            self.accept_presentation(&data, presented_ns, now_ns);
+            if self.quit {
+                return;
+            }
+        }
+    }
+
     // Called in the pointer callback as well as tick: events in one dispatch batch
     // cannot confirm a sample invalidated by motion before the next timer tick.
     fn active_output(&self) -> Option<usize> {
@@ -1234,6 +1396,12 @@ impl App {
         Ok(())
     }
     fn tick(&mut self, feed: &capture::CaptureFeed, qh: &QueueHandle<Self>) -> Result<()> {
+        if !self.deferred_feedback.is_empty() {
+            self.process_deferred_feedback(monotonic_ns()?);
+            if self.quit {
+                return Ok(());
+            }
+        }
         if self
             .pending
             .is_some_and(|(_, t)| t.elapsed() > Duration::from_secs(2))
@@ -1299,11 +1467,12 @@ impl App {
         if pts > monotonic_ns()? {
             return Err("video PTS exceeds local CLOCK_MONOTONIC; incompatible clock".into());
         }
-        if f.received_at
+        let age = f
+            .received_at
             .elapsed()
-            .map_or(true, |age| age > Duration::from_secs(2))
-        {
-            return Err("stale capture image".into());
+            .map_err(|_| "capture image receipt is in the future")?;
+        if !frame_is_ready(age, self.guard.hiding())? {
+            return Ok(());
         }
         if self.guard.hiding() {
             if !self.guard.clean_stream_frame(id, Some(pts))? {
@@ -1689,9 +1858,6 @@ impl Dispatch<wp_presentation_feedback::WpPresentationFeedback, Feedback> for Ap
                     app.fail("invalid presentation nanoseconds");
                     return;
                 }
-                if app.pending.is_some_and(|(c, _)| c == data.ticket.commit) {
-                    app.pending = None;
-                }
                 let receipt_ns = match monotonic_ns() {
                     Ok(t) => t,
                     Err(e) => {
@@ -1699,37 +1865,24 @@ impl Dispatch<wp_presentation_feedback::WpPresentationFeedback, Feedback> for Ap
                         return;
                     }
                 };
-                match app
-                    .guard
-                    .presented_after_receipt(data.ticket, ns, receipt_ns)
-                {
-                    Ok(true) => {
-                        if let Some(sample) = data.ticket.sample {
-                            let c = sample.color;
-                            log!(
-                                "LENS_PRESENTED commit={} color=#{:02X}{:02X}{:02X} source={:?} video_pts={:?} presented_ns={ns} generation={}",
-                                data.ticket.commit,
-                                c[0],
-                                c[1],
-                                c[2],
-                                data.source,
-                                data.video_pts,
-                                data.ticket.generation
-                            );
-                        } else {
-                            log!(
-                                "GUARD_HIDE_PRESENTED barrier_ns={receipt_ns} presented_ns={ns} commit={} generation={}",
-                                data.ticket.commit,
-                                data.ticket.generation
-                            );
-                        }
+                if ns > receipt_ns {
+                    // Keep the existing two-second feedback bound, and never
+                    // authorize a timestamp that is still in the future.
+                    if ns - receipt_ns > Duration::from_secs(2).as_nanos() as u64
+                        || app.deferred_feedback.len() >= 128
+                    {
+                        app.fail("presentation timestamp too far in the future");
+                        return;
                     }
-                    Ok(false) => log!(
-                        "PRESENTATION_IGNORED commit={} stale_generation_or_hidden=true",
-                        data.ticket.commit
-                    ),
-                    Err(e) => app.fail(e),
+                    log!(
+                        "PRESENTATION_DEFERRED commit={} delta_ns={}",
+                        data.ticket.commit,
+                        ns - receipt_ns
+                    );
+                    app.deferred_feedback.push((data.clone(), ns));
+                    return;
                 }
+                app.accept_presentation(data, ns, receipt_ns);
             }
             wp_presentation_feedback::Event::Discarded => {
                 if app.pending.is_some_and(|(c, _)| c == data.ticket.commit) {
