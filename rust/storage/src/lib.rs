@@ -14,8 +14,11 @@ use rusqlite::{Connection, ErrorCode, OptionalExtension, TransactionBehavior, pa
 pub use swatch_board_picker_core::Rgba8;
 use uuid::Uuid;
 
+mod palettes;
+pub use palettes::{GenerationRecord, PaletteRepository, SavedPalette};
+
 pub const DEFAULT_RETENTION: usize = 100;
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug)]
@@ -29,6 +32,8 @@ pub enum Error {
     Malformed(String),
     /// A newer or otherwise unrecognized schema must not be modified.
     IncompatibleSchema(String),
+    InvalidInput(String),
+    NotFound(String),
     Database(rusqlite::Error),
 }
 
@@ -40,6 +45,8 @@ impl fmt::Display for Error {
             Self::Busy(e) => write!(f, "storage database is busy: {e}"),
             Self::Malformed(e) => write!(f, "malformed storage database: {e}"),
             Self::IncompatibleSchema(e) => write!(f, "incompatible storage schema: {e}"),
+            Self::InvalidInput(e) => write!(f, "invalid input: {e}"),
+            Self::NotFound(e) => write!(f, "not found: {e}"),
             Self::Database(e) => write!(f, "storage database error: {e}"),
         }
     }
@@ -272,6 +279,41 @@ fn migrate(connection: &mut Connection) -> Result<(), Error> {
     .map_err(|e| Error::IncompatibleSchema(format!("invalid history schema: {e}")))?;
     tx.prepare("SELECT key, value FROM settings_meta LIMIT 0")
         .map_err(|e| Error::IncompatibleSchema(format!("invalid settings schema: {e}")))?;
+    if version < 2 {
+        tx.execute_batch("CREATE TABLE palettes (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL);
+            CREATE TABLE palette_colors (palette_id TEXT NOT NULL REFERENCES palettes(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL, red INTEGER NOT NULL CHECK(red BETWEEN 0 AND 255),
+                green INTEGER NOT NULL CHECK(green BETWEEN 0 AND 255), blue INTEGER NOT NULL CHECK(blue BETWEEN 0 AND 255),
+                alpha INTEGER NOT NULL CHECK(alpha BETWEEN 0 AND 255), locked INTEGER NOT NULL CHECK(locked IN (0, 1)),
+                PRIMARY KEY (palette_id, position));
+            CREATE TABLE palette_generations (id TEXT PRIMARY KEY NOT NULL, description TEXT NOT NULL);
+            CREATE TABLE generation_colors (generation_id TEXT NOT NULL REFERENCES palette_generations(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL, red INTEGER NOT NULL CHECK(red BETWEEN 0 AND 255),
+                green INTEGER NOT NULL CHECK(green BETWEEN 0 AND 255), blue INTEGER NOT NULL CHECK(blue BETWEEN 0 AND 255),
+                alpha INTEGER NOT NULL CHECK(alpha BETWEEN 0 AND 255), locked INTEGER NOT NULL CHECK(locked IN (0, 1)),
+                PRIMARY KEY (generation_id, position));
+            INSERT INTO schema_migrations (version, applied_at) VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            PRAGMA user_version = 2;")?;
+    }
+    let valid: i64 = tx
+        .query_row(
+            "SELECT count(*) FROM schema_migrations WHERE version = 2",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| Error::IncompatibleSchema(format!("missing migration metadata: {e}")))?;
+    if valid != 1 {
+        return Err(Error::IncompatibleSchema("missing migration 2".into()));
+    }
+    for sql in [
+        "SELECT id, name FROM palettes LIMIT 0",
+        "SELECT palette_id, position, red, green, blue, alpha, locked FROM palette_colors LIMIT 0",
+        "SELECT id, description FROM palette_generations LIMIT 0",
+        "SELECT generation_id, position, red, green, blue, alpha, locked FROM generation_colors LIMIT 0",
+    ] {
+        tx.prepare(sql)
+            .map_err(|e| Error::IncompatibleSchema(format!("invalid palette schema: {e}")))?;
+    }
     tx.commit()?;
     Ok(())
 }

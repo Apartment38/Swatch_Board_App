@@ -16,7 +16,8 @@ Read the root `AGENTS.md` before changing the repository. Commit coherent, verif
 user-approved replacement for the unsafe physical KWin restart test described
 below.** Phase 2 Board shell also passed physical Board/picker acceptance.
 Phase 3 Color Mixer passed user-reported physical desktop acceptance.
-Phase 4 Palette Editor is next.
+Phase 4 Palette Editor passed user-reported physical desktop acceptance.
+Phase 5 Theme Generator is next.
 
 **Phase 1E is accepted under that revised gate.** The settings utility, typed
 configuration, shortcut portal worker, KDE shortcut reassignment, autostart
@@ -420,3 +421,27 @@ evidence is under `target/mixer-spectrum-window.png`,
 `target/mixer-spectrum-fixed.png`, and `target/mixer-spectrum-final.png`.
 The final capture confirms the taller spectrum remains fully visible.
 Normal history and manual portal approvals remain unchanged.
+
+## Phase 4 Palette Editor implementation
+
+The Board now supports seeded OKLCH generation, editable and lockable swatches,
+history application, palette undo/redo, saved palettes, and separate persistent
+generation snapshots. Mixer and Theme-tab context use the active palette.
+Storage migrates version 1 databases transactionally to version 2. The README
+documents the gamut/contrast behavior and intended future theme-link policy.
+
+The affected Board, color, and storage suites passed 33 tests across seven
+suites; strict all-targets Clippy for those packages passed. The user reported
+that the physical desktop scenarios passed: generation and locks, editing and
+undo/redo, history click and drag, saved and generated palette operations, and
+Mixer/Theme context.
+
+The user subsequently requested and verified the pinned-panel revision:
+swatches appear only there, can be reordered by dragging, expose hover lock/delete
+buttons, and have editable HEX values. History drag still works. The user then
+reported that locked swatches could still be changed manually; after the fix,
+the user confirmed locked HEX editing, history replacement, and deletion are
+prevented, unlocking restores those actions, and reordering preserves the lock.
+These physical observations are user-reported because native automation's
+AT-SPI connection and capture are unavailable. Board tests, strict all-targets
+Board Clippy, formatting, and a debug Board build passed after the lock fix.

@@ -1,4 +1,5 @@
 mod mixer;
+mod palette;
 mod worker;
 
 use eframe::egui;
@@ -39,6 +40,7 @@ struct Board {
     config: Config,
     history: Vec<Capture>,
     mixer: mixer::Mixer,
+    palette: palette::PaletteEditor,
     history_open: bool,
     connected: bool,
     loaded: bool,
@@ -135,6 +137,7 @@ impl Board {
             config: Config::default(),
             history: Vec::new(),
             mixer: mixer::Mixer::default(),
+            palette: palette::PaletteEditor::new(),
             history_open: true,
             connected: false,
             loaded: false,
@@ -204,11 +207,15 @@ impl Board {
                             );
                             response.dnd_set_drag_payload(color);
                             if response.clicked() {
-                                self.mixer.select(color);
-                                self.tab = Tab::Mixer;
+                                if self.tab == Tab::Palette {
+                                    self.palette.add_history(color, &mut self.mixer);
+                                } else {
+                                    self.mixer.select(color);
+                                    self.tab = Tab::Mixer;
+                                }
                             }
                             response.on_hover_text(format!(
-                                "{}\n{}\n{:?}\nClick to select; drag to mixer",
+                                "{}\n{}\n{:?}\nClick to select or add; drag to mixer or palette",
                                 color.format(Format::HexRgba),
                                 capture.captured_at,
                                 capture.source
@@ -289,12 +296,17 @@ impl eframe::App for Board {
                 }
             });
         });
+        self.palette.sync_from_mixer(&self.mixer);
         egui::TopBottomPanel::bottom("active_palette")
             .resizable(true)
-            .default_height(115.0)
-            .min_height(100.0)
-            .max_height(180.0)
-            .show(ctx, |ui| self.mixer.palette_ui(ui));
+            .default_height(145.0)
+            .min_height(130.0)
+            .max_height(220.0)
+            .show(ctx, |ui| {
+                self.mixer.palette_ui(ui);
+                self.palette.sync_from_mixer(&self.mixer);
+                self.palette.pinned_ui(ui, &mut self.mixer);
+            });
         if self.history_open {
             egui::SidePanel::left("history_sidebar")
                 .resizable(true)
@@ -330,12 +342,15 @@ impl eframe::App for Board {
                     self.mixer.ui(ui, format);
                 }
                 Tab::Palette => {
-                    ui.heading("Palette Editor");
-                    ui.label("Palette generation and editing belong to Phase 4.");
+                    self.palette.ui(ui, &mut self.mixer);
                 }
                 Tab::Theme => {
                     ui.heading("Theme Generator");
                     ui.label("Theme preview and export belong to Phase 5.");
+                    ui.label(format!(
+                        "Active palette: {} colors",
+                        self.mixer.colors().len()
+                    ));
                 }
             }
         });

@@ -85,7 +85,7 @@ pub fn mix(sources: &[(Color, f64)], space: MixingSpace) -> Result<Color, &'stat
     })
 }
 
-fn decode(channel: u8) -> f64 {
+pub(crate) fn decode(channel: u8) -> f64 {
     let v = f64::from(channel) / 255.0;
     if v <= 0.04045 {
         v / 12.92
@@ -103,7 +103,7 @@ fn encode(v: f64) -> f64 {
     }
 }
 
-fn to_oklch(color: Color) -> [f64; 3] {
+pub(crate) fn to_oklch(color: Color) -> [f64; 3] {
     let (r, g, b) = (decode(color.r), decode(color.g), decode(color.b));
     let l = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b).cbrt();
     let m = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b).cbrt();
@@ -114,7 +114,7 @@ fn to_oklch(color: Color) -> [f64; 3] {
     [lightness, a.hypot(b), b.atan2(a)]
 }
 
-fn from_oklch(l: f64, c: f64, h: f64) -> [f64; 3] {
+pub(crate) fn from_oklch(l: f64, c: f64, h: f64) -> [f64; 3] {
     let a = c * h.cos();
     let b = c * h.sin();
     let l_ = (l + 0.3963377774 * a + 0.2158037573 * b).powi(3);

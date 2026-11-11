@@ -54,6 +54,19 @@ impl Default for Mixer {
 }
 
 impl Mixer {
+    pub fn colors(&self) -> &[Color] {
+        &self.state.palette
+    }
+
+    pub fn replace_palette(&mut self, colors: Vec<Color>) {
+        if self.state.palette != colors {
+            self.state.palette = colors;
+            // Do not let an old mixer snapshot resurrect a different palette.
+            self.undo.clear();
+            self.redo.clear();
+        }
+    }
+
     fn sync_fields(&mut self) {
         for (field, (format, _)) in self.fields.iter_mut().zip(FORMATS) {
             *field = self.state.current.format(format);
@@ -202,28 +215,21 @@ impl Mixer {
     pub fn palette_ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_wrapped(|ui| {
             ui.strong(format!(
-                "Active palette · unsaved draft · {} colors",
+                "Active palette · {} colors",
                 self.state.palette.len()
             ));
-            if ui.button("Add current color").clicked() {
+            if ui
+                .add_enabled(
+                    self.state.palette.len() < 64,
+                    egui::Button::new("Add current color"),
+                )
+                .clicked()
+            {
                 let previous = self.state.clone();
                 self.state.palette.push(self.state.current);
                 self.commit(previous);
             }
         });
-        ui.small("Draft persists across tabs and picking; closing Board discards it.");
-        egui::ScrollArea::horizontal()
-            .id_salt("active_palette")
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    for color in &self.state.palette {
-                        ui.vertical(|ui| {
-                            swatch(ui, *color, egui::vec2(48.0, 30.0));
-                            ui.label(color.format(Format::HexRgba));
-                        });
-                    }
-                });
-            });
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui, format: Format) {
@@ -318,7 +324,7 @@ impl Mixer {
             if let Some(error) = &self.error {
                 ui.colored_label(ui.visuals().error_fg_color, error);
             }
-            ui.small("The active draft palette is pinned below the mixer.");
+            ui.small("The active palette is pinned below the mixer.");
         });
     }
 }

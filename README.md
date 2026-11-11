@@ -3,8 +3,8 @@
 Build beautiful palettes with swatches.
 
 Swatch Board is a Rust-only KDE Plasma Wayland color utility. The picker,
-tray, history, settings, Board shell, and Color Mixer have passed target-desktop
-acceptance. Palette and theme editors are future phases.
+tray, history, settings, Board shell, Color Mixer, and Palette Editor have passed
+target-desktop acceptance. The theme editor is a future phase.
 See the [current handoff](docs/current-handoff.md).
 
 ## Build and test
@@ -146,10 +146,33 @@ Mix two or more sources with normalized weights in encoded sRGB or OKLCH.
 OKLCH averages hue along the shortest arc relative to the first chromatic source,
 ignores achromatic hues, and clips out-of-gamut linear RGB channels. Alpha is
 weighted independently. Undo and redo cover mixer state and draft changes.
-The active unsaved draft is pinned to the bottom of every tab, independently of
-mixer scrolling. **Add current color** appends to that draft, not capture history.
-It remains in memory across tabs and window hide/restore but is discarded when
-Board exits. Saving palettes belongs to Phase 4.
+The active palette is pinned to the bottom of every tab, independently of mixer
+scrolling. **Add current color** appends to it, not capture history. Unsaved
+changes survive window recreation but are discarded when Board exits.
+
+### Palette Editor
+
+Generate 1–64 colors with a seeded complementary, split-complementary, analogous,
+triadic, tetradic, monochromatic, perceptual-contrast, or random generator. An
+optional base color, non-wrapping hue interval, OKLCH lightness and chroma bounds,
+and minimum contrast against the base (or white) constrain generation. OKLCH
+candidate colors are converted by clipping linear sRGB channels; gamut clipping
+and 8-bit quantization can change the resulting OKLCH coordinates. Contrast is
+measured after conversion, ignoring alpha. Bounded search reports an error when
+constraints cannot be met, including exceptionally narrow feasible regions.
+
+The active swatches appear only in the pinned bottom panel. Drag a swatch onto
+another to reorder it, hover it for lock and delete controls, or edit its HEX
+value and press Enter. A locked swatch cannot be edited, replaced from history,
+or deleted until unlocked; it is also preserved on regeneration. In the
+Palette Editor, clicking history adds a swatch; the checkbox controls whether
+additions are locked. History can also be dragged onto a pinned swatch. Save,
+rename, duplicate, search, reopen, or delete saved palettes. Generation history
+is separate from saved palettes and retains the latest 100 snapshots. Reopening
+a snapshot creates an unsaved draft. The active palette is shared with the Mixer
+and exposed as context on the Theme tab. Theme roles are not implemented yet:
+the intended policy is that linked roles follow their palette swatch, while
+explicit role overrides remain independent.
 
 **Pick Color** requires the tray; **Settings** also works without it. When
 `hide_board_while_picking` is enabled, the Board closes its native window before
