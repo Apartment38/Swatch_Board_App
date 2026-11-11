@@ -15,6 +15,7 @@ const FORMATS: [(Format, &str); 5] = [
 #[derive(Clone, PartialEq)]
 struct State {
     current: Color,
+    hsv: [f32; 3],
     sources: Vec<(Color, f64)>,
     space: MixingSpace,
     // This is the Board's active unsaved palette, not capture history.
@@ -34,6 +35,7 @@ impl Default for Mixer {
         let mut mixer = Self {
             state: State {
                 current: Color::new(36, 122, 195, 255),
+                hsv: hsv(Color::new(36, 122, 195, 255)),
                 sources: vec![
                     (Color::new(255, 0, 0, 255), 1.0),
                     (Color::new(0, 0, 255, 255), 1.0),
@@ -74,6 +76,11 @@ impl Mixer {
     pub fn select(&mut self, color: Color) {
         let previous = self.state.clone();
         self.state.current = color;
+        let mut channels = hsv(color);
+        if channels[1] == 0.0 {
+            channels[0] = self.state.hsv[0];
+        }
+        self.state.hsv = channels;
         self.commit(previous);
         self.sync_fields();
     }
@@ -126,9 +133,97 @@ impl Mixer {
 
     fn blend(&mut self) {
         match mix(&self.state.sources, self.state.space) {
-            Ok(color) => self.state.current = color,
+            Ok(color) => {
+                self.state.current = color;
+                self.state.hsv = hsv(color);
+            }
             Err(error) => self.error = Some(error.into()),
         }
+    }
+
+    fn channel_editor(&mut self, ui: &mut egui::Ui) {
+        let previous = self.state.clone();
+        let mut changed = spectrum(ui, &mut self.state.hsv);
+        let mut channels = [
+            self.state.hsv[0] * 360.0,
+            self.state.hsv[1] * 100.0,
+            self.state.hsv[2] * 100.0,
+        ];
+        ui.horizontal_wrapped(|ui| {
+            for (index, label) in ["Hue °", "Sat %", "Value %"].iter().enumerate() {
+                ui.label(*label);
+                changed |= ui
+                    .add(
+                        egui::DragValue::new(&mut channels[index])
+                            .range(0.0..=if index == 0 { 360.0 } else { 100.0 })
+                            .speed(0.5),
+                    )
+                    .changed();
+            }
+        });
+        if changed {
+            self.state.hsv = [
+                channels[0] / 360.0,
+                channels[1] / 100.0,
+                channels[2] / 100.0,
+            ];
+            self.state.current = from_hsv(self.state.hsv, self.state.current.a);
+        }
+        let mut color = self.state.current;
+        let mut rgb_changed = false;
+        ui.horizontal_wrapped(|ui| {
+            for (label, channel) in [
+                ("Red", &mut color.r),
+                ("Green", &mut color.g),
+                ("Blue", &mut color.b),
+                ("Alpha", &mut color.a),
+            ] {
+                ui.label(label);
+                rgb_changed |= ui
+                    .add(egui::DragValue::new(channel).range(0..=255))
+                    .changed();
+            }
+        });
+        if rgb_changed {
+            if (color.r, color.g, color.b)
+                != (
+                    self.state.current.r,
+                    self.state.current.g,
+                    self.state.current.b,
+                )
+            {
+                self.state.hsv = hsv(color);
+            }
+            self.state.current = color;
+        }
+        self.commit(previous);
+    }
+
+    pub fn palette_ui(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal_wrapped(|ui| {
+            ui.strong(format!(
+                "Active palette · unsaved draft · {} colors",
+                self.state.palette.len()
+            ));
+            if ui.button("Add current color").clicked() {
+                let previous = self.state.clone();
+                self.state.palette.push(self.state.current);
+                self.commit(previous);
+            }
+        });
+        ui.small("Draft persists across tabs and picking; closing Board discards it.");
+        egui::ScrollArea::horizontal()
+            .id_salt("active_palette")
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    for color in &self.state.palette {
+                        ui.vertical(|ui| {
+                            swatch(ui, *color, egui::vec2(48.0, 30.0));
+                            ui.label(color.format(Format::HexRgba));
+                        });
+                    }
+                });
+            });
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui, format: Format) {
@@ -147,7 +242,8 @@ impl Mixer {
                 self.redo();
             }
         });
-        egui::ScrollArea::vertical().id_salt("mixer_body").show(ui, |ui| {
+        self.channel_editor(ui);
+        egui::ScrollArea::vertical().id_salt("mixer_details").show(ui, |ui| {
             let current = self.state.current;
             let target = ui.dnd_drop_zone::<Color, _>(egui::Frame::group(ui.style()), |ui| {
                 swatch(ui, current, egui::vec2(ui.available_width().max(80.0), 90.0));
@@ -172,11 +268,6 @@ impl Mixer {
                 ui.label(format!("Configured output: {}", self.state.current.format(format)));
                 if ui.button("Copy current color").clicked() {
                     ui.ctx().copy_text(self.state.current.format(format));
-                }
-                if ui.button("Add to active palette").clicked() {
-                    let previous = self.state.clone();
-                    self.state.palette.push(self.state.current);
-                    self.commit(previous);
                 }
             });
             ui.separator();
@@ -227,19 +318,117 @@ impl Mixer {
             if let Some(error) = &self.error {
                 ui.colored_label(ui.visuals().error_fg_color, error);
             }
-            ui.separator();
-            ui.strong(format!("Active palette · unsaved draft · {} colors", self.state.palette.len()));
-            ui.label("Draft stays available across tabs and hide/restore; closing Board discards it. Palette saving arrives in Phase 4.");
-            ui.horizontal_wrapped(|ui| {
-                for color in &self.state.palette {
-                    ui.vertical(|ui| {
-                        swatch(ui, *color, egui::vec2(48.0, 30.0));
-                        ui.label(color.format(Format::HexRgba));
-                    });
-                }
-            });
+            ui.small("The active draft palette is pinned below the mixer.");
         });
     }
+}
+
+fn hsv(color: Color) -> [f32; 3] {
+    let value = egui::ecolor::Hsva::from_rgb([
+        color.r as f32 / 255.0,
+        color.g as f32 / 255.0,
+        color.b as f32 / 255.0,
+    ]);
+    [value.h, value.s, value.v]
+}
+
+fn from_hsv([h, s, v]: [f32; 3], alpha: u8) -> Color {
+    let [r, g, b] = egui::ecolor::Hsva::new(h, s, v, 1.0).to_rgb();
+    Color::new(
+        (r * 255.0).round() as u8,
+        (g * 255.0).round() as u8,
+        (b * 255.0).round() as u8,
+        alpha,
+    )
+}
+
+fn spectrum(ui: &mut egui::Ui, hsv: &mut [f32; 3]) -> bool {
+    let mut changed = false;
+    let width = (ui.available_width() - 36.0).clamp(120.0, 480.0);
+    let height = (width * 0.65)
+        .min(ui.available_height() * 0.45)
+        .clamp(80.0, 250.0);
+    ui.horizontal(|ui| {
+        let (rect, response) =
+            ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click_and_drag());
+        // Keep endpoint values and their marker inside the pointer hit region.
+        let rect = rect.shrink(6.0);
+        if let Some(pos) = response.interact_pointer_pos()
+            && (response.clicked() || response.dragged())
+        {
+            hsv[0] = ((pos.x - rect.left()) / rect.width()).clamp(0.0, 1.0);
+            hsv[1] = (1.0 - (pos.y - rect.top()) / rect.height()).clamp(0.0, 1.0);
+            changed = true;
+        }
+        let mut mesh = egui::Mesh::default();
+        for sector in 0..=6 {
+            let hue = sector as f32 / 6.0;
+            let color = from_hsv([hue, 1.0, 1.0], 255);
+            let x = egui::lerp(rect.x_range(), hue);
+            mesh.colored_vertex(
+                egui::pos2(x, rect.top()),
+                egui::Color32::from_rgb(color.r, color.g, color.b),
+            );
+            mesh.colored_vertex(egui::pos2(x, rect.bottom()), egui::Color32::WHITE);
+            if sector < 6 {
+                let i = sector * 2;
+                mesh.add_triangle(i, i + 1, i + 2);
+                mesh.add_triangle(i + 1, i + 3, i + 2);
+            }
+        }
+        ui.painter().add(egui::Shape::mesh(mesh));
+        let marker = egui::pos2(
+            egui::lerp(rect.x_range(), hsv[0]),
+            egui::lerp(rect.y_range(), 1.0 - hsv[1]),
+        );
+        ui.painter().circle_stroke(
+            marker,
+            5.0,
+            egui::Stroke::new(3.0_f32, egui::Color32::BLACK),
+        );
+        ui.painter().circle_stroke(
+            marker,
+            5.0,
+            egui::Stroke::new(1.0_f32, egui::Color32::WHITE),
+        );
+        response
+            .on_hover_text("Hue left to right; saturation bottom to top. Click or drag to select.");
+        let (bar, response) =
+            ui.allocate_exact_size(egui::vec2(24.0, height), egui::Sense::click_and_drag());
+        let bar = bar.shrink2(egui::vec2(0.0, 6.0));
+        if let Some(pos) = response.interact_pointer_pos()
+            && (response.clicked() || response.dragged())
+        {
+            hsv[2] = (1.0 - (pos.y - bar.top()) / bar.height()).clamp(0.0, 1.0);
+            changed = true;
+        }
+        let color = from_hsv([hsv[0], hsv[1], 1.0], 255);
+        let top = egui::Color32::from_rgb(color.r, color.g, color.b);
+        let mut mesh = egui::Mesh::default();
+        for (pos, color) in [
+            (bar.left_top(), top),
+            (bar.right_top(), top),
+            (bar.left_bottom(), egui::Color32::BLACK),
+            (bar.right_bottom(), egui::Color32::BLACK),
+        ] {
+            mesh.colored_vertex(pos, color);
+        }
+        mesh.add_triangle(0, 1, 2);
+        mesh.add_triangle(1, 3, 2);
+        ui.painter().add(egui::Shape::mesh(mesh));
+        let y = egui::lerp(bar.y_range(), 1.0 - hsv[2]);
+        for (width, color) in [
+            (3.0_f32, egui::Color32::BLACK),
+            (1.0_f32, egui::Color32::WHITE),
+        ] {
+            ui.painter().line_segment(
+                [egui::pos2(bar.left(), y), egui::pos2(bar.right(), y)],
+                egui::Stroke::new(width, color),
+            );
+        }
+        response.on_hover_text("Brightness / HSV value. Click or drag to adjust.");
+    });
+    changed
 }
 
 pub fn swatch(ui: &mut egui::Ui, color: Color, size: egui::Vec2) -> egui::Response {
@@ -277,6 +466,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn spectrum_click_changes_hue_and_saturation_without_changing_value() {
+        let ctx = egui::Context::default();
+        let mut channels = [0.0, 0.0, 0.5];
+        let mut rect = egui::Rect::NOTHING;
+        let _ = ctx.run(egui::RawInput::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                rect = ui.available_rect_before_wrap();
+                spectrum(ui, &mut channels);
+            });
+        });
+        let pos = rect.min + egui::vec2(240.0, 1.0);
+        for pressed in [true, false] {
+            let _ = ctx.run(
+                egui::RawInput {
+                    events: vec![
+                        egui::Event::PointerMoved(pos),
+                        egui::Event::PointerButton {
+                            pos,
+                            button: egui::PointerButton::Primary,
+                            pressed,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                    ..Default::default()
+                },
+                |ctx| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        spectrum(ui, &mut channels);
+                    });
+                },
+            );
+        }
+        let color = from_hsv(channels, 77);
+        assert_eq!(channels[1], 1.0, "top edge reaches full saturation");
+        assert_eq!(color, Color::new(0, 128, 128, 77));
+    }
+
+    #[test]
     fn adding_different_colors_appends_to_draft() {
         fn render(mixer: &mut Mixer, ctx: &egui::Context, events: Vec<egui::Event>) -> egui::Pos2 {
             let output = ctx.run(
@@ -289,6 +516,9 @@ mod tests {
                     ..Default::default()
                 },
                 |ctx| {
+                    egui::TopBottomPanel::bottom("palette").show(ctx, |ui| {
+                        mixer.palette_ui(ui);
+                    });
                     egui::CentralPanel::default().show(ctx, |ui| {
                         mixer.ui(ui, Format::HexRgb);
                     });
@@ -299,7 +529,7 @@ mod tests {
                 .iter()
                 .find_map(|shape| {
                     if let egui::Shape::Text(text) = &shape.shape
-                        && text.galley.text() == "Add to active palette"
+                        && text.galley.text() == "Add current color"
                     {
                         Some(text.pos + text.galley.size() * 0.5)
                     } else {

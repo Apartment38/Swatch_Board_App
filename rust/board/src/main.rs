@@ -39,6 +39,7 @@ struct Board {
     config: Config,
     history: Vec<Capture>,
     mixer: mixer::Mixer,
+    history_open: bool,
     connected: bool,
     loaded: bool,
     picking: bool,
@@ -134,6 +135,7 @@ impl Board {
             config: Config::default(),
             history: Vec::new(),
             mixer: mixer::Mixer::default(),
+            history_open: true,
             connected: false,
             loaded: false,
             picking: false,
@@ -181,16 +183,20 @@ impl Board {
             .clipboard_format
             .parse::<Format>()
             .unwrap_or(Format::HexRgb);
-        egui::ScrollArea::horizontal()
+        egui::ScrollArea::vertical()
             .id_salt("shared_history")
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
+                ui.vertical(|ui| {
                     for capture in &self.history {
                         ui.vertical(|ui| {
                             let rgba = capture.color;
                             let color =
                                 swatch_board_color::Color::new(rgba.r, rgba.g, rgba.b, rgba.a);
-                            let response = mixer::swatch(ui, color, egui::vec2(76.0, 44.0));
+                            let response = mixer::swatch(
+                                ui,
+                                color,
+                                egui::vec2(ui.available_width().min(180.0), 44.0),
+                            );
                             let response = ui.interact(
                                 response.rect,
                                 ui.make_persistent_id(capture.id),
@@ -265,6 +271,12 @@ impl eframe::App for Board {
                     self.error =
                         Some("Could not open settings: background service stopped.".into());
                 }
+                if ui
+                    .selectable_label(self.history_open, "Color history")
+                    .clicked()
+                {
+                    self.history_open = !self.history_open;
+                }
                 ui.label(if self.connected {
                     "Tray connected"
                 } else {
@@ -277,13 +289,27 @@ impl eframe::App for Board {
                 }
             });
         });
-        egui::TopBottomPanel::bottom("history")
+        egui::TopBottomPanel::bottom("active_palette")
             .resizable(true)
-            .default_height(135.0)
-            .min_height(105.0)
-            .show(ctx, |ui| {
-                self.history_strip(ui);
-            });
+            .default_height(115.0)
+            .min_height(100.0)
+            .max_height(180.0)
+            .show(ctx, |ui| self.mixer.palette_ui(ui));
+        if self.history_open {
+            egui::SidePanel::left("history_sidebar")
+                .resizable(true)
+                .default_width(200.0)
+                .width_range(140.0..=320.0)
+                .show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.strong("History");
+                        if ui.small_button("Collapse").clicked() {
+                            self.history_open = false;
+                        }
+                    });
+                    self.history_strip(ui);
+                });
+        }
         egui::CentralPanel::default().show(ctx, |ui| {
             if let Some(error) = &self.error {
                 ui.colored_label(ui.visuals().error_fg_color, error);

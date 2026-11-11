@@ -392,3 +392,31 @@ Board and tray remain running for further interactive use. The development picke
 entry at `~/.local/share/applications/org.apartment38.SwatchBoard.desktop` points
 to `target/debug/swatch-board-picker`; it is required for portal registration.
 Portal approvals remained manual.
+
+### Spectrum and layout revision
+
+The mixer now exposes a clickable/draggable hue–saturation spectrum, a vertical
+HSV value bar, and individual HSV, RGB, and alpha numeric controls. HSV uses
+degrees and percentages; RGB/alpha use 0–255. Hue is retained for achromatic
+selections. These edits use the existing undo/redo state.
+
+History is a resizable left sidebar, collapsed from its header and reopened with
+the toolbar's **Color history** toggle. The active draft and its **Add current
+color** action are pinned in a bottom panel across all tabs; its swatches scroll
+horizontally without moving the panel.
+
+The user reported a spectrum ceiling around 50% saturation. A Spectacle window
+capture showed that the scroll area's retained offset clipped the spectrum's
+upper half. Moving spectrum/channel controls above the scrolling details fixed
+that path; spectrum sizing adapts to available height. Pointer endpoint margins
+also make exact 0%/100% accessible. The user subsequently confirmed full
+saturation, channel edits, pinned palette, and collapsible history passed.
+
+Five focused Board tests, strict all-targets Board Clippy, and the debug Board
+build passed. The spectrum pointer regression checks full saturation and
+preserved brightness/alpha. Native automation capture remains unavailable, but
+Spectacle successfully captured the actual Board window as a fallback; ignored
+evidence is under `target/mixer-spectrum-window.png`,
+`target/mixer-spectrum-fixed.png`, and `target/mixer-spectrum-final.png`.
+The final capture confirms the taller spectrum remains fully visible.
+Normal history and manual portal approvals remain unchanged.
