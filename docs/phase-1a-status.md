@@ -6,7 +6,7 @@
 
 The Rust-owned presented-sample picker is the default and only backend. The obsolete KWin ColorPicker path, `--native`, and legacy `--repeat` acceptance mode were removed. The authoritative selected value is the exact center sample attached to a genuinely presented lens commit.
 
-No Phase 1B, tray, or Board work has started.
+Phase 1A–1E have since passed under the revised gate in the [current handoff](current-handoff.md); Board work has not started.
 
 ## Implemented behavior
 

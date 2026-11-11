@@ -12,9 +12,11 @@ Read the root `AGENTS.md` before changing the repository. Commit coherent, verif
 
 ## Current milestone
 
-**Phase 1A, Phase 1B, Phase 1C, and Phase 1D acceptance passed.** Board has not started.
+**Phase 1A–1E jointly passed on the actual KDE Plasma Wayland target, with the
+user-approved replacement for the unsafe physical KWin restart test described
+below.** Board has not started and is the next phase.
 
-**Phase 1E is in progress, not accepted.** The settings utility, typed
+**Phase 1E is accepted under that revised gate.** The settings utility, typed
 configuration, shortcut portal worker, KDE shortcut reassignment, autostart
 and staged installer have been implemented. An isolated session-bus scenario
 verified single-instance startup, settings reload, invalid-setting rejection,
@@ -35,9 +37,10 @@ timed out and was killed. These logs do not establish the cause of the login
 failure. The physical restart must not be repeated as routine verification.
 The user approved replacing the unsafe physical KWin restart gate with the
 already recorded private KWin restart/recovery plus a normal physical logout
-and login performed manually. The logout/login and full physical Phase 1A–1E
-joint acceptance remain open. Automation cannot capture this desktop. Board
-must not begin until the revised gate passes.
+and login performed manually. The user subsequently logged out and back in
+and completed the post-login joint scenario below. The original physical KWin
+restart and shortcut recovery after a private KWin restart were not verified.
+Automation cannot capture this desktop; visual observations are user-reported.
 
 The debug tray's isolated idle sample reported PSS 14,983 KiB and private
 clean plus dirty memory 14,956 KiB. The main thread accumulated 2.35 ms CPU
@@ -89,6 +92,18 @@ and KGlobalAccel readback reported J/K. The user then confirmed that trying to
 swap the two bindings reported a conflict and left both unchanged, and restored
 J/K preferences. The temporary tray and desktop entries were removed; the user
 removed the temporary KDE assignments, and J/K were verified available.
+
+After a normal logout/login, the user approved J/K for an isolated release tray
+and confirmed a real pick, matching clipboard paste, history popup, and saved
+settings. The user reported the picked value `#493C7D`; `GetLastColor` returned
+that value, and `GetHistory(5)` returned the corresponding `#493C7DFF` picker
+capture. After a clean tray restart, both captures and the last color remained,
+the portal reported J/K, and the user confirmed Meta+Shift+K opened history
+with the saved color. The tray
+and temporary entries were removed, the user removed the test assignments, and
+KGlobalAccel reported J/K available. Isolated data remains under ignored
+`target/phase1e-reassign-check/`.
+
 Replacing existing IDs with new IDs would cause KDE to offer a prefilled
 approval dialog, but KDE also removes omitted old actions and can accept only
 part of a request. Keeping both old and new IDs avoids immediate removal but can
@@ -285,4 +300,5 @@ ignored `target/phase1d-private-multiscreen.png` and
 Offline workspace tests passed 123 tests across 17 suites; formatting and strict
 workspace Clippy passed.
 
-Do not start the Board before Phases 1A–1E jointly pass.
+Phases 1A–1E jointly passed with the explicitly revised compositor-recovery
+gate above. Board implementation may now begin.
