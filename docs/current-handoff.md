@@ -15,7 +15,8 @@ Read the root `AGENTS.md` before changing the repository. Commit coherent, verif
 **Phase 1A–1E jointly passed on the actual KDE Plasma Wayland target, with the
 user-approved replacement for the unsafe physical KWin restart test described
 below.** Phase 2 Board shell also passed physical Board/picker acceptance.
-Phase 3 Color Mixer is next; it has not started.
+Phase 3 Color Mixer passed user-reported physical desktop acceptance.
+Phase 4 Palette Editor is next.
 
 **Phase 1E is accepted under that revised gate.** The settings utility, typed
 configuration, shortcut portal worker, KDE shortcut reassignment, autostart
@@ -309,7 +310,8 @@ gate above.
 `swatch-board` is an independently launched eframe process. Open Board is enabled
 in the tray and the installer includes its executable and desktop launcher. Tabs
 are Color Mixer, Palette Editor, and Theme Generator, with shared scrollable
-history. Functional tab tools remain assigned to Phases 3–5.
+history. The Mixer is implemented in Phase 3; Palette Editor and Theme Generator
+remain assigned to Phases 4 and 5.
 
 The Board loads shared settings and SQLite history without a tray, subscribes to
 tray changes, refreshes history on reconnect, and reloads settings while open.
@@ -360,3 +362,33 @@ physical acceptance processes were stopped, temporary desktop registrations
 were removed, and the user confirmed removing the temporary C/H shortcut
 assignments. Test data and logs remain under ignored `target/phase2-physical/`;
 normal user history was not used.
+
+## Phase 3 Color Mixer
+
+The Board provides editable HEX, RGB, RGBA, HSL and HSV values, approximate CMYK,
+configured-format copying, selectable and draggable history, weighted sRGB and
+OKLCH mixing, undo/redo, and an active in-memory draft palette. The draft survives
+window recreation but is discarded on Board exit; palette saving is Phase 4.
+OKLCH mixing uses the first chromatic source as the shortest-arc hue reference,
+ignores achromatic hues, and clips out-of-gamut linear RGB channels.
+
+Focused Board and color package tests and strict package Clippy passed. During
+physical acceptance, the first launch used an older executable; rebuilding Board
+made history selection and dragging available. The user then reported passing
+editing, invalid-input handling, weighted sRGB/OKLCH mixing, copying, and undo/redo.
+After clarifying that the active draft is separate from capture history, the user
+confirmed that applying and adding red and then blue retained both draft swatches.
+An input-driven egui regression test also verifies two appended draft colors and
+undo/redo of the second addition. No palette replacement defect was reproduced by
+that exact physical sequence.
+
+The focused Board/color run passed 16 tests across four suites, and strict
+all-targets package Clippy passed. These desktop results are user-reported:
+automation's AT-SPI connection was refused, and Wayland capture is unavailable
+without the tool's `wayland-pipewire` feature. Normal shared history was used;
+the user's new captures were not removed.
+
+Board and tray remain running for further interactive use. The development picker
+entry at `~/.local/share/applications/org.apartment38.SwatchBoard.desktop` points
+to `target/debug/swatch-board-picker`; it is required for portal registration.
+Portal approvals remained manual.

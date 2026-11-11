@@ -1,3 +1,4 @@
+mod mixer;
 mod worker;
 
 use eframe::egui;
@@ -37,6 +38,7 @@ struct Board {
     tab: Tab,
     config: Config,
     history: Vec<Capture>,
+    mixer: mixer::Mixer,
     connected: bool,
     loaded: bool,
     picking: bool,
@@ -131,6 +133,7 @@ impl Board {
             tab: Tab::default(),
             config: Config::default(),
             history: Vec::new(),
+            mixer: mixer::Mixer::default(),
             connected: false,
             loaded: false,
             picking: false,
@@ -163,7 +166,7 @@ impl Board {
         }
     }
 
-    fn history_strip(&self, ui: &mut egui::Ui) {
+    fn history_strip(&mut self, ui: &mut egui::Ui) {
         ui.strong("Color history");
         if self.history.is_empty() {
             ui.label(if self.loaded {
@@ -187,17 +190,19 @@ impl Board {
                             let rgba = capture.color;
                             let color =
                                 swatch_board_color::Color::new(rgba.r, rgba.g, rgba.b, rgba.a);
-                            let (rect, response) = ui
-                                .allocate_exact_size(egui::vec2(76.0, 44.0), egui::Sense::hover());
-                            ui.painter().rect_filled(
-                                rect,
-                                5.0,
-                                egui::Color32::from_rgba_unmultiplied(
-                                    color.r, color.g, color.b, color.a,
-                                ),
+                            let response = mixer::swatch(ui, color, egui::vec2(76.0, 44.0));
+                            let response = ui.interact(
+                                response.rect,
+                                ui.make_persistent_id(capture.id),
+                                egui::Sense::click_and_drag(),
                             );
+                            response.dnd_set_drag_payload(color);
+                            if response.clicked() {
+                                self.mixer.select(color);
+                                self.tab = Tab::Mixer;
+                            }
                             response.on_hover_text(format!(
-                                "{}\n{}\n{:?}",
+                                "{}\n{}\n{:?}\nClick to select; drag to mixer",
                                 color.format(Format::HexRgba),
                                 capture.captured_at,
                                 capture.source
@@ -224,9 +229,7 @@ impl eframe::App for Board {
                     self.connected = connected;
                     self.loaded = true;
                     if !self.picking {
-                        self.message =
-                            "History is saved automatically. No editable document in this phase."
-                                .into();
+                        self.message = "History is saved automatically.".into();
                     }
                 }
                 Event::PickStarted => {}
@@ -290,19 +293,25 @@ impl eframe::App for Board {
                 ui.separator();
             }
             ui.label(&self.message);
-            ui.add_space(20.0);
-            let title = Tab::ALL
-                .iter()
-                .find(|(tab, _)| *tab == self.tab)
-                .map(|(_, title)| *title)
-                .unwrap();
-            ui.heading(title);
-            ui.label("Board shell · shared history and screen picking are available.");
-            ui.label(match self.tab {
-                Tab::Mixer => "Color editing and mixing belong to Phase 3.",
-                Tab::Palette => "Palette generation and editing belong to Phase 4.",
-                Tab::Theme => "Theme preview and export belong to Phase 5.",
-            });
+            ui.add_space(8.0);
+            match self.tab {
+                Tab::Mixer => {
+                    let format = self
+                        .config
+                        .clipboard_format
+                        .parse::<Format>()
+                        .unwrap_or(Format::HexRgb);
+                    self.mixer.ui(ui, format);
+                }
+                Tab::Palette => {
+                    ui.heading("Palette Editor");
+                    ui.label("Palette generation and editing belong to Phase 4.");
+                }
+                Tab::Theme => {
+                    ui.heading("Theme Generator");
+                    ui.label("Theme preview and export belong to Phase 5.");
+                }
+            }
         });
     }
 

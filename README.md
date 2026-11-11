@@ -3,9 +3,9 @@
 Build beautiful palettes with swatches.
 
 Swatch Board is a Rust-only KDE Plasma Wayland color utility. The picker,
-tray, history, settings, and on-demand Board shell have passed target-desktop
-acceptance. Board editor tools are the next phases. See the
-[current handoff](docs/current-handoff.md) for verification and limitations.
+tray, history, settings, Board shell, and Color Mixer have passed target-desktop
+acceptance. Palette and theme editors are future phases.
+See the [current handoff](docs/current-handoff.md).
 
 ## Build and test
 
@@ -128,9 +128,21 @@ cargo run --offline --locked -p swatch-board
 
 The Board opens independently of the tray. Its tabs are **Color Mixer**,
 **Palette Editor**, and **Theme Generator**, with a horizontal history strip in
-every tab. This phase implements the shared shell, not the editor functionality.
-History comes from the shared SQLite library and refreshes on tray signals and
-reconnection. Settings reload while the Board is open.
+every tab. History comes from the shared SQLite library and refreshes on tray
+signals and reconnection. Settings reload while the Board is open.
+
+Click a history swatch to select it in the mixer, or drag it onto the current
+color or a mix source. Edit HEX, RGB, RGBA, HSL, or HSV values and apply them;
+editing a format without alpha preserves the current alpha. CMYK is approximate
+and unprofiled. Copy uses the configured clipboard format.
+
+Mix two or more sources with normalized weights in encoded sRGB or OKLCH.
+OKLCH averages hue along the shortest arc relative to the first chromatic source,
+ignores achromatic hues, and clips out-of-gamut linear RGB channels. Alpha is
+weighted independently. Undo and redo cover mixer state and draft changes.
+Adding a color creates an active unsaved draft if necessary; it remains in memory
+across tabs and window hide/restore but is discarded when Board exits. Saving
+palettes belongs to Phase 4.
 
 **Pick Color** requires the tray; **Settings** also works without it. When
 `hide_board_while_picking` is enabled, the Board closes its native window before

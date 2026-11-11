@@ -5,6 +5,8 @@
 //! color in one of these formats intentionally omits its alpha. CMYK conversion
 //! is a device-independent approximation, not an ICC-profile conversion.
 
+pub mod mixing;
+
 use std::{error::Error, fmt, str::FromStr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
