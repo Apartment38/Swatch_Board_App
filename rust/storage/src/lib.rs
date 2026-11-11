@@ -16,9 +16,11 @@ use uuid::Uuid;
 
 mod palettes;
 pub use palettes::{GenerationRecord, PaletteRepository, SavedPalette};
+mod themes;
+pub use themes::{SavedTheme, ThemeRepository};
 
 pub const DEFAULT_RETENTION: usize = 100;
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 3;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug)]
@@ -313,6 +315,44 @@ fn migrate(connection: &mut Connection) -> Result<(), Error> {
     ] {
         tx.prepare(sql)
             .map_err(|e| Error::IncompatibleSchema(format!("invalid palette schema: {e}")))?;
+    }
+    if version < 3 {
+        tx.execute_batch("CREATE TABLE theme_projects (
+                id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, plugin_id TEXT NOT NULL,
+                plugin_version TEXT NOT NULL, palette_id TEXT, scene TEXT NOT NULL,
+                payload TEXT NOT NULL, dirty INTEGER NOT NULL CHECK(dirty IN (0, 1)));
+            CREATE TABLE theme_assignments (
+                project_id TEXT NOT NULL REFERENCES theme_projects(id) ON DELETE CASCADE,
+                role_id TEXT NOT NULL, assignment_json TEXT NOT NULL,
+                PRIMARY KEY (project_id, role_id));
+            CREATE TABLE theme_draft (id INTEGER PRIMARY KEY CHECK(id = 1), payload TEXT NOT NULL);
+            CREATE TABLE palette_swatches (
+                palette_id TEXT NOT NULL, position INTEGER NOT NULL, name TEXT NOT NULL,
+                PRIMARY KEY (palette_id, position), UNIQUE (palette_id, name),
+                FOREIGN KEY (palette_id, position) REFERENCES palette_colors(palette_id, position) ON DELETE CASCADE);
+            INSERT INTO palette_swatches (palette_id, position, name)
+                SELECT palette_id, position, 'Swatch ' || (position + 1) FROM palette_colors;
+            INSERT INTO schema_migrations (version, applied_at) VALUES (3, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+            PRAGMA user_version = 3;")?;
+    }
+    let valid: i64 = tx
+        .query_row(
+            "SELECT count(*) FROM schema_migrations WHERE version = 3",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| Error::IncompatibleSchema(format!("missing migration metadata: {e}")))?;
+    if valid != 1 {
+        return Err(Error::IncompatibleSchema("missing migration 3".into()));
+    }
+    for sql in [
+        "SELECT id, name, plugin_id, plugin_version, palette_id, scene, payload, dirty FROM theme_projects LIMIT 0",
+        "SELECT project_id, role_id, assignment_json FROM theme_assignments LIMIT 0",
+        "SELECT id, payload FROM theme_draft LIMIT 0",
+        "SELECT palette_id, position, name FROM palette_swatches LIMIT 0",
+    ] {
+        tx.prepare(sql)
+            .map_err(|e| Error::IncompatibleSchema(format!("invalid theme schema: {e}")))?;
     }
     tx.commit()?;
     Ok(())

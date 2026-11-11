@@ -1,0 +1,33 @@
+{
+  "$schema": "https://zed.dev/schema/themes/v0.2.0.json",
+  "name": "Swatch Board",
+  "author": "Swatch Board",
+  "themes": [{
+    "name": "Swatch Board",
+    "appearance": "dark",
+    "style": {
+      "background": "{{ roles.background | hex }}",
+      "text": "{{ roles.foreground | hex }}",
+      "border": "{{ roles.border | hex }}",
+      "surface.background": "{{ roles.surface | hex }}",
+      "tab.active_background": "{{ roles.tab_active | hex }}",
+      "tab.inactive_background": "{{ roles.tab_inactive | hex }}",
+      "panel.background": "{{ roles.sidebar | hex }}",
+      "status_bar.background": "{{ roles.status | hex }}",
+      "text.muted": "{{ roles.muted | hex }}",
+      "text.accent": "{{ roles.accent | hex }}",
+      "editor.background": "{{ roles.background | hex }}",
+      "editor.foreground": "{{ roles.foreground | hex }}",
+      "players": [{ "cursor": "{{ roles.accent | hex }}", "selection": "{{ roles.selection | hex }}", "background": "{{ roles.background | hex }}" }],
+      "error": "{{ roles.error | hex }}",
+      "warning": "{{ roles.warning | hex }}",
+      "syntax": {
+        "keyword": { "color": "{{ roles.keyword | hex }}" },
+        "string": { "color": "{{ roles.string | hex }}" },
+        "comment": { "color": "{{ roles.comment | hex }}" },
+        "function": { "color": "{{ roles.function | hex }}" },
+        "type": { "color": "{{ roles.type | hex }}" }
+      }
+    }
+  }]
+}

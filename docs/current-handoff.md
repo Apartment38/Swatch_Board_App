@@ -17,7 +17,13 @@ user-approved replacement for the unsafe physical KWin restart test described
 below.** Phase 2 Board shell also passed physical Board/picker acceptance.
 Phase 3 Color Mixer passed user-reported physical desktop acceptance.
 Phase 4 Palette Editor passed user-reported physical desktop acceptance.
-Phase 5 Theme Generator is next.
+Phase 5 Theme Generator has an automated implementation checkpoint; its full
+hard gate and physical desktop acceptance remain open. Runtime-authored external
+plugin interaction now has headless egui coverage, not physical desktop proof.
+Template intermediate memory allocations are not contained, so third-party
+untrusted-template safety is also an explicit remaining blocker.
+The computer backend reports no display, capture, or accessibility connection;
+visual and interactive acceptance requires an available desktop session.
 
 **Phase 1E is accepted under that revised gate.** The settings utility, typed
 configuration, shortcut portal worker, KDE shortcut reassignment, autostart
@@ -445,3 +451,65 @@ prevented, unlocking restores those actions, and reordering preserves the lock.
 These physical observations are user-reported because native automation's
 AT-SPI connection and capture are unavailable. Board tests, strict all-targets
 Board Clippy, formatting, and a debug Board build passed after the lock fix.
+
+## Phase 5 automated implementation checkpoint
+
+The Theme Generator now uses a shared data-driven egui scene renderer, runtime
+plugin discovery/reload, role overrides and named saved-palette links, undo/redo,
+recoverable drafts, named theme projects, export preview, and explicit overwrite
+confirmation. Ghostty, Zed, and KDE are data-only packages with golden outputs.
+Storage migration 3 adds theme projects, indexed assignments, drafts, and named
+palette swatches. Packaging stages plugin data and published schemas. See
+[plugin-authoring.md](plugin-authoring.md) for the API and limitations.
+
+Input-driven headless egui tests create a new package after the test executable
+is built, install it in isolated child-process XDG storage, reload/select it,
+open a hidden drawer, select and drop onto a text role, edit values with keyboard
+input, undo/redo, save/read back SQLite state, restore the draft, reopen a saved
+project, and preview/export actual files with overwrite protection. Drag payloads
+are injected at the egui boundary: this is not a native drag-source test or
+physical KDE acceptance. Palette links and image assets still need dedicated
+interactive acceptance. Tests use isolated data, not normal user history.
+
+Reproduced defects fixed in this checkpoint:
+
+- Background nodes could consume drops intended for foreground nodes.
+- Text-only semantic role bindings were not interactive.
+- New projects retained the previous selected role; corrected color text retained
+  a stale validation error.
+- Output names could collide with staging filenames, corrupting or deleting
+  exported files; staging now avoids requested output basenames.
+- NUL-containing declared paths were accepted by the loader.
+- Invalid JSON could replace a saved theme and clear its role index; saves now
+  reject invalid JSON before modifying persisted state.
+
+Parent verification of the integrated tree:
+
+- `cargo test --offline --workspace --all-targets --locked`: 161 passed.
+- `cargo clippy --offline --workspace --all-targets --locked -- -D warnings`: passed.
+- `cargo fmt --all -- --check` and `git diff --check`: passed.
+- `cargo build --offline --workspace --locked`: passed (debug, not release).
+- Staged install using debug binaries: all five executables, three plugin
+  packages and four schemas present under isolated `target/phase5-stage.*`.
+- All nine bundled manifest/role/scene documents passed their published schemas.
+
+Local verification logs are ignored under `target/phase5-{workspace-tests,clippy,build}.log`.
+No native app was launched, no live themes were applied, no normal desktop
+settings/history were changed, and no commits were pushed.
+
+### Remaining Phase 5 gates and next work
+
+**Security first:** MiniJinja fuel and output size limits do not contain
+intermediate allocations. A reviewed probe captured an 8 MiB string inside a
+block while emitting a tiny valid file. The renderer runs in Board, so hostile
+templates can exhaust Board memory. Implement a resource-limited rendering
+worker or a deliberately restricted template language before declaring
+untrusted third-party packages safe. No claim of complete sandboxing is made;
+use only reviewed trusted templates meanwhile.
+
+Then exercise palette-link propagation/renames/deletion, asset handling, and
+physical external-plugin acceptance on KDE (including real history/palette drag
+sources, layout, save/reopen, and export). The full Phase 5 hard gate has **not**
+passed. Do not advance to declaring Phase 6 complete or repeat disruptive KWin
+restart testing. Per-file export is atomic; a multi-file export is not a
+transaction and can leave earlier files written on later failure.

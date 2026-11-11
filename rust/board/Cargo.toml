@@ -13,6 +13,9 @@ swatch-board-color = { path = "../color" }
 swatch-board-config-core = { path = "../config-core" }
 swatch-board-ipc = { path = "../ipc" }
 swatch-board-storage = { path = "../storage" }
+swatch-board-theme-core = { path = "../theme-core" }
+serde_json = "1"
+image = { version = "0.25", default-features = false, features = ["png"] }
 tokio = { workspace = true, features = ["process"] }
 zbus.workspace = true
 raw-window-handle = "=0.6.2"

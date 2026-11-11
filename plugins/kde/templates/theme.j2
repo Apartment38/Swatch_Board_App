@@ -1,0 +1,88 @@
+[General]
+Name=Swatch Board
+ColorScheme=SwatchBoard
+
+[Colors:Window]
+BackgroundNormal={{ roles.window_background | rgb_csv }}
+BackgroundAlternate={{ roles.window_background | rgb_csv }}
+ForegroundNormal={{ roles.window_foreground | rgb_csv }}
+ForegroundInactive={{ roles.inactive_foreground | rgb_csv }}
+ForegroundLink={{ roles.link | rgb_csv }}
+ForegroundVisited={{ roles.visited | rgb_csv }}
+ForegroundNegative={{ roles.negative | rgb_csv }}
+ForegroundNeutral={{ roles.neutral | rgb_csv }}
+ForegroundPositive={{ roles.positive | rgb_csv }}
+DecorationFocus={{ roles.selection_background | rgb_csv }}
+DecorationHover={{ roles.link | rgb_csv }}
+
+[Colors:View]
+BackgroundNormal={{ roles.view_background | rgb_csv }}
+BackgroundAlternate={{ roles.view_background | rgb_csv }}
+ForegroundNormal={{ roles.view_foreground | rgb_csv }}
+ForegroundInactive={{ roles.inactive_foreground | rgb_csv }}
+ForegroundLink={{ roles.link | rgb_csv }}
+ForegroundVisited={{ roles.visited | rgb_csv }}
+ForegroundNegative={{ roles.negative | rgb_csv }}
+ForegroundNeutral={{ roles.neutral | rgb_csv }}
+ForegroundPositive={{ roles.positive | rgb_csv }}
+DecorationFocus={{ roles.selection_background | rgb_csv }}
+DecorationHover={{ roles.link | rgb_csv }}
+
+[Colors:Button]
+BackgroundNormal={{ roles.button_background | rgb_csv }}
+BackgroundAlternate={{ roles.button_background | rgb_csv }}
+ForegroundNormal={{ roles.button_foreground | rgb_csv }}
+ForegroundInactive={{ roles.inactive_foreground | rgb_csv }}
+ForegroundLink={{ roles.link | rgb_csv }}
+ForegroundVisited={{ roles.visited | rgb_csv }}
+ForegroundNegative={{ roles.negative | rgb_csv }}
+ForegroundNeutral={{ roles.neutral | rgb_csv }}
+ForegroundPositive={{ roles.positive | rgb_csv }}
+DecorationFocus={{ roles.selection_background | rgb_csv }}
+DecorationHover={{ roles.link | rgb_csv }}
+
+[Colors:Selection]
+BackgroundNormal={{ roles.selection_background | rgb_csv }}
+BackgroundAlternate={{ roles.selection_background | rgb_csv }}
+ForegroundNormal={{ roles.selection_foreground | rgb_csv }}
+ForegroundInactive={{ roles.inactive_foreground | rgb_csv }}
+ForegroundLink={{ roles.link | rgb_csv }}
+ForegroundVisited={{ roles.visited | rgb_csv }}
+ForegroundNegative={{ roles.negative | rgb_csv }}
+ForegroundNeutral={{ roles.neutral | rgb_csv }}
+ForegroundPositive={{ roles.positive | rgb_csv }}
+DecorationFocus={{ roles.selection_background | rgb_csv }}
+DecorationHover={{ roles.link | rgb_csv }}
+
+[Colors:Tooltip]
+BackgroundNormal={{ roles.tooltip_background | rgb_csv }}
+BackgroundAlternate={{ roles.tooltip_background | rgb_csv }}
+ForegroundNormal={{ roles.tooltip_foreground | rgb_csv }}
+ForegroundInactive={{ roles.inactive_foreground | rgb_csv }}
+ForegroundLink={{ roles.link | rgb_csv }}
+ForegroundVisited={{ roles.visited | rgb_csv }}
+ForegroundNegative={{ roles.negative | rgb_csv }}
+ForegroundNeutral={{ roles.neutral | rgb_csv }}
+ForegroundPositive={{ roles.positive | rgb_csv }}
+DecorationFocus={{ roles.selection_background | rgb_csv }}
+DecorationHover={{ roles.link | rgb_csv }}
+
+[ColorEffects:Inactive]
+Enable=true
+ChangeSelectionColor=true
+Color={{ roles.inactive_background | rgb_csv }}
+ColorAmount=0.025
+ColorEffect=2
+ContrastAmount=0.1
+ContrastEffect=2
+IntensityAmount=0
+IntensityEffect=0
+
+[ColorEffects:Disabled]
+Color={{ roles.disabled_foreground | rgb_csv }}
+ColorAmount=0.25
+ColorEffect=2
+ContrastAmount=0.65
+ContrastEffect=1
+IntensityAmount=0.1
+IntensityEffect=2

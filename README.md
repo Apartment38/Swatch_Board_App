@@ -4,8 +4,8 @@ Build beautiful palettes with swatches.
 
 Swatch Board is a Rust-only KDE Plasma Wayland color utility. The picker,
 tray, history, settings, Board shell, Color Mixer, and Palette Editor have passed
-target-desktop acceptance. The theme editor is a future phase.
-See the [current handoff](docs/current-handoff.md).
+target-desktop acceptance. The Theme Generator implementation has not yet been
+accepted on the target desktop. See the [current handoff](docs/current-handoff.md).
 
 ## Build and test
 
@@ -170,9 +170,39 @@ additions are locked. History can also be dragged onto a pinned swatch. Save,
 rename, duplicate, search, reopen, or delete saved palettes. Generation history
 is separate from saved palettes and retains the latest 100 snapshots. Reopening
 a snapshot creates an unsaved draft. The active palette is shared with the Mixer
-and exposed as context on the Theme tab. Theme roles are not implemented yet:
-the intended policy is that linked roles follow their palette swatch, while
-explicit role overrides remain independent.
+and Theme Generator.
+
+### Theme Generator
+
+Choose a plugin to start a project. Select preview elements to inspect their
+roles; clickable preview controls open other scenes. Drop a history or palette
+color onto a preview element or role swatch to override it. Role values can
+also be edited using the configured clipboard format. Save a palette before
+linking its named swatches to roles. Linked roles follow changes to the named
+swatch in the active saved palette; overrides remain independent. Renaming or
+deleting a linked swatch leaves an unresolved link until corrected. Undo and
+redo apply to project changes. Save a named project or recover the latest draft
+when Board restarts.
+
+Reload Plugins discovers data-only packages in
+`${XDG_DATA_HOME:-$HOME/.local/share}/swatch-board/plugins/` and each
+`$XDG_DATA_DIRS/swatch-board/plugins/`. Duplicate IDs are rejected. Bundled
+Ghostty, Zed, and KDE packages use the same contract; schemas are installed under
+`share/swatch-board/schemas/`. Each package contains `manifest.json`,
+`roles.json`, `scenes.json`, and MiniJinja templates under `templates/`. Templates
+receive `roles` and host filters `hex`, `hex_no_hash`, and `rgb_csv`; undefined
+variables are errors. API 1 accepts bounded PNG assets and validates references,
+relative paths, output sizes, and templates. Rhai and executable plugins are not
+supported. See the [plugin-authoring guide](docs/plugin-authoring.md) for the
+package contract, minimal multi-scene example, template compatibility, resource
+limits, and acceptance checklist. **Security limitation:** template intermediate
+allocations are not memory-contained; use only reviewed, trusted templates until
+the remaining rendering isolation work is complete.
+
+Preview rendered files before exporting to an existing directory. Existing files
+are replaced only when the overwrite confirmation is checked. Files are staged
+and atomically renamed individually; an error in a multi-file export can leave
+earlier files written. Export never applies a theme to the desktop.
 
 **Pick Color** requires the tray; **Settings** also works without it. When
 `hide_board_while_picking` is enabled, the Board closes its native window before

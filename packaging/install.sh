@@ -47,6 +47,9 @@ for binary in swatch-board-picker swatch-board-tray swatch-board-history swatch-
 done
 install -m 644 "$root/share/icons/hicolor/scalable/apps/org.apartment38.SwatchBoard.svg" \
     "$destdir$prefix/share/icons/hicolor/scalable/apps/org.apartment38.SwatchBoard.svg"
+install -d "$destdir$prefix/share/swatch-board/plugins" "$destdir$prefix/share/swatch-board/schemas"
+cp -R "$root/plugins/." "$destdir$prefix/share/swatch-board/plugins/"
+cp -R "$root/schemas/." "$destdir$prefix/share/swatch-board/schemas/"
 
 install_entry() {
     local source=$1 binary=$2 line

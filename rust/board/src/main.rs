@@ -1,5 +1,6 @@
 mod mixer;
 mod palette;
+mod theme;
 mod worker;
 
 use eframe::egui;
@@ -41,6 +42,7 @@ struct Board {
     history: Vec<Capture>,
     mixer: mixer::Mixer,
     palette: palette::PaletteEditor,
+    theme: theme::ThemeEditor,
     history_open: bool,
     connected: bool,
     loaded: bool,
@@ -138,6 +140,7 @@ impl Board {
             history: Vec::new(),
             mixer: mixer::Mixer::default(),
             palette: palette::PaletteEditor::new(),
+            theme: theme::ThemeEditor::new(),
             history_open: true,
             connected: false,
             loaded: false,
@@ -345,12 +348,14 @@ impl eframe::App for Board {
                     self.palette.ui(ui, &mut self.mixer);
                 }
                 Tab::Theme => {
-                    ui.heading("Theme Generator");
-                    ui.label("Theme preview and export belong to Phase 5.");
-                    ui.label(format!(
-                        "Active palette: {} colors",
-                        self.mixer.colors().len()
-                    ));
+                    self.theme.ui(
+                        ui,
+                        &self.palette,
+                        self.config
+                            .clipboard_format
+                            .parse::<Format>()
+                            .unwrap_or(Format::HexRgb),
+                    );
                 }
             }
         });

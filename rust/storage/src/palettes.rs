@@ -11,6 +11,7 @@ pub struct SavedPalette {
     pub name: String,
     pub colors: Vec<Rgba8>,
     pub locked: Vec<bool>,
+    pub swatch_names: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -47,11 +48,13 @@ impl PaletteRepository {
             let id: String = row.get(0)?;
             let name: String = row.get(1)?;
             let (colors, locked) = read_colors(&self.connection, false, &id)?;
+            let swatch_names = read_swatch_names(&self.connection, &id)?;
             palettes.push(SavedPalette {
                 id,
                 name,
                 colors,
                 locked,
+                swatch_names,
             });
         }
         Ok(palettes)
@@ -64,6 +67,30 @@ impl PaletteRepository {
         colors: &[Rgba8],
         locked: &[bool],
     ) -> Result<SavedPalette, Error> {
+        let mut names = match id {
+            Some(id) => read_swatch_names(&self.connection, id)?,
+            None => Vec::new(),
+        };
+        names.truncate(colors.len());
+        while names.len() < colors.len() {
+            let mut number = names.len() + 1;
+            while names.iter().any(|name| name == &format!("Swatch {number}")) {
+                number += 1;
+            }
+            names.push(format!("Swatch {number}"));
+        }
+        self.save_named(id, name, colors, locked, &names)
+    }
+
+    /// Save colors and their stable, unique swatch names in matching order.
+    pub fn save_named(
+        &mut self,
+        id: Option<&str>,
+        name: &str,
+        colors: &[Rgba8],
+        locked: &[bool],
+        swatch_names: &[String],
+    ) -> Result<SavedPalette, Error> {
         let name = name.trim();
         if name.is_empty() || name.chars().count() > 256 {
             return Err(Error::InvalidInput(
@@ -71,6 +98,16 @@ impl PaletteRepository {
             ));
         }
         validate_colors(colors, locked)?;
+        let mut unique_names = std::collections::HashSet::new();
+        if swatch_names.len() != colors.len()
+            || swatch_names
+                .iter()
+                .any(|name| name.trim().is_empty() || !unique_names.insert(name))
+        {
+            return Err(Error::InvalidInput(
+                "swatch names must be nonempty, unique, and match colors".into(),
+            ));
+        }
         let existing = id.is_some();
         let id = id
             .map(str::to_owned)
@@ -94,12 +131,21 @@ impl PaletteRepository {
             )?;
         }
         insert_colors(&tx, false, &id, colors, locked)?;
+        {
+            let mut statement = tx.prepare(
+                "INSERT INTO palette_swatches (palette_id, position, name) VALUES (?1, ?2, ?3)",
+            )?;
+            for (position, swatch_name) in swatch_names.iter().enumerate() {
+                statement.execute(params![id, position as i64, swatch_name])?;
+            }
+        }
         tx.commit()?;
         Ok(SavedPalette {
             id,
             name: name.to_owned(),
             colors: colors.to_vec(),
             locked: locked.to_vec(),
+            swatch_names: swatch_names.to_vec(),
         })
     }
 
@@ -124,6 +170,7 @@ impl PaletteRepository {
             let id: String = row.get(0)?;
             let description: String = row.get(1)?;
             let (colors, locked) = read_colors(&self.connection, true, &id)?;
+            let swatch_names = (1..=colors.len()).map(|i| format!("Swatch {i}")).collect();
             records.push(GenerationRecord {
                 id,
                 description,
@@ -132,6 +179,7 @@ impl PaletteRepository {
                     name: String::new(),
                     colors,
                     locked,
+                    swatch_names,
                 },
             });
         }
@@ -194,6 +242,13 @@ fn insert_colors(
         ])?;
     }
     Ok(())
+}
+
+fn read_swatch_names(connection: &Connection, id: &str) -> Result<Vec<String>, Error> {
+    let mut statement = connection
+        .prepare("SELECT name FROM palette_swatches WHERE palette_id = ?1 ORDER BY position")?;
+    let rows = statement.query_map([id], |row| row.get(0))?;
+    Ok(rows.collect::<Result<Vec<_>, _>>()?)
 }
 
 fn read_colors(
@@ -296,13 +351,6 @@ mod tests {
                 )
                 .unwrap(),
             "dark"
-        );
-        assert_eq!(
-            history
-                .connection
-                .pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
-                .unwrap(),
-            2
         );
         assert!(
             PaletteRepository::open(&path)

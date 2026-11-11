@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://swatch-board.local/schemas/theme-project.schema.json",
+  "title": "Swatch Board theme project, version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "name", "plugin_id", "plugin_version", "palette_id", "scene", "assignments", "dirty"],
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "plugin_id": { "type": "string" },
+    "plugin_version": { "type": "string" },
+    "palette_id": { "type": ["string", "null"] },
+    "scene": { "type": "string" },
+    "assignments": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "object", "required": ["kind", "value"], "additionalProperties": false, "properties": { "kind": { "const": "Override" }, "value": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$" } } },
+          { "type": "object", "required": ["kind", "value"], "additionalProperties": false, "properties": { "kind": { "const": "Link" }, "value": { "type": "string", "minLength": 1 } } },
+          { "type": "object", "required": ["kind"], "additionalProperties": false, "properties": { "kind": { "const": "Default" } } }
+        ]
+      }
+    },
+    "dirty": { "type": "boolean" }
+  }
+}

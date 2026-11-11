@@ -12,6 +12,7 @@ struct Draft {
     name: String,
     colors: Vec<Color>,
     locked: Vec<bool>,
+    names: Vec<String>,
     id: Option<String>,
 }
 
@@ -28,6 +29,7 @@ pub struct PaletteEditor {
     use_contrast: bool,
     contrast: f64,
     search: String,
+    name_edits: Vec<String>,
     edit: Vec<String>,
     error: Option<String>,
     lock_history: bool,
@@ -55,6 +57,7 @@ impl PaletteEditor {
             draft: Draft {
                 name: "Untitled".into(),
                 colors: Vec::new(),
+                names: Vec::new(),
                 locked: Vec::new(),
                 id: None,
             },
@@ -68,6 +71,7 @@ impl PaletteEditor {
             base: "#247AC3".into(),
             use_contrast: false,
             contrast: 4.5,
+            name_edits: Vec::new(),
             search: String::new(),
             edit: Vec::new(),
             error,
@@ -89,6 +93,26 @@ impl PaletteEditor {
         }
     }
 
+    fn fresh_name(names: &[String]) -> String {
+        (1..)
+            .map(|n| format!("Swatch {n}"))
+            .find(|name| !names.contains(name))
+            .unwrap()
+    }
+
+    pub fn theme_palette(&self) -> (Option<&str>, &str, Vec<(String, Color)>) {
+        (
+            self.draft.id.as_deref(),
+            &self.draft.name,
+            self.draft
+                .names
+                .iter()
+                .cloned()
+                .zip(self.draft.colors.iter().copied())
+                .collect(),
+        )
+    }
+
     fn sync_fields(&mut self) {
         self.edit = self
             .draft
@@ -96,6 +120,7 @@ impl PaletteEditor {
             .iter()
             .map(|c| c.format(Format::HexRgba))
             .collect();
+        self.name_edits = self.draft.names.clone();
     }
 
     fn commit(&mut self, previous: Draft, mixer: &mut Mixer) {
@@ -115,6 +140,10 @@ impl PaletteEditor {
             let previous = self.draft.clone();
             self.draft.colors = mixer.colors().to_vec();
             self.draft.locked.resize(self.draft.colors.len(), false);
+            self.draft.names.truncate(self.draft.colors.len());
+            while self.draft.names.len() < self.draft.colors.len() {
+                self.draft.names.push(Self::fresh_name(&self.draft.names));
+            }
             if self.undo.len() == 100 {
                 self.undo.remove(0);
             }
@@ -137,6 +166,7 @@ impl PaletteEditor {
         }
         let previous = self.draft.clone();
         self.draft.colors.push(color);
+        self.draft.names.push(Self::fresh_name(&self.draft.names));
         self.draft.locked.push(self.lock_history);
         self.commit(previous, mixer);
     }
@@ -147,6 +177,7 @@ impl PaletteEditor {
             name: palette.name.clone(),
             colors: palette.colors.iter().copied().map(from_rgba).collect(),
             locked: palette.locked.clone(),
+            names: palette.swatch_names.clone(),
             id: Some(palette.id.clone()),
         };
         self.commit(previous, mixer);
@@ -179,17 +210,30 @@ impl PaletteEditor {
             self.error = Some("Palette size is smaller than the number of locked swatches.".into());
             return;
         }
-        let locked: Vec<(Color, bool)> = self
+        let locked: Vec<(Color, String)> = self
             .draft
             .colors
             .iter()
             .copied()
             .zip(self.draft.locked.iter().copied())
+            .zip(self.draft.names.iter().cloned())
             .enumerate()
-            .filter_map(|(i, pair)| (pair.1 && i >= options.count).then_some(pair))
+            .filter_map(|(i, ((color, lock), name))| {
+                (lock && i >= options.count).then_some((color, name))
+            })
             .collect();
         let mut colors = generated;
         let mut locks = vec![false; options.count];
+        let mut names: Vec<String> = self
+            .draft
+            .names
+            .iter()
+            .take(options.count)
+            .cloned()
+            .collect();
+        while names.len() < options.count {
+            names.push(Self::fresh_name(&names));
+        }
         for (i, (&color, &lock)) in self
             .draft
             .colors
@@ -203,10 +247,11 @@ impl PaletteEditor {
                 locks[i] = true;
             }
         }
-        for (color, _) in locked {
+        for (color, name) in locked {
             if let Some(i) = locks.iter().position(|locked| !locked) {
                 colors[i] = color;
                 locks[i] = true;
+                names[i] = name;
             }
         }
         if let Some(repo) = &mut self.repository {
@@ -224,6 +269,7 @@ impl PaletteEditor {
             return;
         }
         self.draft.colors = colors;
+        self.draft.names = names;
         self.draft.locked = locks;
         self.commit(previous, mixer);
         self.error = None;
@@ -236,11 +282,12 @@ impl PaletteEditor {
             return;
         };
         let colors: Vec<_> = self.draft.colors.iter().copied().map(to_rgba).collect();
-        match repo.save(
+        match repo.save_named(
             self.draft.id.as_deref(),
             &self.draft.name,
             &colors,
             &self.draft.locked,
+            &self.draft.names,
         ) {
             Ok(palette) => {
                 self.draft.id = Some(palette.id);
@@ -272,11 +319,16 @@ impl PaletteEditor {
                                     ui.id().with("swatch_drag"),
                                     egui::Sense::click_and_drag(),
                                 );
-                                response.dnd_set_drag_payload(i);
-                                if response.dnd_hover_payload::<usize>().is_some() {
-                                    if let Some(source) = response.dnd_release_payload::<usize>() {
-                                        if *source != i {
-                                            action = Some(Action::Move(*source, i));
+                                response.dnd_set_drag_payload(PaletteDrag {
+                                    index: i,
+                                    color: self.draft.colors[i],
+                                });
+                                if response.dnd_hover_payload::<PaletteDrag>().is_some() {
+                                    if let Some(source) =
+                                        response.dnd_release_payload::<PaletteDrag>()
+                                    {
+                                        if source.index != i {
+                                            action = Some(Action::Move(source.index, i));
                                         }
                                     }
                                 } else if response.dnd_hover_payload::<Color>().is_some() {
@@ -340,6 +392,32 @@ impl PaletteEditor {
                                 if edit.lost_focus() && action.is_none() && !self.draft.locked[i] {
                                     action = Some(Action::Apply(i));
                                 }
+                                let name_edit = ui.add(
+                                    egui::TextEdit::singleline(&mut self.name_edits[i])
+                                        .desired_width(104.0)
+                                        .hint_text("Swatch name"),
+                                );
+                                if name_edit.lost_focus()
+                                    && action.is_none()
+                                    && self.name_edits[i] != self.draft.names[i]
+                                {
+                                    let name = &self.name_edits[i];
+                                    if name.trim().is_empty()
+                                        || self
+                                            .draft
+                                            .names
+                                            .iter()
+                                            .enumerate()
+                                            .any(|(j, existing)| j != i && existing == name)
+                                    {
+                                        self.error = Some(
+                                            "Swatch names must be nonempty and unique.".into(),
+                                        );
+                                        self.name_edits[i] = self.draft.names[i].clone();
+                                    } else {
+                                        action = Some(Action::Rename(i, name.clone()));
+                                    }
+                                }
                             });
                         });
                     }
@@ -349,16 +427,20 @@ impl PaletteEditor {
             let previous = self.draft.clone();
             match action {
                 Action::Set(i, c) => self.draft.colors[i] = c,
+                Action::Rename(i, name) => self.draft.names[i] = name,
                 Action::Lock(i, value) => self.draft.locked[i] = value,
                 Action::Move(from, to) => {
                     let color = self.draft.colors.remove(from);
+                    let name = self.draft.names.remove(from);
                     let locked = self.draft.locked.remove(from);
                     self.draft.colors.insert(to, color);
                     self.draft.locked.insert(to, locked);
+                    self.draft.names.insert(to, name);
                 }
                 Action::Remove(i) => {
                     self.draft.colors.remove(i);
                     self.draft.locked.remove(i);
+                    self.draft.names.remove(i);
                 }
                 Action::Apply(i) => match self.edit[i].parse::<Color>() {
                     Ok(c) => {
@@ -394,7 +476,7 @@ impl PaletteEditor {
                 if ui.text_edit_singleline(&mut self.draft.name).changed() { self.commit(previous, mixer); }
                 if ui.button("New draft").clicked() {
                     let previous = self.draft.clone();
-                    self.draft = Draft { name: "Untitled".into(), colors: Vec::new(), locked: Vec::new(), id: None };
+                    self.draft = Draft { name: "Untitled".into(), colors: Vec::new(), locked: Vec::new(), names: Vec::new(), id: None };
                     self.commit(previous, mixer);
                 }
                 if ui.button("Save palette").clicked() { self.save(); }
@@ -461,10 +543,17 @@ impl PaletteEditor {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct PaletteDrag {
+    pub index: usize,
+    pub color: Color,
+}
+
 enum Action {
     Set(usize, Color),
     Lock(usize, bool),
     Move(usize, usize),
+    Rename(usize, String),
     Remove(usize),
     Apply(usize),
 }
@@ -489,6 +578,7 @@ mod tests {
                 name: "Example".into(),
                 colors: vec![],
                 locked: vec![],
+                names: vec![],
                 id: None,
             },
             undo: vec![],
@@ -502,6 +592,7 @@ mod tests {
             use_contrast: false,
             contrast: 4.5,
             search: String::new(),
+            name_edits: vec![],
             edit: vec![],
             error: None,
             lock_history: true,

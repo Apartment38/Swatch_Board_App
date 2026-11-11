@@ -1,0 +1,164 @@
+[
+  {
+    "id": "window_background",
+    "title": "Window background",
+    "help": "Window background",
+    "default": "#eff0f1",
+    "alpha": false,
+    "group": "Window",
+    "links": []
+  },
+  {
+    "id": "window_foreground",
+    "title": "Window text",
+    "help": "Window text",
+    "default": "#232629",
+    "alpha": false,
+    "group": "Window",
+    "links": []
+  },
+  {
+    "id": "view_background",
+    "title": "View background",
+    "help": "View background",
+    "default": "#fcfcfc",
+    "alpha": false,
+    "group": "View",
+    "links": []
+  },
+  {
+    "id": "view_foreground",
+    "title": "View text",
+    "help": "View text",
+    "default": "#232629",
+    "alpha": false,
+    "group": "View",
+    "links": []
+  },
+  {
+    "id": "button_background",
+    "title": "Button background",
+    "help": "Button background",
+    "default": "#eff0f1",
+    "alpha": false,
+    "group": "Button",
+    "links": []
+  },
+  {
+    "id": "button_foreground",
+    "title": "Button text",
+    "help": "Button text",
+    "default": "#232629",
+    "alpha": false,
+    "group": "Button",
+    "links": []
+  },
+  {
+    "id": "selection_background",
+    "title": "Selection background",
+    "help": "Selection background",
+    "default": "#3daee9",
+    "alpha": false,
+    "group": "Selection",
+    "links": []
+  },
+  {
+    "id": "selection_foreground",
+    "title": "Selection text",
+    "help": "Selection text",
+    "default": "#ffffff",
+    "alpha": false,
+    "group": "Selection",
+    "links": []
+  },
+  {
+    "id": "tooltip_background",
+    "title": "Tooltip background",
+    "help": "Tooltip background",
+    "default": "#31363b",
+    "alpha": false,
+    "group": "Tooltip",
+    "links": []
+  },
+  {
+    "id": "tooltip_foreground",
+    "title": "Tooltip text",
+    "help": "Tooltip text",
+    "default": "#eff0f1",
+    "alpha": false,
+    "group": "Tooltip",
+    "links": []
+  },
+  {
+    "id": "inactive_background",
+    "title": "Inactive background",
+    "help": "Inactive background",
+    "default": "#e0e0e0",
+    "alpha": false,
+    "group": "Inactive",
+    "links": []
+  },
+  {
+    "id": "inactive_foreground",
+    "title": "Inactive text",
+    "help": "Inactive text",
+    "default": "#63686d",
+    "alpha": false,
+    "group": "Inactive",
+    "links": []
+  },
+  {
+    "id": "disabled_foreground",
+    "title": "Disabled text",
+    "help": "Disabled text",
+    "default": "#a0a4a8",
+    "alpha": false,
+    "group": "Disabled",
+    "links": []
+  },
+  {
+    "id": "link",
+    "title": "Link",
+    "help": "Link",
+    "default": "#2980b9",
+    "alpha": false,
+    "group": "Text",
+    "links": []
+  },
+  {
+    "id": "visited",
+    "title": "Visited link",
+    "help": "Visited link",
+    "default": "#7f8c8d",
+    "alpha": false,
+    "group": "Text",
+    "links": []
+  },
+  {
+    "id": "negative",
+    "title": "Negative text",
+    "help": "Negative text",
+    "default": "#da4453",
+    "alpha": false,
+    "group": "Text",
+    "links": []
+  },
+  {
+    "id": "neutral",
+    "title": "Neutral text",
+    "help": "Neutral text",
+    "default": "#f67400",
+    "alpha": false,
+    "group": "Text",
+    "links": []
+  },
+  {
+    "id": "positive",
+    "title": "Positive text",
+    "help": "Positive text",
+    "default": "#27ae60",
+    "alpha": false,
+    "group": "Text",
+    "links": []
+  }
+]

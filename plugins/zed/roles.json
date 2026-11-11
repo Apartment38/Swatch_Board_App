@@ -1,0 +1,164 @@
+[
+  {
+    "id": "background",
+    "title": "Editor background",
+    "help": "Editor background",
+    "default": "#1e1e2e",
+    "alpha": false,
+    "group": "Editor",
+    "links": []
+  },
+  {
+    "id": "foreground",
+    "title": "Editor text",
+    "help": "Editor text",
+    "default": "#cdd6f4",
+    "alpha": false,
+    "group": "Editor",
+    "links": []
+  },
+  {
+    "id": "border",
+    "title": "Border",
+    "help": "Border",
+    "default": "#45475a",
+    "alpha": false,
+    "group": "Chrome",
+    "links": []
+  },
+  {
+    "id": "surface",
+    "title": "Surface",
+    "help": "Surface",
+    "default": "#181825",
+    "alpha": false,
+    "group": "Chrome",
+    "links": []
+  },
+  {
+    "id": "tab_active",
+    "title": "Active tab",
+    "help": "Active tab",
+    "default": "#313244",
+    "alpha": false,
+    "group": "Tabs",
+    "links": []
+  },
+  {
+    "id": "tab_inactive",
+    "title": "Inactive tab",
+    "help": "Inactive tab",
+    "default": "#181825",
+    "alpha": false,
+    "group": "Tabs",
+    "links": []
+  },
+  {
+    "id": "sidebar",
+    "title": "Sidebar",
+    "help": "Sidebar",
+    "default": "#181825",
+    "alpha": false,
+    "group": "Sidebar",
+    "links": []
+  },
+  {
+    "id": "status",
+    "title": "Status bar",
+    "help": "Status bar",
+    "default": "#313244",
+    "alpha": false,
+    "group": "Chrome",
+    "links": []
+  },
+  {
+    "id": "muted",
+    "title": "Muted text",
+    "help": "Muted text",
+    "default": "#a6adc8",
+    "alpha": false,
+    "group": "Text",
+    "links": []
+  },
+  {
+    "id": "accent",
+    "title": "Accent",
+    "help": "Accent",
+    "default": "#89b4fa",
+    "alpha": false,
+    "group": "Text",
+    "links": []
+  },
+  {
+    "id": "selection",
+    "title": "Selection",
+    "help": "Selection",
+    "default": "#585b70",
+    "alpha": false,
+    "group": "Editor",
+    "links": []
+  },
+  {
+    "id": "keyword",
+    "title": "Keyword",
+    "help": "Keyword",
+    "default": "#cba6f7",
+    "alpha": false,
+    "group": "Syntax",
+    "links": []
+  },
+  {
+    "id": "string",
+    "title": "String",
+    "help": "String",
+    "default": "#a6e3a1",
+    "alpha": false,
+    "group": "Syntax",
+    "links": []
+  },
+  {
+    "id": "comment",
+    "title": "Comment",
+    "help": "Comment",
+    "default": "#6c7086",
+    "alpha": false,
+    "group": "Syntax",
+    "links": []
+  },
+  {
+    "id": "function",
+    "title": "Function",
+    "help": "Function",
+    "default": "#89b4fa",
+    "alpha": false,
+    "group": "Syntax",
+    "links": []
+  },
+  {
+    "id": "type",
+    "title": "Type",
+    "help": "Type",
+    "default": "#f9e2af",
+    "alpha": false,
+    "group": "Syntax",
+    "links": []
+  },
+  {
+    "id": "error",
+    "title": "Error",
+    "help": "Error",
+    "default": "#f38ba8",
+    "alpha": false,
+    "group": "Diagnostics",
+    "links": []
+  },
+  {
+    "id": "warning",
+    "title": "Warning",
+    "help": "Warning",
+    "default": "#f9e2af",
+    "alpha": false,
+    "group": "Diagnostics",
+    "links": []
+  }
+]

@@ -1,0 +1,402 @@
+[
+  {
+    "id": "terminal",
+    "title": "Terminal",
+    "width": 800,
+    "height": 480,
+    "nodes": [
+      {
+        "id": "back",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          800,
+          480
+        ],
+        "role": "background"
+      },
+      {
+        "id": "title",
+        "kind": "text",
+        "rect": [
+          24,
+          12,
+          500,
+          30
+        ],
+        "role": "foreground",
+        "text": "Ghostty · Terminal",
+        "font_size": 18
+      },
+      {
+        "id": "menu",
+        "kind": "tab",
+        "rect": [
+          680,
+          10,
+          100,
+          30
+        ],
+        "role": "ansi_4",
+        "text": "Menu",
+        "text_role": "background",
+        "target": "menu"
+      },
+      {
+        "id": "prompt",
+        "kind": "text",
+        "rect": [
+          30,
+          75,
+          700,
+          30
+        ],
+        "role": "ansi_2",
+        "text": "user@host ~ $ swatch-board",
+        "font_size": 18
+      },
+      {
+        "id": "line",
+        "kind": "text",
+        "rect": [
+          30,
+          112,
+          700,
+          30
+        ],
+        "role": "foreground",
+        "text": "A colorful terminal preview",
+        "font_size": 17
+      },
+      {
+        "id": "selection",
+        "kind": "rect",
+        "rect": [
+          30,
+          155,
+          300,
+          30
+        ],
+        "role": "selection_background",
+        "text": "selected text",
+        "text_role": "selection_foreground"
+      },
+      {
+        "id": "cursor",
+        "kind": "rect",
+        "rect": [
+          32,
+          205,
+          14,
+          24
+        ],
+        "role": "cursor"
+      },
+      {
+        "id": "color_0",
+        "kind": "rect",
+        "rect": [
+          30,
+          280,
+          64,
+          40
+        ],
+        "role": "ansi_0"
+      },
+      {
+        "id": "color_1",
+        "kind": "rect",
+        "rect": [
+          110,
+          280,
+          64,
+          40
+        ],
+        "role": "ansi_1"
+      },
+      {
+        "id": "color_2",
+        "kind": "rect",
+        "rect": [
+          190,
+          280,
+          64,
+          40
+        ],
+        "role": "ansi_2"
+      },
+      {
+        "id": "color_3",
+        "kind": "rect",
+        "rect": [
+          270,
+          280,
+          64,
+          40
+        ],
+        "role": "ansi_3"
+      },
+      {
+        "id": "color_4",
+        "kind": "rect",
+        "rect": [
+          350,
+          280,
+          64,
+          40
+        ],
+        "role": "ansi_4"
+      },
+      {
+        "id": "color_5",
+        "kind": "rect",
+        "rect": [
+          430,
+          280,
+          64,
+          40
+        ],
+        "role": "ansi_5"
+      },
+      {
+        "id": "color_6",
+        "kind": "rect",
+        "rect": [
+          510,
+          280,
+          64,
+          40
+        ],
+        "role": "ansi_6"
+      },
+      {
+        "id": "color_7",
+        "kind": "rect",
+        "rect": [
+          590,
+          280,
+          64,
+          40
+        ],
+        "role": "ansi_7"
+      },
+      {
+        "id": "color_8",
+        "kind": "rect",
+        "rect": [
+          30,
+          335,
+          64,
+          40
+        ],
+        "role": "ansi_8"
+      },
+      {
+        "id": "color_9",
+        "kind": "rect",
+        "rect": [
+          110,
+          335,
+          64,
+          40
+        ],
+        "role": "ansi_9"
+      },
+      {
+        "id": "color_10",
+        "kind": "rect",
+        "rect": [
+          190,
+          335,
+          64,
+          40
+        ],
+        "role": "ansi_10"
+      },
+      {
+        "id": "color_11",
+        "kind": "rect",
+        "rect": [
+          270,
+          335,
+          64,
+          40
+        ],
+        "role": "ansi_11"
+      },
+      {
+        "id": "color_12",
+        "kind": "rect",
+        "rect": [
+          350,
+          335,
+          64,
+          40
+        ],
+        "role": "ansi_12"
+      },
+      {
+        "id": "color_13",
+        "kind": "rect",
+        "rect": [
+          430,
+          335,
+          64,
+          40
+        ],
+        "role": "ansi_13"
+      },
+      {
+        "id": "color_14",
+        "kind": "rect",
+        "rect": [
+          510,
+          335,
+          64,
+          40
+        ],
+        "role": "ansi_14"
+      },
+      {
+        "id": "color_15",
+        "kind": "rect",
+        "rect": [
+          590,
+          335,
+          64,
+          40
+        ],
+        "role": "ansi_15"
+      }
+    ]
+  },
+  {
+    "id": "menu",
+    "title": "Terminal menu",
+    "width": 800,
+    "height": 480,
+    "nodes": [
+      {
+        "id": "back",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          800,
+          480
+        ],
+        "role": "background"
+      },
+      {
+        "id": "menu_panel",
+        "kind": "rect",
+        "rect": [
+          500,
+          45,
+          260,
+          240
+        ],
+        "role": "selection_background"
+      },
+      {
+        "id": "heading",
+        "kind": "text",
+        "rect": [
+          520,
+          60,
+          220,
+          30
+        ],
+        "role": "foreground",
+        "text": "Terminal menu"
+      },
+      {
+        "id": "settings",
+        "kind": "tab",
+        "rect": [
+          520,
+          110,
+          210,
+          35
+        ],
+        "role": "ansi_4",
+        "text": "Preferences",
+        "text_role": "background",
+        "target": "preferences"
+      },
+      {
+        "id": "close",
+        "kind": "tab",
+        "rect": [
+          520,
+          165,
+          210,
+          35
+        ],
+        "role": "background",
+        "text": "Close menu",
+        "text_role": "foreground",
+        "target": "terminal"
+      }
+    ]
+  },
+  {
+    "id": "preferences",
+    "title": "Preferences dialog",
+    "width": 800,
+    "height": 480,
+    "nodes": [
+      {
+        "id": "back",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          800,
+          480
+        ],
+        "role": "background"
+      },
+      {
+        "id": "dialog",
+        "kind": "dialog",
+        "rect": [
+          180,
+          90,
+          440,
+          300
+        ],
+        "role": "selection_background",
+        "text": "Preferences",
+        "text_role": "foreground"
+      },
+      {
+        "id": "info",
+        "kind": "text",
+        "rect": [
+          210,
+          155,
+          360,
+          45
+        ],
+        "role": "foreground",
+        "text": "Terminal appearance preview"
+      },
+      {
+        "id": "done",
+        "kind": "tab",
+        "rect": [
+          440,
+          300,
+          140,
+          40
+        ],
+        "role": "ansi_4",
+        "text": "Done",
+        "text_role": "background",
+        "target": "terminal"
+      }
+    ]
+  }
+]

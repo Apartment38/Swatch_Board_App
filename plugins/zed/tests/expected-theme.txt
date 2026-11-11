@@ -1,0 +1,33 @@
+{
+  "$schema": "https://zed.dev/schema/themes/v0.2.0.json",
+  "name": "Swatch Board",
+  "author": "Swatch Board",
+  "themes": [{
+    "name": "Swatch Board",
+    "appearance": "dark",
+    "style": {
+      "background": "#101820",
+      "text": "#CDD6F4",
+      "border": "#45475A",
+      "surface.background": "#181825",
+      "tab.active_background": "#313244",
+      "tab.inactive_background": "#181825",
+      "panel.background": "#181825",
+      "status_bar.background": "#313244",
+      "text.muted": "#A6ADC8",
+      "text.accent": "#89B4FA",
+      "editor.background": "#101820",
+      "editor.foreground": "#CDD6F4",
+      "players": [{ "cursor": "#89B4FA", "selection": "#585B70", "background": "#101820" }],
+      "error": "#F38BA8",
+      "warning": "#F9E2AF",
+      "syntax": {
+        "keyword": { "color": "#FF3344" },
+        "string": { "color": "#A6E3A1" },
+        "comment": { "color": "#6C7086" },
+        "function": { "color": "#89B4FA" },
+        "type": { "color": "#F9E2AF" }
+      }
+    }
+  }]
+}
