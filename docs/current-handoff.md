@@ -218,10 +218,13 @@ Full workspace build/all-target tests passed (180 passed, one ignored), strict
 Clippy, formatting, whitespace and release build passed. A corrected release build
 is staged under `target/phase6-physical/retest-stage/`; its SHA-256 is recorded in
 `physical-keyboard.json`. It is not the previous Arch package; recipe pin/package
-refresh remains necessary after acceptance. The old Board and Settings remain
-open; request normal close of both, verify exact PID cleanup, then relaunch using
-the corrected stage with the same isolated data. Retest invalid Apply feedback,
-valid `#E06C75FF`, Undo and Redo with keyboard and mouse. Settings PID 8925 was
+refresh remains necessary after acceptance. The user closed both original windows;
+exact original PIDs 5133 and 8925 were verified absent. The corrected Board is now
+running as PID 17804 (starttime 1200534 clock ticks) from the retest stage with the
+same isolated data and a new private bus. Executable SHA-256 matches the recorded
+retest artifact; native Wayland identity was verified. Launch identity is saved in
+`target/phase6-physical/retest-start.json`. Retest invalid Apply feedback, valid
+`#E06C75FF`, Undo and Redo with keyboard and mouse. Settings PID 8925 was
 measured idle over 10.001874 seconds: PSS 32,092 KiB, private clean+dirty 27,356 KiB,
 10,073,549 ns CPU and 75 scheduled runs across 15 stable endpoint threads. The raw
 sample is `target/phase6-physical/settings-idle.json`; the same sampling limitations
