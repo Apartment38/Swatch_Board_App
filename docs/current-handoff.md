@@ -607,3 +607,31 @@ native session, reopen `Acceptance palette` and the theme, then recheck palette
 drop before continuing link propagation, export, overwrite protection and clean
 close/reopen. The full physical gate is not passed; do not count the automated
 repair as physical verification.
+
+### Physical follow-up: links passed; export layout repair awaiting retest
+
+After relaunching the corrected build, the user confirmed native palette dragging
+worked; draft readback confirmed Accent override `#81A1C1FF`. Initial link testing
+was ambiguous (draft held an override), so the session was reopened and tested
+one transition at a time. Readback then proved `Link("Accent")` to the saved
+source; the user confirmed editing the pinned swatch to `#46B878` updated both
+the preview and role text. SQLite confirmed the green saved palette and saved
+linked theme. The supplied screenshot independently showed the green preview,
+role text and Accent link dropdown, and Saved state.
+
+Preview export appeared to do nothing and window scrolling did not reveal output.
+A direct diagnostic worker render returned the expected green theme; that was
+not counted as GUI acceptance. The screenshot showed the controls flush against
+the pinned palette. The Theme Generator had inner role/output scroll areas but
+no outer scroll container, leaving expanded export content below the viewport
+unreachable. A short-window regression reproduced this using wheel input and
+clipped painted-text bounds (not merely model preview state). Wrapping the theme
+tab content in a dedicated vertical scroll area fixes reachability while leaving
+the separately pinned palette outside that scrolling region.
+
+After the repair: 178 workspace/all-targets tests passed, strict workspace Clippy,
+formatting, whitespace checks and debug Board build passed. The regression went
+RED before the production change and GREEN afterward. Logs are under
+`target/phase5-export-layout-{tests,clippy}.log`. Physical export, overwrite and
+final reopen acceptance still require a relaunch and user verification; the old
+window must be saved/closed before starting the rebuilt executable.

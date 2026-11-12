@@ -278,6 +278,13 @@ impl ThemeEditor {
         }
     }
     pub fn ui(&mut self, ui: &mut egui::Ui, palette: &PaletteEditor, format: Format) {
+        egui::ScrollArea::vertical()
+            .id_salt("theme_editor_scroll")
+            .auto_shrink([false, false])
+            .show(ui, |ui| self.contents(ui, palette, format));
+    }
+
+    fn contents(&mut self, ui: &mut egui::Ui, palette: &PaletteEditor, format: Format) {
         ui.horizontal_wrapped(|ui| {
             ui.heading("Theme Generator");
             if ui.button("Reload Plugins").clicked() {
@@ -854,6 +861,8 @@ mod tests {
         pinned_on_theme: bool,
         mixer: crate::mixer::Mixer,
         painted_textures: Vec<egui::TextureId>,
+        screen_size: Vec2,
+        visible_text: Vec<(String, Rect)>,
     }
     impl Headless {
         fn new() -> Self {
@@ -866,15 +875,14 @@ mod tests {
                 pinned_on_theme: false,
                 mixer: crate::mixer::Mixer::default(),
                 painted_textures: Vec::new(),
+                screen_size: egui::vec2(1400.0, 1100.0),
+                visible_text: Vec::new(),
             }
         }
         fn frame(&mut self, events: Vec<egui::Event>) {
             let output = self.ctx.run(
                 egui::RawInput {
-                    screen_rect: Some(Rect::from_min_size(
-                        egui::Pos2::ZERO,
-                        egui::vec2(1400.0, 1100.0),
-                    )),
+                    screen_rect: Some(Rect::from_min_size(egui::Pos2::ZERO, self.screen_size)),
                     events,
                     ..Default::default()
                 },
@@ -917,12 +925,23 @@ mod tests {
                 }
             }
             self.text.clear();
+            self.visible_text.clear();
             self.painted_textures.clear();
             for shape in output.shapes {
                 if let egui::epaint::Shape::Mesh(mesh) = &shape.shape {
                     self.painted_textures.push(mesh.texture_id);
                 }
-                collect(shape.shape, &mut self.text);
+                let mut text = Vec::new();
+                collect(shape.shape, &mut text);
+                self.visible_text.extend(
+                    text.iter()
+                        .filter(|(_, rect)| {
+                            shape.clip_rect.contains(rect.center())
+                                && rect.center().y < self.screen_size.y - 145.0
+                        })
+                        .cloned(),
+                );
+                self.text.extend(text);
             }
         }
         fn palette_tab(&mut self, active: bool) {
@@ -1037,6 +1056,72 @@ mod tests {
         app.click("Runtime fixture");
         app.link_ink("Accent");
         app
+    }
+
+    #[test]
+    fn export_preview_remains_reachable_above_pinned_palette_in_short_window() {
+        isolated(
+            "export_preview_remains_reachable_above_pinned_palette_in_short_window",
+            |root| {
+                let mut app = linked_app(root);
+                app.click("Preview export");
+                assert_eq!(app.editor.preview.len(), 1);
+                app.pinned_on_theme = true;
+                app.screen_size = egui::vec2(1000.0, 600.0);
+                app.frame(vec![]);
+                app.frame(vec![]);
+                for _ in 0..24 {
+                    if app
+                        .visible_text
+                        .iter()
+                        .any(|(text, _)| text == "example.txt")
+                    {
+                        break;
+                    }
+                    app.frame(vec![
+                        egui::Event::PointerMoved(egui::pos2(100.0, 250.0)),
+                        egui::Event::MouseWheel {
+                            unit: egui::MouseWheelUnit::Point,
+                            delta: egui::vec2(0.0, -100.0),
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ]);
+                    app.frame(vec![]);
+                }
+                assert!(
+                    app.visible_text
+                        .iter()
+                        .any(|(text, _)| text == "example.txt"),
+                    "scrolling must expose the export filename above the pinned panel; visible={:?}",
+                    app.visible_text
+                );
+                app.click("example.txt");
+                for _ in 0..12 {
+                    if app
+                        .visible_text
+                        .iter()
+                        .any(|(text, _)| text.contains("ink=#ABCDEF"))
+                    {
+                        break;
+                    }
+                    app.frame(vec![
+                        egui::Event::PointerMoved(egui::pos2(100.0, 250.0)),
+                        egui::Event::MouseWheel {
+                            unit: egui::MouseWheelUnit::Point,
+                            delta: egui::vec2(0.0, -100.0),
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ]);
+                    app.frame(vec![]);
+                }
+                assert!(
+                    app.visible_text
+                        .iter()
+                        .any(|(text, _)| text.contains("ink=#ABCDEF")),
+                    "expanded exported content must be reachable, not merely laid out below the clip"
+                );
+            },
+        );
     }
 
     #[test]
