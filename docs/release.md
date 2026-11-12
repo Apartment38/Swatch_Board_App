@@ -3,7 +3,7 @@
 ## Arch Linux first
 
 `packaging/arch/PKGBUILD` is the initial distro recipe. It pins the application
-source to a full Git commit and fetches Rust dependencies according to
+source payload to `64212c8c16f610791e38dbed7f7c99f636309351` and fetches Rust dependencies according to
 `Cargo.lock`; the compiler and platform libraries are supplied by the build
 system. This is a locked source build, not a claim of bit-for-bit reproducibility.
 The Git source uses `SKIP` because makepkg verifies the fixed commit instead of
@@ -14,11 +14,23 @@ the source pin.
 
 The recipe's native build requirements are Rust/Cargo, Git, Clang/libclang, pkgconf,
 PipeWire, Wayland and libxkbcommon development metadata. Runtime dependencies
-are based on the shipped ELF linkage and dynamic graphics loader: glibc, GCC
-runtime, PipeWire and libglvnd. KDE's XDG portal is an optional runtime
-integration, and `kscreen` is only used by the documented output-selection
-fallback. Verify these against each supported Arch snapshot before publishing;
-this repository has not yet been built in an Arch clean chroot.
+include glibc, GCC runtime, PipeWire, libglvnd, and hicolor-icon-theme. The latter
+is required for the installed icon hierarchy. `options=('!lto')` is deliberate:
+Arch's GCC LTO C objects for bundled SQLite cannot be consumed by Rust's LLVM
+linker. This was reproduced in the isolated build and fixed before packaging.
+KDE's XDG portal is an optional runtime integration, and `kscreen` is only used
+by the documented output-selection fallback.
+
+A fresh Arch Docker container built the pinned payload, ran 178 tests and strict
+Clippy, produced the package, installed it **inside the container**, and passed
+installed picker, four-plugin golden, data inventory and metadata checks. No
+host Cargo cache/target or desktop sockets were mounted. A local Git bundle
+supplied the unpushed source revision via a makepkg Git URL rewrite; this is not
+a test of public source availability. The source commit must be pushed only
+when explicitly authorised before remote package consumers can fetch it.
+See `docs/evidence/phase6-packaging/checks.json` for the image digest, versions,
+package checksum, and remaining warnings. This container run is not the official
+devtools clean-chroot qualification or a physical desktop test.
 
 Build recipe verification in a clean Arch chroot is a release gate:
 

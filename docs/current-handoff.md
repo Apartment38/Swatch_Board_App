@@ -208,7 +208,8 @@ render matching the fixture golden bytes, desktop-file validation, and
 AppStream validation. The helper used only staged installed plugin data. No
 GUI, user settings, grants, compositor restart, publication, or push was used.
 
-On CachyOS (Arch-derived), the parent independently repeated the full offline
+Earlier local-only checkpoint (before the container/package follow-up below):
+on CachyOS (Arch-derived), the parent independently repeated the full offline
 workspace build/tests, strict Clippy and formatting checks. Review found and
 corrected missing Git/Clang build prerequisites and made the normal debug helper
 build explicit before recipe tests. Four packaging tests pass, including RED-to-
@@ -221,13 +222,33 @@ the earlier shim error was an interpreter PATH issue, not a missing installation
 commits are separate so the recipe can name the exact immutable payload revision.
 No Arch clean-chroot package build has been performed.
 
-The package recipe pins a Git commit and the Cargo lockfile but has not had an
-Arch clean-chroot build or package inspection. Fedora/openSUSE, release bitwise
-reproducibility, dependency license audit, full assistive-technology review,
-and broader physical acceptance remain open. The safe compositor substitute is
-private-KWin restart/recovery plus normal manual logout/login. Never restart the
-live KWin service; that previously ended the session and required reboot. The
-test matrix in `testing.md` and release gates in `release.md` retain these limits.
+The source payload is committed as `64212c8c16f610791e38dbed7f7c99f636309351`.
+The Arch recipe and `.SRCINFO` pin that exact immutable payload. A fresh official
+Arch Docker image built it from a local Git bundle with no host target/Cargo cache
+or desktop sockets mounted. The initial build reproduced GCC-LTO/LLVM-linker
+incompatibility for bundled SQLite; disabling makepkg LTO fixed the build. All
+178 tests and strict Clippy passed inside the container. Package inspection
+identified and fixed a missing hicolor-icon-theme dependency; the final package
+installed inside the container and passed installed picker help/version, all four
+helper golden renders, plugin/schema/license byte checks, and metadata validation.
+Namcap has no errors, with remaining dependency/interpreter warnings recorded in
+`evidence/phase6-packaging/checks.json`. Default split-debug packaging reports no
+debugging symbols; no debug-runtime claim is made. The unsigned local package is
+under `target/phase6-release/`; no source commit or package was published.
+
+Eight packaging tests pass, including recipe/source-pin/SRCINFO checks and
+RED-to-GREEN regressions for missing Git, incompatible LTO, missing icon dependency,
+and missing validators. Parent verified full workspace build/tests/Clippy/fmt and
+the staged release gate. The Docker result does not constitute official devtools
+clean-chroot qualification, physical desktop acceptance or bitwise reproducibility.
+
+**Phase 6 is not fully accepted.** Remaining gates include fresh physical
+keyboard-only/accessibility and per-process resource/cleanup measurements,
+dependency redistribution/license-notice audit, independent reproducibility,
+official clean-chroot qualification, and any advertised non-x86_64/distro coverage.
+The safe compositor substitute remains private-KWin restart/recovery plus normal
+manual logout/login. Never restart the live KWin service. See `testing.md` and
+`release.md`; prior physical successes remain historical, not new Phase 6 results.
 
 ## Acceptance evidence
 

@@ -1,0 +1,48 @@
+{
+  "milestone": "phase6",
+  "status": "automated-packaging-checkpoint-passed-not-full-physical-acceptance",
+  "source_commit": "64212c8c16f610791e38dbed7f7c99f636309351",
+  "arch_container": {
+    "base_image": "archlinux:base@sha256:d4594bb2300cba11f41c2f27923eb56f63d9988909c402f9c95517d1e362c899",
+    "isolation": "Docker container, fresh Cargo target and crate cache, no host source/target/display/session-bus mounts",
+    "source_transport": "Local Git bundle; MAKEPKG_GIT_CONFIG rewrites the exact GitHub URL to its local bare mirror. No push or authenticated remote source fetch was performed.",
+    "rust": "1:1.99.1-2",
+    "clang": "23.1.4-1",
+    "pipewire": "1:1.6.11-1",
+    "wayland": "1.26.0-1",
+    "libxkbcommon": "1.13.2-1",
+    "build": "makepkg --noconfirm --holdver passed after disabling incompatible GCC LTO",
+    "final_package": "Repackaged with added hicolor-icon-theme dependency, then installed inside the container",
+    "tests": {"passed": 178, "failed": 0, "ignored": 1, "suites": 23},
+    "strict_workspace_clippy": "passed",
+    "installed_picker_help_version": "passed",
+    "installed_plugin_golden_renders": ["ghostty", "zed", "kde", "example-terminal"],
+    "installed_plugin_schema_inventory_and_license_bytes": "passed",
+    "desktop_and_appstream_validation": "passed",
+    "namcap_errors": [],
+    "namcap_warnings": ["Unused ELF interpreter report for six executables", "libgcc and libpipewire implicitly satisfied by gcc-libs and pipewire", "gcc-libs, libglvnd, pipewire may not be needed by static linkage analysis; graphics loading and desktop services also have runtime requirements"],
+    "build_warnings": ["Default split-debug packaging reported no debugging symbols; main package was produced and installed successfully"]
+  },
+  "package": {
+    "filename": "swatch-board-0.1.0-1-x86_64.pkg.tar.zst",
+    "sha256": "bf90994ee4436f167cf7aaa891aa52f7e72f340eb4f41bf6859bfeee7d31b98b",
+    "location": "target/phase6-release/",
+    "signed": false,
+    "publication": "local development artifact; pinned source commit must be published explicitly before remote consumers can fetch it"
+  },
+  "host_checks": {
+    "workspace_build_tests_clippy_fmt": "passed independently",
+    "packaging_tests": {"passed": 8, "failed": 0},
+    "release_stage": "passed with mandatory validators, complete data inventory, and four real helper golden renders",
+    "dependency_license_inventory": "313 Linux-resolved third-party packages have license declarations; not a legal/license-notice audit"
+  },
+  "remaining_gates": [
+    "Official devtools clean-chroot qualification (container result is separate)",
+    "Fresh physical release-build KDE keyboard-only/focus/accessibility review",
+    "Phase6 process-by-process memory/startup and closed-process cleanup measurements",
+    "Dependency license/redistribution notice audit and independent reproducibility comparison",
+    "aarch64 and Fedora/openSUSE qualification if advertised",
+    "Public source availability and signing only when explicitly authorised"
+  ],
+  "safety": "No host package install, GUI launch, user data/settings change, portal approval, live compositor restart or push"
+}
