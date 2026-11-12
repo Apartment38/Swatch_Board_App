@@ -187,6 +187,14 @@ The obsolete KWin ColorPicker implementation, `--native`, and `--repeat` were re
 
 ## Phase 6 packaging and documentation checkpoint
 
+**Paused by the user at the verified packaging checkpoint.** Source payload commit
+`64212c8` and pinned/container-verified Arch packaging commit `1d4457d` are local;
+nothing was pushed. No physical Phase 6 acceptance was started. The task-owned
+Arch container was removed after verification; the local package and build logs
+remain under ignored `target/phase6-release/`. Resume with physical keyboard/focus
+acceptance and per-process resource/cleanup measurements using isolated data;
+retain the other release qualifications listed below as open.
+
 Arch-first packaging and release documentation are now present: `packaging/arch/PKGBUILD`,
 `share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml`, staged installer
 integration, an installed-helper release verifier, the declarative
