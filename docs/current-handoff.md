@@ -187,7 +187,7 @@ The obsolete KWin ColorPicker implementation, `--native`, and `--repeat` were re
 
 ## Phase 6 packaging and documentation checkpoint
 
-**Resumed for physical acceptance; first keyboard round awaits user results.**
+**Physical acceptance in progress; first keyboard round passed by user report.**
 Source payload commit `64212c8` and pinned/container-verified Arch packaging
 commit `1d4457d` are local; nothing was pushed. The task-owned Arch container was
 removed after verification; package/build logs remain in `target/phase6-release/`.
@@ -198,11 +198,15 @@ were started. Exact Board PID is in `target/phase6-physical/board.pid` (5133 at
 handoff); verify its executable/start identity before acting, since PIDs can be
 reused. Launcher and Wayland diagnostics are in that same ignored directory.
 
-The Board remains open for the user's first keyboard-only round: visible focus,
-Tab/Shift+Tab traversal, Enter/Space activation of all three tabs, and toggling
-Color history off/on; return to Mixer and leave open. The feedback form timed
-out without a response: **none of those physical assertions is passed yet**.
-Computer Use capture returned no display connection. A 10.001-second initial
+The user reported all three first-round tests passed: visible focus with
+Tab/Shift+Tab traversal, Enter/Space activation of all three Board tabs, and
+keyboard toggling of Color history off/on. These are user-reported physical
+results, not native automated input assertions or a full accessibility audit.
+Durable summary: `evidence/phase6-packaging/physical-keyboard.json`.
+The packaged Board remains open. Next round covers invalid/valid HEX entry,
+keyboard Undo/Redo, and opening Settings through the keyboard; leave Settings
+open for the next resource sample. Computer Use capture returned no display
+connection. A 10.001-second initial
 Board idle sample measured 37,229 KiB PSS, 31,364 KiB private clean+dirty memory,
 and 6,608,746 ns CPU / 161 scheduled runs across 15 stable endpoint threads.
 Scheduled runs are not wakeups, short-lived intervening threads cannot be

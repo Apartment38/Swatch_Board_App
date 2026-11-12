@@ -1,0 +1,30 @@
+{
+  "status": "in-progress",
+  "artifact": "swatch-board-0.1.0-1-x86_64.pkg.tar.zst",
+  "source_commit": "64212c8c16f610791e38dbed7f7c99f636309351",
+  "desktop": "physical KDE Plasma Wayland",
+  "state_isolation": "Separate HOME/config/data/cache/state and private session bus under target/phase6-physical; packaged Board executable; no tray/picker launched",
+  "round_1": {
+    "evidence_type": "user-reported physical interactions",
+    "user_report": "All three tests passed",
+    "visible_focus_and_tab_shift_tab_traversal": "passed",
+    "keyboard_activation_of_all_three_board_tabs": "passed",
+    "keyboard_color_history_toggle_off_and_on": "passed",
+    "scope": "Only the assigned first round; not general screen-reader or complete keyboard accessibility acceptance"
+  },
+  "initial_board_idle_sample": {
+    "elapsed_seconds": 10.001137118000031,
+    "pss_kib": 37229,
+    "private_clean_dirty_kib": 31364,
+    "stable_threads": 15,
+    "stable_thread_cpu_ns": 6608746,
+    "stable_thread_scheduled_runs": 161,
+    "limitations": "One observation with Wayland diagnostics enabled; scheduled runs are not wakeups; endpoint sampling cannot exclude short-lived intervening threads"
+  },
+  "remaining": [
+    "Keyboard editing, validation error recovery, undo/redo",
+    "Settings keyboard navigation and error handling",
+    "Remaining process-by-process resource and normal-close cleanup measurements",
+    "Other release qualification gates in current-handoff.md"
+  ]
+}
