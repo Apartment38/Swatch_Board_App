@@ -5,5 +5,5 @@ Comment=View and copy recent colors
 Exec=swatch-board-history
 Icon=org.apartment38.SwatchBoard
 Terminal=false
-Categories=Graphics;Utility;
+Categories=Utility;
 StartupNotify=false

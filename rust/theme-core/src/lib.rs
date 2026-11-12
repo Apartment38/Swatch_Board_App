@@ -874,7 +874,7 @@ mod tests {
     #[test]
     fn bundled_package_golden_outputs() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugins");
-        for name in ["ghostty", "zed", "kde"] {
+        for name in ["ghostty", "zed", "kde", "example-terminal"] {
             let package = root.join(name);
             let plugin = load(&fs::canonicalize(&package).unwrap()).unwrap();
             let values: BTreeMap<String, String> = serde_json::from_slice(

@@ -5,5 +5,5 @@ Comment=Configure Swatch Board
 Exec=swatch-board-config
 Icon=org.apartment38.SwatchBoard
 Terminal=false
-Categories=Settings;Utility;
+Categories=Settings;
 StartupNotify=false

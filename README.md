@@ -228,3 +228,14 @@ does not close the Board. A second launch activates the existing Board instance.
 The workspace also contains the lightweight `swatch-board-tray` and
 `swatch-board-ipc` packages. The former binary/package names are no longer
 supported.
+
+## Packaging and release checks
+
+The Arch-first PKGBUILD, locked source-build notes, staged installation and
+installed theme-worker smoke check are in [release documentation](docs/release.md).
+The local release smoke is `packaging/verify-release.sh`; it builds all six
+release executables, stages them under a temporary prefix, and verifies a real
+installed-helper render against `plugins/example-terminal/`. It does not start
+desktop applications. See the [test matrix](docs/testing.md) for verified KDE
+coverage and outstanding distro/physical gates, and the
+[troubleshooting guide](docs/troubleshooting.md) for recovery steps.

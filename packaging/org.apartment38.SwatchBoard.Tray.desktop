@@ -5,5 +5,5 @@ Comment=Pick colors and manage your palette
 Exec=swatch-board-tray
 Icon=org.apartment38.SwatchBoard
 Terminal=false
-Categories=Graphics;Utility;
+Categories=Utility;
 StartupNotify=false

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.apartment38.SwatchBoard.Board</id>
+  <name>Swatch Board</name>
+  <summary>Build palettes and preview color themes</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>Swatch Board is a KDE Plasma Wayland color utility for picking colors,
+    organizing palettes, and previewing and exporting declarative theme files.</p>
+  </description>
+  <launchable type="desktop-id">org.apartment38.SwatchBoard.Board.desktop</launchable>
+  <url type="homepage">https://github.com/Apartment38/Swatch_Board_App</url>
+  <developer id="org.apartment38">
+    <name>Apartment38</name>
+  </developer>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2026-11-11">
+      <description><p>Initial packaged release.</p></description>
+    </release>
+  </releases>
+</component>

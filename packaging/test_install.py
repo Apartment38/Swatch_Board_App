@@ -43,6 +43,10 @@ class InstallerTests(unittest.TestCase):
         entries = list((prefix / "share/applications").glob("*.desktop"))
         self.assertEqual(len(entries), 5)
         self.assertFalse(any("theme-worker" in p.read_text() for p in entries))
+        metainfo = prefix / "share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml"
+        self.assertTrue(metainfo.is_file())
+        self.assertIn("<id>org.apartment38.SwatchBoard.Board</id>", metainfo.read_text())
+        self.assertTrue((prefix / "share/swatch-board/plugins/example-terminal/manifest.json").is_file())
 
     def test_missing_worker_fails_before_writing_stage(self):
         (self.bindir / "swatch-board-theme-worker").unlink()

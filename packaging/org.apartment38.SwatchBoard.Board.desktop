@@ -5,5 +5,5 @@ Comment=Open the Swatch Board
 Exec=swatch-board
 Icon=org.apartment38.SwatchBoard
 Terminal=false
-Categories=Graphics;Utility;
+Categories=Graphics;
 StartupNotify=false

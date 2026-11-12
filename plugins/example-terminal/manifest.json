@@ -1,0 +1,11 @@
+{
+  "id": "example-terminal",
+  "name": "Example Terminal",
+  "version": "1.0.0",
+  "api_version": 1,
+  "target": "Example Terminal",
+  "target_versions": ["1.x"],
+  "outputs": [
+    {"path": "example-terminal.conf", "template": "templates/theme.j2", "format": "text"}
+  ]
+}

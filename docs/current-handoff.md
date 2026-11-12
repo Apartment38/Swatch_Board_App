@@ -185,6 +185,50 @@ The picker:
 
 The obsolete KWin ColorPicker implementation, `--native`, and `--repeat` were removed. Do not restore compatibility aliases or a second backend.
 
+## Phase 6 packaging and documentation checkpoint
+
+Arch-first packaging and release documentation are now present: `packaging/arch/PKGBUILD`,
+`share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml`, staged installer
+integration, an installed-helper release verifier, the declarative
+`plugins/example-terminal/` template, and release, troubleshooting and test
+matrix guides. Installer contract tests cover the new AppStream and fixture
+assets. The existing bundled-plugin golden test now also renders the starter
+fixture through the real helper. Desktop-file category hints were corrected to
+one main category, and all launchers validate cleanly.
+
+Verification on 2026-11-11: initial `cargo build --workspace --locked
+--offline` passed; `python3 packaging/test_install.py` passed (2); `cargo test
+--workspace --all-targets --locked --offline` passed: 178 passed, zero failed,
+one pipe fixture intentionally ignored across 23 suites; strict
+workspace/all-targets Clippy and rustfmt check passed. `appstreamcli validate
+--no-net` passed. The final
+`packaging/verify-release.sh` run passed: release build, installer contract,
+staged six-binary checks, staged picker help/version, actual installed-helper
+render matching the fixture golden bytes, desktop-file validation, and
+AppStream validation. The helper used only staged installed plugin data. No
+GUI, user settings, grants, compositor restart, publication, or push was used.
+
+On CachyOS (Arch-derived), the parent independently repeated the full offline
+workspace build/tests, strict Clippy and formatting checks. Review found and
+corrected missing Git/Clang build prerequisites and made the normal debug helper
+build explicit before recipe tests. Four packaging tests pass, including RED-to-
+GREEN regressions for the missing Git dependency and missing release validators.
+The strengthened staged gate passes all four plugin golden renders, byte-for-byte
+plugin/schema inventory and license checks, and mandatory desktop/AppStream
+validation. System-PATH `namcap` now validates the recipe without warnings;
+the earlier shim error was an interpreter PATH issue, not a missing installation.
+`makechrootpkg` remains unavailable. Source-payload and pinned-recipe checkpoint
+commits are separate so the recipe can name the exact immutable payload revision.
+No Arch clean-chroot package build has been performed.
+
+The package recipe pins a Git commit and the Cargo lockfile but has not had an
+Arch clean-chroot build or package inspection. Fedora/openSUSE, release bitwise
+reproducibility, dependency license audit, full assistive-technology review,
+and broader physical acceptance remain open. The safe compositor substitute is
+private-KWin restart/recovery plus normal manual logout/login. Never restart the
+live KWin service; that previously ended the session and required reboot. The
+test matrix in `testing.md` and release gates in `release.md` retain these limits.
+
 ## Acceptance evidence
 
 Primary summaries:

@@ -5,6 +5,6 @@ Comment=Live Wayland magnifying color picker
 Exec=swatch-board-picker
 Icon=org.apartment38.SwatchBoard
 Terminal=false
-Categories=Graphics;Utility;
+Categories=Graphics;
 StartupNotify=false
 NoDisplay=true

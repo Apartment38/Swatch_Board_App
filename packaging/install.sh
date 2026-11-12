@@ -41,12 +41,16 @@ for binary in swatch-board-picker swatch-board-tray swatch-board-history swatch-
 done
 
 install -d "$destdir$prefix/bin" "$destdir$prefix/share/applications" \
-    "$destdir$prefix/share/icons/hicolor/scalable/apps"
+    "$destdir$prefix/share/icons/hicolor/scalable/apps" "$destdir$prefix/share/metainfo" \
+    "$destdir$prefix/share/licenses/swatch-board"
 for binary in swatch-board-picker swatch-board-tray swatch-board-history swatch-board-config swatch-board swatch-board-theme-worker; do
     install -m 755 "$bindir/$binary" "$destdir$prefix/bin/$binary"
 done
 install -m 644 "$root/share/icons/hicolor/scalable/apps/org.apartment38.SwatchBoard.svg" \
     "$destdir$prefix/share/icons/hicolor/scalable/apps/org.apartment38.SwatchBoard.svg"
+install -m 644 "$root/share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml" \
+    "$destdir$prefix/share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml"
+install -m 644 "$root/LICENSE" "$destdir$prefix/share/licenses/swatch-board/LICENSE"
 install -d "$destdir$prefix/share/swatch-board/plugins" "$destdir$prefix/share/swatch-board/schemas"
 cp -R "$root/plugins/." "$destdir$prefix/share/swatch-board/plugins/"
 cp -R "$root/schemas/." "$destdir$prefix/share/swatch-board/schemas/"

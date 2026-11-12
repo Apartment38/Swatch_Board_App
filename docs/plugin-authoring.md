@@ -3,6 +3,10 @@
 Plugins describe mock previews and exported configuration; they do not execute
 code, apply themes, or reproduce a target application's rendering engine exactly.
 Ghostty, Zed, and KDE under `plugins/` are complete examples of the same contract.
+The small `plugins/example-terminal/` package is the distributable starter
+fixture: copy it to a new directory, change its unique ID and target metadata,
+then update the role references, scene and golden output together. The installer
+ships it as ordinary plugin data; it adds no executable plugin runtime.
 
 ## Install and reload
 
