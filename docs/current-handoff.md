@@ -187,13 +187,29 @@ The obsolete KWin ColorPicker implementation, `--native`, and `--repeat` were re
 
 ## Phase 6 packaging and documentation checkpoint
 
-**Paused by the user at the verified packaging checkpoint.** Source payload commit
-`64212c8` and pinned/container-verified Arch packaging commit `1d4457d` are local;
-nothing was pushed. No physical Phase 6 acceptance was started. The task-owned
-Arch container was removed after verification; the local package and build logs
-remain under ignored `target/phase6-release/`. Resume with physical keyboard/focus
-acceptance and per-process resource/cleanup measurements using isolated data;
-retain the other release qualifications listed below as open.
+**Resumed for physical acceptance; first keyboard round awaits user results.**
+Source payload commit `64212c8` and pinned/container-verified Arch packaging
+commit `1d4457d` are local; nothing was pushed. The task-owned Arch container was
+removed after verification; package/build logs remain in `target/phase6-release/`.
+The actual package was extracted under `target/phase6-physical/stage/` and its
+Board launched natively on the physical Wayland desktop with isolated HOME,
+config/data/cache/state and a private session bus. No tray/picker or portal grants
+were started. Exact Board PID is in `target/phase6-physical/board.pid` (5133 at
+handoff); verify its executable/start identity before acting, since PIDs can be
+reused. Launcher and Wayland diagnostics are in that same ignored directory.
+
+The Board remains open for the user's first keyboard-only round: visible focus,
+Tab/Shift+Tab traversal, Enter/Space activation of all three tabs, and toggling
+Color history off/on; return to Mixer and leave open. The feedback form timed
+out without a response: **none of those physical assertions is passed yet**.
+Computer Use capture returned no display connection. A 10.001-second initial
+Board idle sample measured 37,229 KiB PSS, 31,364 KiB private clean+dirty memory,
+and 6,608,746 ns CPU / 161 scheduled runs across 15 stable endpoint threads.
+Scheduled runs are not wakeups, short-lived intervening threads cannot be
+excluded, and diagnostic logging was enabled. Raw JSON is
+`target/phase6-physical/board-idle.json`; this is not a latency/performance verdict.
+Continue with reported keyboard results, other per-process samples and verified
+normal-close cleanup. Retain the release qualifications listed below as open.
 
 Arch-first packaging and release documentation are now present: `packaging/arch/PKGBUILD`,
 `share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml`, staged installer
