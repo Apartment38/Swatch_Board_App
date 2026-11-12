@@ -4,8 +4,10 @@ Build beautiful palettes with swatches.
 
 Swatch Board is a Rust-only KDE Plasma Wayland color utility. The picker,
 tray, history, settings, Board shell, Color Mixer, and Palette Editor have passed
-target-desktop acceptance. The Theme Generator implementation has not yet been
-accepted on the target desktop. See the [current handoff](docs/current-handoff.md).
+target-desktop acceptance. The Theme Generator's runtime-authored external-plugin
+workflow has passed native KDE Wayland acceptance with user-operated interactions
+and database/export verification. This does not establish physical testing of
+every bundled target plugin. See the [current handoff](docs/current-handoff.md).
 
 ## Build and test
 

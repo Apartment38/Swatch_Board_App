@@ -17,14 +17,19 @@ user-approved replacement for the unsafe physical KWin restart test described
 below.** Phase 2 Board shell also passed physical Board/picker acceptance.
 Phase 3 Color Mixer passed user-reported physical desktop acceptance.
 Phase 4 Palette Editor passed user-reported physical desktop acceptance.
-Phase 5 Theme Generator has an automated implementation checkpoint; its full
-hard gate and physical desktop acceptance remain open. Runtime-authored external
-plugin interaction now has headless egui coverage, not physical desktop proof.
+**Phase 5's runtime-authored external-plugin hard gate passed on the actual native
+KDE Wayland desktop with user-operated GUI interactions**, after fixing palette
+drop consumption and clipped export layout. Database and filesystem readback
+verified saved links/colors, exported bytes, overwrite behavior, and process exit.
+Durable evidence is under `docs/evidence/phase5-physical/`. This is not automated
+native-input coverage or physical testing of every bundled target plugin.
 The template intermediate-allocation defect is addressed by an exec-based,
 resource-limited rendering helper; this is not a filesystem/network sandbox.
-Automated palette-link and PNG-rendering acceptance now passes too.
-The computer backend reports no display, capture, or accessibility connection;
-visual and interactive acceptance requires an available desktop session.
+Automated palette-link and PNG-rendering acceptance also passes. The current
+Computer Use process lacks display environment; a diagnostic with the real KDE
+session environment reaches AT-SPI and portal capture, but the native KWin input
+backend refuses raw target-bound input. The user therefore performed physical
+interactions; supplied screenshots are separately identified as such.
 
 **Phase 1E is accepted under that revised gate.** The settings utility, typed
 configuration, shortcut portal worker, KDE shortcut reassignment, autostart
@@ -635,3 +640,43 @@ RED before the production change and GREEN afterward. Logs are under
 `target/phase5-export-layout-{tests,clippy}.log`. Physical export, overwrite and
 final reopen acceptance still require a relaunch and user verification; the old
 window must be saved/closed before starting the rebuilt executable.
+
+### Physical external-plugin workflow accepted
+
+The user confirmed the repaired export preview became accessible and exported
+successfully. Direct file readback matched:
+
+```text
+surface=#202830
+accent=#46B878
+text=#FFFFFF
+```
+
+With overwrite unchecked, the user reported the expected refusal and the file's
+inode, nanosecond modification time, and SHA-256 remained unchanged. With explicit
+overwrite confirmation, replacement was verified by changed file identity/time
+and unchanged expected bytes. After saving and closing, Board's exact process
+was gone. A final native Wayland relaunch recovered the saved link and submenu;
+the user reopened the saved source palette and project, confirmed the green
+linked state, and closed normally. Final verification found the process absent,
+SQLite integrity `ok`, the saved Accent link intact, the source swatch green,
+and the export still correct.
+
+This satisfies the physical runtime-authored fixture workflow: package creation
+after host build/launch, reload without rebuilding, hidden view interaction,
+history and palette drag sources, direct editing and undo/redo, named links and
+propagation, save/reopen, export preview, overwrite refusal/confirmation and clean
+shutdown. GUI observations are user-reported; the user-supplied screenshot proves
+only its visible state, not the entire interaction sequence. Headless tests and
+file/database assertions remain separately identified.
+
+Durable evidence: `docs/evidence/phase5-physical/acceptance-result.json`, the exact
+fixture data package, verified exported text, and user-supplied linked-theme
+screenshot. Test runtime/logs remain under ignored `target/phase5-physical/`.
+No acceptance Board remains running; no tray/picker or permission grants were
+started for this workflow. Normal user data and settings were not changed.
+
+Remaining development is Phase 6 packaging/documentation/hardening and any broader
+coverage it requires. This acceptance does not claim native automated KWin input,
+new picker accuracy tests, multiple physical displays/scales, or physical runtime
+validation of all bundled Ghostty/Zed/KDE packages. Nothing was pushed.
