@@ -569,3 +569,41 @@ and reload of a newly authored plugin, hidden-scene navigation, real history and
 palette drag sources, role/link editing, save/reopen, export, and native layout.
 Headless PNG meshes and injected egui drag payloads are not physical appearance or
 native input evidence. Do not repeat the disruptive physical KWin restart test.
+
+## Physical Phase 5 acceptance in progress
+
+A native Wayland Board acceptance session uses isolated data under
+`target/phase5-physical/`. The launcher removes DISPLAY and native Wayland
+protocol traffic was verified. The external `physical-fixture` package was
+created after building and launching Board. Synthetic history and a named saved
+palette were seeded through the production storage API for real GUI drag tests;
+these rows are not real picker captures. Normal user data was not modified.
+The user performs physical interactions because cua-driver currently refuses
+safe target-bound KWin raw input. The KWin investigation handoff is saved at
+`/home/erick/Desktop/KWin-Computer-Use-Handoff.md`.
+
+The user reported first-round plugin reload, hidden submenu navigation, history
+drag, role text editing, undo/redo and saving passed. Database readback confirmed
+project `Physical acceptance`, scene `submenu`, and after clarification/re-save
+Accent override `#A344CCFF`.
+
+Second-round palette-to-preview dragging failed physically: the cursor changed
+to a drag indicator but dropping did nothing. Reproduced with a typed palette
+payload and a full pointer-driven drag from the pinned palette. Root cause:
+egui's `take_payload<T>` consumes the payload even when its type mismatches;
+the history-color probe discarded `PaletteDrag` before fallback. The handler
+now inspects payload type before consuming. Added two RED-to-GREEN regressions,
+including real source initiation without payload injection. The harness models
+the pinned panel's production height bounds to keep source coordinates stable.
+
+Integrated verification: 177 workspace/all-targets tests passed (one subprocess
+fixture remains intentionally ignored during normal discovery), strict workspace
+Clippy, formatting, whitespace checks, and debug Board build passed. Logs:
+`target/phase5-palette-drop-{tests,clippy}.log`.
+
+The running acceptance window still uses the previous executable until closed
+and relaunched. Next: user saves/closes that window, relaunch the same isolated
+native session, reopen `Acceptance palette` and the theme, then recheck palette
+drop before continuing link propagation, export, overwrite protection and clean
+close/reopen. The full physical gate is not passed; do not count the automated
+repair as physical verification.

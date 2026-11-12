@@ -751,14 +751,17 @@ fn egui_color(c: Color) -> Color32 {
     Color32::from_rgba_unmultiplied(c.r, c.g, c.b, c.a)
 }
 fn dropped_color(response: &egui::Response) -> Option<Color> {
-    response
-        .dnd_release_payload::<Color>()
-        .map(|c| *c)
-        .or_else(|| {
-            response
-                .dnd_release_payload::<PaletteDrag>()
-                .map(|p| p.color)
-        })
+    // egui clears a taken payload even if its type does not match.
+    // Inspect first so palette drags survive the history-color type check.
+    if response.dnd_hover_payload::<Color>().is_some() {
+        response.dnd_release_payload::<Color>().map(|c| *c)
+    } else if response.dnd_hover_payload::<PaletteDrag>().is_some() {
+        response
+            .dnd_release_payload::<PaletteDrag>()
+            .map(|p| p.color)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -848,6 +851,7 @@ mod tests {
         palette: PaletteEditor,
         text: Vec<(String, Rect)>,
         palette_mode: bool,
+        pinned_on_theme: bool,
         mixer: crate::mixer::Mixer,
         painted_textures: Vec<egui::TextureId>,
     }
@@ -859,6 +863,7 @@ mod tests {
                 palette: PaletteEditor::new(),
                 text: Vec::new(),
                 palette_mode: false,
+                pinned_on_theme: false,
                 mixer: crate::mixer::Mixer::default(),
                 painted_textures: Vec::new(),
             }
@@ -874,8 +879,17 @@ mod tests {
                     ..Default::default()
                 },
                 |ctx| {
-                    if self.palette_mode {
-                        egui::TopBottomPanel::bottom("test_palette").show(ctx, |ui| {
+                    if self.palette_mode || self.pinned_on_theme {
+                        let panel = egui::TopBottomPanel::bottom("test_palette");
+                        let panel = if self.pinned_on_theme {
+                            panel
+                                .default_height(145.0)
+                                .min_height(130.0)
+                                .max_height(220.0)
+                        } else {
+                            panel
+                        };
+                        panel.show(ctx, |ui| {
                             self.palette.pinned_ui(ui, &mut self.mixer);
                         });
                     }
@@ -1023,6 +1037,72 @@ mod tests {
         app.click("Runtime fixture");
         app.link_ink("Accent");
         app
+    }
+
+    #[test]
+    fn palette_payload_is_not_consumed_by_history_type_probe() {
+        isolated(
+            "palette_payload_is_not_consumed_by_history_type_probe",
+            |root| {
+                let mut app = linked_app(root);
+                app.click("Open drawer");
+                let target = app.rect("Hidden title").center();
+                app.frame(vec![
+                    egui::Event::PointerMoved(target),
+                    Headless::pointer(target, true),
+                ]);
+                egui::DragAndDrop::set_payload(
+                    &app.ctx,
+                    PaletteDrag {
+                        index: 0,
+                        color: Color::new(224, 160, 64, 255),
+                    },
+                );
+                app.frame(vec![Headless::pointer(target, false)]);
+                app.frame(vec![]);
+                assert_eq!(
+                    app.editor.project.as_ref().unwrap().assignments.get("ink"),
+                    Some(&Assignment::Override("#E0A040FF".into()))
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn pinned_palette_starts_real_drag_into_theme_preview() {
+        isolated(
+            "pinned_palette_starts_real_drag_into_theme_preview",
+            |root| {
+                let mut app = linked_app(root);
+                app.pinned_on_theme = true;
+                app.editor
+                    .assign("ink", Assignment::Override("#A344CC".into()));
+                app.frame(vec![]);
+                app.click("Open drawer");
+                // Let the newly visible bottom panel settle before measuring drag coordinates.
+                app.frame(vec![]);
+                app.frame(vec![]);
+                let source = app.rect("#ABCDEFFF").center() - egui::vec2(0.0, 40.0);
+                let target = app.rect("Hidden title").center();
+                app.frame(vec![egui::Event::PointerMoved(source)]);
+                app.frame(vec![Headless::pointer(source, true)]);
+                app.frame(vec![egui::Event::PointerMoved(
+                    source + egui::vec2(15.0, -5.0),
+                )]);
+                app.frame(vec![egui::Event::PointerMoved(target)]);
+                assert!(
+                    egui::DragAndDrop::has_payload_of_type::<PaletteDrag>(&app.ctx),
+                    "a real pinned-swatch drag must create the palette payload; source={source:?}, target={target:?}, text={:?}",
+                    app.text
+                );
+                app.frame(vec![Headless::pointer(target, false)]);
+                app.frame(vec![]);
+                assert_eq!(
+                    app.editor.project.as_ref().unwrap().assignments.get("ink"),
+                    Some(&Assignment::Override("#ABCDEFFF".into()))
+                );
+            },
+        );
     }
 
     #[test]
