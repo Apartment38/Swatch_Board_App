@@ -248,6 +248,9 @@ impl Mixer {
                 self.redo();
             }
         });
+        if let Some(error) = &self.error {
+            ui.colored_label(ui.visuals().error_fg_color, error);
+        }
         self.channel_editor(ui);
         egui::ScrollArea::vertical().id_salt("mixer_details").show(ui, |ui| {
             let current = self.state.current;
@@ -321,9 +324,6 @@ impl Mixer {
                 self.error = error;
             }
             ui.small("OKLCH: shortest hue arc from the first chromatic source; achromatic hues ignored. Out-of-gamut RGB channels are clipped. Alpha is weighted independently.");
-            if let Some(error) = &self.error {
-                ui.colored_label(ui.visuals().error_fg_color, error);
-            }
             ui.small("The active palette is pinned below the mixer.");
         });
     }
@@ -470,6 +470,238 @@ pub fn swatch(ui: &mut egui::Ui, color: Color, size: egui::Vec2) -> egui::Respon
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn mixer_frame(
+        mixer: &mut Mixer,
+        ctx: &egui::Context,
+        events: Vec<egui::Event>,
+    ) -> egui::FullOutput {
+        mixer_frame_at(mixer, ctx, events, egui::vec2(960.0, 640.0), 145.0)
+    }
+
+    fn mixer_frame_at(
+        mixer: &mut Mixer,
+        ctx: &egui::Context,
+        events: Vec<egui::Event>,
+        size: egui::Vec2,
+        palette_height: f32,
+    ) -> egui::FullOutput {
+        ctx.run(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                events,
+                ..Default::default()
+            },
+            |ctx| {
+                egui::TopBottomPanel::top("toolbar")
+                    .exact_height(54.0)
+                    .show(ctx, |_| {});
+                egui::TopBottomPanel::bottom("active_palette")
+                    .resizable(true)
+                    .exact_height(palette_height)
+                    .min_height(130.0)
+                    .max_height(220.0)
+                    .show(ctx, |ui| mixer.palette_ui(ui));
+                egui::SidePanel::left("history_sidebar")
+                    .default_width(200.0)
+                    .show(ctx, |_| {});
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    ui.label("Ready. History is saved automatically.");
+                    ui.add_space(8.0);
+                    mixer.ui(ui, Format::HexRgb);
+                });
+            },
+        )
+    }
+
+    fn visible_text_position(output: &egui::FullOutput, label: &str) -> Option<egui::Pos2> {
+        output.shapes.iter().find_map(|shape| {
+            if let egui::Shape::Text(text) = &shape.shape
+                && text.galley.text() == label
+            {
+                let bounds = egui::Rect::from_min_size(text.pos, text.galley.size());
+                if shape.clip_rect.contains(bounds.center()) {
+                    return Some(bounds.center());
+                }
+            }
+            None
+        })
+    }
+
+    fn complete_text_visible(output: &egui::FullOutput, label: &str) -> bool {
+        output.shapes.iter().any(|shape| {
+            if let egui::Shape::Text(text) = &shape.shape {
+                text.galley.text() == label
+                    && shape
+                        .clip_rect
+                        .contains_rect(egui::Rect::from_min_size(text.pos, text.galley.size()))
+            } else {
+                false
+            }
+        })
+    }
+
+    fn mixer_click(mixer: &mut Mixer, ctx: &egui::Context, pos: egui::Pos2) -> egui::FullOutput {
+        let mut output = egui::FullOutput::default();
+        for pressed in [true, false] {
+            output = mixer_frame(
+                mixer,
+                ctx,
+                vec![
+                    egui::Event::PointerMoved(pos),
+                    egui::Event::PointerButton {
+                        pos,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+            );
+        }
+        output
+    }
+
+    #[test]
+    fn invalid_apply_has_visible_feedback_in_default_board_layout() {
+        let mut mixer = Mixer::default();
+        let initial = mixer.state.current;
+        let ctx = egui::Context::default();
+        mixer_frame(&mut mixer, &ctx, vec![]);
+        let output = mixer_frame(&mut mixer, &ctx, vec![]);
+        let field = visible_text_position(&output, "#247AC3FF").expect("HEX field visible");
+        mixer_click(&mut mixer, &ctx, field);
+        mixer_frame(
+            &mut mixer,
+            &ctx,
+            vec![
+                egui::Event::Key {
+                    key: egui::Key::A,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: egui::Modifiers::COMMAND,
+                },
+                egui::Event::Key {
+                    key: egui::Key::A,
+                    physical_key: None,
+                    pressed: false,
+                    repeat: false,
+                    modifiers: egui::Modifiers::COMMAND,
+                },
+                egui::Event::Text("not-a-color".into()),
+            ],
+        );
+        assert_eq!(
+            mixer.fields[0], "not-a-color",
+            "actual field editing is retained"
+        );
+        let output = mixer_frame(&mut mixer, &ctx, vec![]);
+        let apply = visible_text_position(&output, "Apply").expect("HEX Apply visible");
+        mixer_click(&mut mixer, &ctx, apply);
+        let output = mixer_frame(&mut mixer, &ctx, vec![]);
+        assert_eq!(mixer.state.current, initial);
+        assert!(mixer.undo.is_empty());
+        let error = mixer
+            .error
+            .as_deref()
+            .expect("Apply processes invalid input")
+            .to_owned();
+        assert!(
+            complete_text_visible(&output, &error),
+            "Apply must show its complete error without requiring an unrelated scroll"
+        );
+        for size in [egui::vec2(960.0, 640.0), egui::vec2(540.0, 360.0)] {
+            for palette_height in [145.0, 220.0] {
+                mixer_frame_at(&mut mixer, &ctx, vec![], size, palette_height);
+                let output = mixer_frame_at(&mut mixer, &ctx, vec![], size, palette_height);
+                assert!(
+                    complete_text_visible(&output, &error),
+                    "complete error visible at {size:?}, palette height {palette_height}"
+                );
+            }
+        }
+    }
+
+    fn mixer_key(mixer: &mut Mixer, ctx: &egui::Context, key: egui::Key) {
+        mixer_frame(
+            mixer,
+            ctx,
+            vec![true, false]
+                .into_iter()
+                .map(|pressed| egui::Event::Key {
+                    key,
+                    physical_key: None,
+                    pressed,
+                    repeat: false,
+                    modifiers: egui::Modifiers::NONE,
+                })
+                .collect(),
+        );
+    }
+
+    fn activate_mixer_button(mixer: &mut Mixer, ctx: &egui::Context, label: &str, keyboard: bool) {
+        let output = mixer_frame(mixer, ctx, vec![]);
+        let target = visible_text_position(&output, label).expect("button label visible");
+        if keyboard {
+            for _ in 0..120 {
+                let focused = ctx
+                    .memory(|memory| memory.focused())
+                    .and_then(|id| ctx.read_response(id));
+                if focused.is_some_and(|response| response.rect.contains(target)) {
+                    mixer_key(mixer, ctx, egui::Key::Enter);
+                    return;
+                }
+                mixer_key(mixer, ctx, egui::Key::Tab);
+            }
+            panic!("keyboard could not reach {label}");
+        } else {
+            mixer_click(mixer, ctx, target);
+        }
+    }
+
+    #[test]
+    fn actual_apply_undo_redo_work_with_pointer_and_keyboard_for_changed_color() {
+        for keyboard in [false, true] {
+            let mut mixer = Mixer::default();
+            let initial = mixer.state.current;
+            let changed = Color::new(224, 108, 117, 255);
+            assert_ne!(initial, changed);
+            let ctx = egui::Context::default();
+            mixer_frame(&mut mixer, &ctx, vec![]);
+            let output = mixer_frame(&mut mixer, &ctx, vec![]);
+            let field = visible_text_position(&output, "#247AC3FF").expect("HEX field visible");
+            mixer_click(&mut mixer, &ctx, field);
+            mixer_frame(
+                &mut mixer,
+                &ctx,
+                vec![
+                    egui::Event::Key {
+                        key: egui::Key::A,
+                        physical_key: None,
+                        pressed: true,
+                        repeat: false,
+                        modifiers: egui::Modifiers::COMMAND,
+                    },
+                    egui::Event::Key {
+                        key: egui::Key::A,
+                        physical_key: None,
+                        pressed: false,
+                        repeat: false,
+                        modifiers: egui::Modifiers::COMMAND,
+                    },
+                    egui::Event::Text("#E06C75FF".into()),
+                ],
+            );
+            assert_eq!(mixer.fields[0], "#E06C75FF");
+            activate_mixer_button(&mut mixer, &ctx, "Apply", keyboard);
+            assert_eq!(mixer.state.current, changed, "Apply keyboard={keyboard}");
+            assert!(mixer.error.is_none());
+            activate_mixer_button(&mut mixer, &ctx, "Undo", keyboard);
+            assert_eq!(mixer.state.current, initial, "Undo keyboard={keyboard}");
+            activate_mixer_button(&mut mixer, &ctx, "Redo", keyboard);
+            assert_eq!(mixer.state.current, changed, "Redo keyboard={keyboard}");
+        }
+    }
 
     #[test]
     fn spectrum_click_changes_hue_and_saturation_without_changing_value() {

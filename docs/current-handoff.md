@@ -203,10 +203,29 @@ Tab/Shift+Tab traversal, Enter/Space activation of all three Board tabs, and
 keyboard toggling of Color history off/on. These are user-reported physical
 results, not native automated input assertions or a full accessibility audit.
 Durable summary: `evidence/phase6-packaging/physical-keyboard.json`.
-The packaged Board remains open. Next round covers invalid/valid HEX entry,
-keyboard Undo/Redo, and opening Settings through the keyboard; leave Settings
-open for the next resource sample. Computer Use capture returned no display
-connection. A 10.001-second initial
+The user subsequently reported keyboard navigation working but Apply, Undo and
+Redo appearing ineffective with keyboard and mouse; Settings opened. This second
+round is **failed/pending corrected-build retest**, not accepted. An input-driven
+regression at the default Board geometry reproduced invalid Apply being processed
+while its diagnostic was below the clipped scroll area. Moving Mixer errors above
+the scrolling details made that test go RED-to-GREEN. A separate characterization
+test edits the real text field and activates Apply/Undo/Redo through mouse and
+Tab/Enter for a changed color; both paths pass. The originally prescribed valid
+value `#247AC3FF` equals the default Mixer color and need not produce an undo
+entry. That test-design flaw does not establish all physical symptoms are fixed.
+
+Full workspace build/all-target tests passed (180 passed, one ignored), strict
+Clippy, formatting, whitespace and release build passed. A corrected release build
+is staged under `target/phase6-physical/retest-stage/`; its SHA-256 is recorded in
+`physical-keyboard.json`. It is not the previous Arch package; recipe pin/package
+refresh remains necessary after acceptance. The old Board and Settings remain
+open; request normal close of both, verify exact PID cleanup, then relaunch using
+the corrected stage with the same isolated data. Retest invalid Apply feedback,
+valid `#E06C75FF`, Undo and Redo with keyboard and mouse. Settings PID 8925 was
+measured idle over 10.001874 seconds: PSS 32,092 KiB, private clean+dirty 27,356 KiB,
+10,073,549 ns CPU and 75 scheduled runs across 15 stable endpoint threads. The raw
+sample is `target/phase6-physical/settings-idle.json`; the same sampling limitations
+apply. Computer Use capture returned no display connection. A 10.001-second initial
 Board idle sample measured 37,229 KiB PSS, 31,364 KiB private clean+dirty memory,
 and 6,608,746 ns CPU / 161 scheduled runs across 15 stable endpoint threads.
 Scheduled runs are not wakeups, short-lived intervening threads cannot be

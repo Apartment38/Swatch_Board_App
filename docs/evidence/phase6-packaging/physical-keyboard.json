@@ -12,6 +12,26 @@
     "keyboard_color_history_toggle_off_and_on": "passed",
     "scope": "Only the assigned first round; not general screen-reader or complete keyboard accessibility acceptance"
   },
+  "round_2": {
+    "evidence_type": "user-reported physical interactions",
+    "user_report": "Keyboard navigation is working. Activating Apply, Undo, and Redo buttons does not do anything; mouse clicks also appear ineffective. Settings is open.",
+    "status": "failed-pending-retest",
+    "investigation": "Input-driven regression reproduced invalid Apply being processed while its error text was clipped below the scroll area. Error placement was repaired. Separate real field/pointer/Tab/Enter tests pass Apply/Undo/Redo using a changed color. Original valid test value #247AC3FF equalled the default and did not require a new undo entry; this does not disprove the user's physical report.",
+    "next_valid_test_color": "#E06C75FF",
+    "automated_repair_checks": "180 workspace tests passed, 1 ignored; strict Clippy, formatting, debug/release build passed. Physical corrected-build acceptance is not yet passed.",
+    "retest_binary_sha256": "e30d70e77e53ee66ded15ed4f84bf7927360c80adfebe68d79309f298a5e4551",
+    "retest_binary": "target/phase6-physical/retest-stage/usr/bin/swatch-board",
+    "artifact_note": "Retest is a newly built release executable, not the previous Arch package. The previous recipe/source pin and distributed local package do not yet include this repair."
+  },
+  "settings_idle_sample": {
+    "elapsed_seconds": 10.00187395500052,
+    "pss_kib": 32092,
+    "private_clean_dirty_kib": 27356,
+    "stable_threads": 15,
+    "stable_thread_cpu_ns": 10073549,
+    "stable_thread_scheduled_runs": 75,
+    "limitations": "One sample with diagnostics enabled, no tray on private session bus; endpoint sampling; scheduled runs are not wakeups"
+  },
   "initial_board_idle_sample": {
     "elapsed_seconds": 10.001137118000031,
     "pss_kib": 37229,
