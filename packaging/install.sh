@@ -5,7 +5,7 @@ set -euo pipefail
 if [[ ${1:-} == --help ]]; then
     printf '%s\n' 'Usage: PREFIX=/usr/local DESTDIR=/tmp/stage BINDIR=target/release bash packaging/install.sh' \
         'PREFIX is the absolute installation prefix; DESTDIR is an optional absolute staging root.' \
-        'BINDIR is the directory containing the five already-built executables (default: target/release).'
+        'BINDIR is the directory containing the six already-built executables (default: target/release).'
     exit 0
 fi
 if (( $# != 0 )); then
@@ -33,7 +33,7 @@ while [[ $prefix != / && $prefix == */ ]]; do prefix=${prefix%/}; done
 while [[ $destdir != / && $destdir == */ ]]; do destdir=${destdir%/}; done
 [[ $destdir == / ]] && destdir=''
 
-for binary in swatch-board-picker swatch-board-tray swatch-board-history swatch-board-config swatch-board; do
+for binary in swatch-board-picker swatch-board-tray swatch-board-history swatch-board-config swatch-board swatch-board-theme-worker; do
     [[ -f $bindir/$binary && -x $bindir/$binary ]] || {
         printf 'Missing executable: %s\n' "$bindir/$binary" >&2
         exit 1
@@ -42,7 +42,7 @@ done
 
 install -d "$destdir$prefix/bin" "$destdir$prefix/share/applications" \
     "$destdir$prefix/share/icons/hicolor/scalable/apps"
-for binary in swatch-board-picker swatch-board-tray swatch-board-history swatch-board-config swatch-board; do
+for binary in swatch-board-picker swatch-board-tray swatch-board-history swatch-board-config swatch-board swatch-board-theme-worker; do
     install -m 755 "$bindir/$binary" "$destdir$prefix/bin/$binary"
 done
 install -m 644 "$root/share/icons/hicolor/scalable/apps/org.apartment38.SwatchBoard.svg" \

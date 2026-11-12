@@ -20,8 +20,9 @@ Phase 4 Palette Editor passed user-reported physical desktop acceptance.
 Phase 5 Theme Generator has an automated implementation checkpoint; its full
 hard gate and physical desktop acceptance remain open. Runtime-authored external
 plugin interaction now has headless egui coverage, not physical desktop proof.
-Template intermediate memory allocations are not contained, so third-party
-untrusted-template safety is also an explicit remaining blocker.
+The template intermediate-allocation defect is addressed by an exec-based,
+resource-limited rendering helper; this is not a filesystem/network sandbox.
+Automated palette-link and PNG-rendering acceptance now passes too.
 The computer backend reports no display, capture, or accessibility connection;
 visual and interactive acceptance requires an available desktop session.
 
@@ -497,7 +498,7 @@ Local verification logs are ignored under `target/phase5-{workspace-tests,clippy
 No native app was launched, no live themes were applied, no normal desktop
 settings/history were changed, and no commits were pushed.
 
-### Remaining Phase 5 gates and next work
+### Remaining gates at the initial checkpoint (superseded below)
 
 **Security first:** MiniJinja fuel and output size limits do not contain
 intermediate allocations. A reviewed probe captured an 8 MiB string inside a
@@ -513,3 +514,58 @@ sources, layout, save/reopen, and export). The full Phase 5 hard gate has **not*
 passed. Do not advance to declaring Phase 6 complete or repeat disruptive KWin
 restart testing. Per-file export is atomic; a multi-file export is not a
 transaction and can leave earlier files written on later failure.
+
+## Phase 5 rendering containment and link/asset checkpoint
+
+`Plugin::render` now launches a fresh sibling `swatch-board-theme-worker`
+executable for each request, with no shell or in-process fallback. Before reading
+request data the worker sets RLIMIT_AS to 64 MiB, RLIMIT_CPU to two seconds, and
+RLIMIT_CORE to zero. The parent enforces a three-second wall deadline, exchanges
+bounded data over nonblocking duplex pipes, and kills/waits on errors. Requests
+and responses are capped at 16 MiB each; results are revalidated against declared
+outputs and limited to 4 MiB per file and 8 MiB aggregate. The worker receives
+validated template/role data, clears its environment, and uses `/` as its cwd.
+This is resource containment, not filesystem/network sandboxing; ordinary OS
+permissions remain. Large otherwise-valid packages can exceed these budgets.
+
+The installer now requires and stages six executables, including the helper,
+and does not create a desktop launcher for the helper. Build the whole workspace
+before running tests; a standalone package test on a fresh target directory may
+otherwise report that the sibling helper is missing. No unsafe fallback exists.
+
+Five new headless tests cover named saved-palette links and propagation, saved
+source identity/rebinding, undo/redo, rename/removal errors without assignment
+loss, independent overrides, stale-preview rejection, PNG texture/image meshes,
+and corrupt asset rejection/reload recovery. A reproduced bug where linked
+editable text kept the old color after palette propagation is fixed; unfocused
+linked text refreshes without overwriting active typing.
+
+Parent verification of the integrated checkpoint:
+
+- Full offline locked workspace debug build passed.
+- Full offline locked workspace/all-targets tests: 175 passed, one ignored
+  subprocess fixture. Supervision tests explicitly invoke that fixture.
+- Strict workspace/all-targets Clippy, workspace formatting, and whitespace checks passed.
+- Two Python installer regression tests passed (synthetic executable fixtures;
+  these are contract tests, not runtime application acceptance).
+- An actual isolated staged installation contained all six executables, and its
+  installed helper rendered the installed Ghostty package successfully.
+- Release helper build passed. A 64 MiB intermediate-allocation attack exited with
+  SIGABRT under its limit, emitted no protocol output, and a subsequent normal
+  release-helper render passed. Debug parent-side regression verifies the caller
+  survives the failed render and can render again.
+- Timeout, stalled input, oversized output, simultaneous duplex traffic, missing
+  executable, protocol validation, resource-limit initialization, and child-reaping
+  checks passed in the Rust tests.
+
+Local logs: `target/phase5-isolation-{build,tests,clippy,release-worker}.log`.
+No native apps launched, no live themes applied, no normal history/settings
+changed, and no pushes performed.
+
+### Next gate
+
+The full Phase 5 hard gate still requires physical KDE acceptance: runtime install
+and reload of a newly authored plugin, hidden-scene navigation, real history and
+palette drag sources, role/link editing, save/reopen, export, and native layout.
+Headless PNG meshes and injected egui drag payloads are not physical appearance or
+native input evidence. Do not repeat the disruptive physical KWin restart test.

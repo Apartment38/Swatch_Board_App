@@ -17,6 +17,7 @@ const DATA_LIMIT: usize = 1024 * 1024;
 const ASSET_LIMIT: usize = 4 * 1024 * 1024;
 const OUTPUT_LIMIT: usize = 4 * 1024 * 1024;
 const MAX_OUTPUTS: usize = 32;
+mod isolation;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -103,7 +104,8 @@ pub struct PluginMetadata {
     pub manifest: Manifest,
     pub path: PathBuf,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RenderedFile {
     pub path: String,
     pub content: String,
@@ -502,51 +504,65 @@ impl Plugin {
     }
     pub fn render(&self, values: &BTreeMap<String, String>) -> Result<Vec<RenderedFile>, String> {
         let roles = self.resolve(values)?;
-        let mut env = minijinja::Environment::new();
-        env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
-        env.set_fuel(Some(100_000));
-        env.set_keep_trailing_newline(true);
-        env.add_filter("hex", |s: String| -> Result<String, minijinja::Error> {
-            color(&s, true)
-                .map_err(|e| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e))
-        });
-        env.add_filter(
-            "hex_no_hash",
-            |s: String| -> Result<String, minijinja::Error> {
-                color(&s, true)
-                    .map(|c| c[1..].to_owned())
-                    .map_err(|e| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e))
-            },
-        );
-        env.add_filter("rgb_csv", |s: String| -> Result<String, minijinja::Error> {
-            let c = color(&s, true)
-                .map_err(|e| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e))?;
-            Ok(format!(
-                "{},{},{}",
-                u8::from_str_radix(&c[1..3], 16).unwrap(),
-                u8::from_str_radix(&c[3..5], 16).unwrap(),
-                u8::from_str_radix(&c[5..7], 16).unwrap()
-            ))
-        });
-        for (name, text) in &self.templates {
-            env.add_template(name, text).map_err(|e| e.to_string())?;
-        }
-        let mut result = Vec::new();
-        for o in &self.manifest.outputs {
-            let mut out = LimitedWriter(Vec::new());
-            env.get_template(&o.template)
-                .map_err(|e| e.to_string())?
-                .render_captured_to(minijinja::context! { roles => &roles }, &mut out)
-                .map_err(|e| format!("{}: {e}", o.path))?;
-            let content = String::from_utf8(out.0).map_err(|e| e.to_string())?;
-            validate_output(&o.format, &content)?;
-            result.push(RenderedFile {
-                path: o.path.clone(),
-                content,
-            });
-        }
-        Ok(result)
+        validate_manifest(&self.manifest)?;
+        isolation::render(&self.manifest.outputs, &self.templates, roles)
     }
+}
+
+// Only the exec'd, resource-limited worker calls this implementation.
+fn render_contained(request: &isolation::Request) -> Result<Vec<RenderedFile>, String> {
+    let roles = &request.roles;
+    let mut env = minijinja::Environment::new();
+    env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
+    env.set_fuel(Some(100_000));
+    env.set_keep_trailing_newline(true);
+    env.add_filter("hex", |s: String| -> Result<String, minijinja::Error> {
+        color(&s, true)
+            .map_err(|e| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e))
+    });
+    env.add_filter(
+        "hex_no_hash",
+        |s: String| -> Result<String, minijinja::Error> {
+            color(&s, true)
+                .map(|c| c[1..].to_owned())
+                .map_err(|e| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e))
+        },
+    );
+    env.add_filter("rgb_csv", |s: String| -> Result<String, minijinja::Error> {
+        let c = color(&s, true)
+            .map_err(|e| minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e))?;
+        Ok(format!(
+            "{},{},{}",
+            u8::from_str_radix(&c[1..3], 16).unwrap(),
+            u8::from_str_radix(&c[3..5], 16).unwrap(),
+            u8::from_str_radix(&c[5..7], 16).unwrap()
+        ))
+    });
+    for (name, text) in &request.templates {
+        env.add_template(name, text).map_err(|e| e.to_string())?;
+    }
+    let mut result = Vec::new();
+    for o in &request.outputs {
+        let mut out = LimitedWriter(Vec::new());
+        env.get_template(&o.template)
+            .map_err(|e| e.to_string())?
+            .render_captured_to(minijinja::context! { roles => &roles }, &mut out)
+            .map_err(|e| format!("{}: {e}", o.path))?;
+        let content = String::from_utf8(out.0).map_err(|e| e.to_string())?;
+        validate_output(&o.format, &content)?;
+        result.push(RenderedFile {
+            path: o.path.clone(),
+            content,
+        });
+    }
+    Ok(result)
+}
+
+/// Entrypoint for the packaged helper only. Never call from the host process:
+/// this lowers process-wide hard resource limits before reading any input.
+#[doc(hidden)]
+pub fn theme_worker_main() -> Result<(), String> {
+    isolation::worker_main()
 }
 struct LimitedWriter(Vec<u8>);
 impl Write for LimitedWriter {
@@ -830,6 +846,22 @@ mod tests {
                 assert_eq!(fs::read_dir(&t.0).unwrap().count(), 3);
             }
         }
+    }
+    #[test]
+    fn intermediate_allocation_is_contained_and_next_render_succeeds() {
+        let t = Temp::new();
+        // Finite 64 MiB RED probe: never use an unbounded allocation in the caller.
+        t.fixture("{% set hidden = 'x' * 67108864 %}background = #123456\n");
+        let result = load(&t.0).unwrap().render(&BTreeMap::new());
+        assert!(
+            result.is_err(),
+            "intermediate allocation escaped containment"
+        );
+        t.fixture("background = {{ roles.background }}\n");
+        assert_eq!(
+            load(&t.0).unwrap().render(&BTreeMap::new()).unwrap()[0].content,
+            "background = #123456\n"
+        );
     }
     #[test]
     fn rejects_unbounded_templates_and_invalid_output() {

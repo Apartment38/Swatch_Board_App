@@ -600,13 +600,23 @@ impl ThemeEditor {
                                 .get(&role.id)
                                 .cloned()
                                 .unwrap_or_else(|| role.default.clone());
+                            let edit_id = ui.make_persistent_id(("role_color", &role.id));
+                            if matches!(
+                                project.assignments.get(&role.id),
+                                Some(Assignment::Link(_))
+                            ) && !ui.memory(|memory| memory.has_focus(edit_id))
+                            {
+                                // Linked values are live; do not retain a stale editable snapshot.
+                                // Preserve text while the user is actively entering an override.
+                                self.edits.remove(&role.id);
+                            }
                             let edit = self.edits.entry(role.id.clone()).or_insert_with(|| {
                                 current
                                     .parse::<Color>()
                                     .map(|c| c.format(format))
                                     .unwrap_or(current)
                             });
-                            let response = ui.text_edit_singleline(edit);
+                            let response = ui.add(egui::TextEdit::singleline(edit).id(edit_id));
                             if response.lost_focus()
                                 && ui.input(|i| i.key_pressed(egui::Key::Enter))
                             {
@@ -837,6 +847,9 @@ mod tests {
         editor: ThemeEditor,
         palette: PaletteEditor,
         text: Vec<(String, Rect)>,
+        palette_mode: bool,
+        mixer: crate::mixer::Mixer,
+        painted_textures: Vec<egui::TextureId>,
     }
     impl Headless {
         fn new() -> Self {
@@ -845,6 +858,9 @@ mod tests {
                 editor: ThemeEditor::new(),
                 palette: PaletteEditor::new(),
                 text: Vec::new(),
+                palette_mode: false,
+                mixer: crate::mixer::Mixer::default(),
+                painted_textures: Vec::new(),
             }
         }
         fn frame(&mut self, events: Vec<egui::Event>) {
@@ -858,8 +874,18 @@ mod tests {
                     ..Default::default()
                 },
                 |ctx| {
-                    egui::CentralPanel::default()
-                        .show(ctx, |ui| self.editor.ui(ui, &self.palette, Format::HexRgba));
+                    if self.palette_mode {
+                        egui::TopBottomPanel::bottom("test_palette").show(ctx, |ui| {
+                            self.palette.pinned_ui(ui, &mut self.mixer);
+                        });
+                    }
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        if self.palette_mode {
+                            self.palette.ui(ui, &mut self.mixer);
+                        } else {
+                            self.editor.ui(ui, &self.palette, Format::HexRgba);
+                        }
+                    });
                 },
             );
             fn collect(shape: egui::epaint::Shape, text: &mut Vec<(String, Rect)>) {
@@ -877,9 +903,32 @@ mod tests {
                 }
             }
             self.text.clear();
+            self.painted_textures.clear();
             for shape in output.shapes {
+                if let egui::epaint::Shape::Mesh(mesh) = &shape.shape {
+                    self.painted_textures.push(mesh.texture_id);
+                }
                 collect(shape.shape, &mut self.text);
             }
+        }
+        fn palette_tab(&mut self, active: bool) {
+            self.palette_mode = active;
+            self.frame(vec![]);
+            self.frame(vec![]);
+        }
+        fn edit(&mut self, current: &str, replacement: &str) {
+            self.click(current);
+            self.replace_focused(replacement);
+            self.enter();
+        }
+        fn link_ink(&mut self, name: &str) {
+            // Ink is the second role; rect() deliberately chooses the last matching label.
+            self.click("Default");
+            self.click(name);
+            assert_eq!(
+                self.editor.project.as_ref().unwrap().assignments.get("ink"),
+                Some(&Assignment::Link(name.into()))
+            );
         }
         fn rect(&self, label: &str) -> Rect {
             self.text
@@ -946,6 +995,312 @@ mod tests {
             self.frame(vec![Self::pointer(pos, false)]);
             self.frame(vec![]);
         }
+    }
+
+    fn linked_app(root: &std::path::Path) -> Headless {
+        install_package(root);
+        let mut repo = swatch_board_storage::PaletteRepository::open_default().unwrap();
+        let saved = repo
+            .save_named(
+                None,
+                "Named source",
+                &[swatch_board_storage::Rgba8 {
+                    r: 171,
+                    g: 205,
+                    b: 239,
+                    a: 255,
+                }],
+                &[false],
+                &["Accent".into()],
+            )
+            .unwrap();
+        let mut app = Headless::new();
+        app.palette_tab(true);
+        app.click("Named source");
+        assert_eq!(app.palette.theme_palette().0, Some(saved.id.as_str()));
+        app.palette_tab(false);
+        app.click("Select plugin");
+        app.click("Runtime fixture");
+        app.link_ink("Accent");
+        app
+    }
+
+    #[test]
+    fn named_palette_link_propagates_and_survives_theme_undo_redo_and_reopen() {
+        isolated(
+            "named_palette_link_propagates_and_survives_theme_undo_redo_and_reopen",
+            |root| {
+                let mut app = linked_app(root);
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#ABCDEF");
+                app.click("Undo");
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#445566");
+                app.click("Redo");
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#ABCDEF");
+                app.click("Save project");
+                let saved_id = app.editor.project.as_ref().unwrap().id.clone();
+                app.click("Preview export");
+                assert_eq!(
+                    app.editor.preview[0].content,
+                    "ink=#ABCDEF\nsurface=#112233\n"
+                );
+
+                app.palette_tab(true);
+                app.edit("#ABCDEFFF", "#102030");
+                app.click("Save palette");
+                let source_id = app.palette.theme_palette().0.unwrap().to_owned();
+                let stored = swatch_board_storage::PaletteRepository::open_default()
+                    .unwrap()
+                    .list()
+                    .unwrap()
+                    .into_iter()
+                    .find(|palette| palette.id == source_id)
+                    .unwrap();
+                assert_eq!(stored.swatch_names, vec!["Accent"]);
+                assert_eq!(
+                    stored.colors,
+                    vec![swatch_board_storage::Rgba8 {
+                        r: 16,
+                        g: 32,
+                        b: 48,
+                        a: 255,
+                    }]
+                );
+                app.palette_tab(false);
+                // Links follow named swatches, not snapshots of their color at assignment time.
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#102030");
+                assert_eq!(
+                    app.editor.edits["ink"], "#102030FF",
+                    "the linked role's editable text must follow the displayed swatch"
+                );
+                assert_eq!(ThemeEditor::new().project, app.editor.project);
+                // A preview from before propagation must never write stale bytes.
+                let export = root.join("linked-export");
+                fs::create_dir(&export).unwrap();
+                app.editor.output_dir = export.to_str().unwrap().into();
+                app.frame(vec![]);
+                app.click("Export previewed files");
+                assert_eq!(
+                    app.editor.error.as_deref(),
+                    Some("Palette changed; preview export again.")
+                );
+                assert!(app.editor.preview.is_empty());
+                assert!(!export.join("example.txt").exists());
+                app.click("Preview export");
+                assert_eq!(
+                    app.editor.preview[0].content,
+                    "ink=#102030\nsurface=#112233\n"
+                );
+                app.click("Export previewed files");
+                assert!(app.editor.error.is_none(), "{:?}", app.editor.error);
+                assert_eq!(
+                    fs::read_to_string(export.join("example.txt")).unwrap(),
+                    "ink=#102030\nsurface=#112233\n"
+                );
+                app.click("Open a project");
+                app.click("Runtime fixture theme");
+                assert_eq!(app.editor.project.as_ref().unwrap().id, saved_id);
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#102030");
+            },
+        );
+    }
+
+    #[test]
+    fn links_require_saved_source_identity_and_explicit_palette_rebinding_is_undoable() {
+        isolated(
+            "links_require_saved_source_identity_and_explicit_palette_rebinding_is_undoable",
+            |root| {
+                let mut app = linked_app(root);
+                let source = app.editor.project.as_ref().unwrap().palette_id.clone();
+                app.palette_tab(true);
+                app.click("Duplicate as draft");
+                assert!(app.palette.theme_palette().0.is_none());
+                app.palette_tab(false);
+                assert_eq!(
+                    app.editor.resolved(&app.palette).unwrap_err(),
+                    "Open the project's saved source palette before resolving links"
+                );
+                // Identical names/colors in an unsaved draft are not the saved source.
+                app.click("Use active palette");
+                assert!(app.editor.project.as_ref().unwrap().palette_id.is_none());
+                assert!(app.editor.resolved(&app.palette).is_err());
+                app.click("Undo");
+                assert_eq!(app.editor.project.as_ref().unwrap().palette_id, source);
+                app.palette_tab(true);
+                app.click("Save palette");
+                let duplicate = app.palette.theme_palette().0.unwrap().to_owned();
+                assert_ne!(Some(duplicate.clone()), source);
+                app.palette_tab(false);
+                assert!(app.editor.resolved(&app.palette).is_err());
+                app.click("Use active palette");
+                assert_eq!(
+                    app.editor.project.as_ref().unwrap().palette_id,
+                    Some(duplicate)
+                );
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#ABCDEF");
+                app.click("Undo");
+                assert_eq!(app.editor.project.as_ref().unwrap().palette_id, source);
+                assert!(app.editor.resolved(&app.palette).is_err());
+                app.click("Redo");
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#ABCDEF");
+                app.palette_tab(true);
+                app.click("Named source");
+                app.palette_tab(false);
+                assert!(app.editor.resolved(&app.palette).is_err());
+                app.click("Undo");
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#ABCDEF");
+            },
+        );
+    }
+
+    #[test]
+    fn linked_swatch_rename_and_removal_fail_closed_without_losing_assignment() {
+        isolated(
+            "linked_swatch_rename_and_removal_fail_closed_without_losing_assignment",
+            |root| {
+                let mut app = linked_app(root);
+                let assignments = app.editor.project.as_ref().unwrap().assignments.clone();
+                app.palette_tab(true);
+                app.edit("Accent", "Renamed");
+                app.click("Save palette");
+                app.palette_tab(false);
+                assert_eq!(
+                    app.editor.resolved(&app.palette).unwrap_err(),
+                    "Linked palette swatch 'Accent' is missing"
+                );
+                app.click("Preview export");
+                assert!(app.editor.preview.is_empty());
+                assert!(
+                    app.editor
+                        .error
+                        .as_ref()
+                        .unwrap()
+                        .contains("'Accent' is missing")
+                );
+                assert_eq!(
+                    app.editor.project.as_ref().unwrap().assignments,
+                    assignments
+                );
+                app.palette_tab(true);
+                app.click("Undo");
+                app.palette_tab(false);
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#ABCDEF");
+
+                app.palette_tab(true);
+                // Hover the pinned swatch, then use its actual Delete overlay.
+                let color_rect = app.rect("#ABCDEFFF");
+                app.frame(vec![egui::Event::PointerMoved(egui::pos2(
+                    color_rect.center().x,
+                    color_rect.top() - 25.0,
+                ))]);
+                let delete = app
+                    .text
+                    .iter()
+                    .filter(|(label, _)| label == "Delete")
+                    .max_by(|a, b| a.1.center().y.total_cmp(&b.1.center().y))
+                    .unwrap()
+                    .1;
+                app.click_at(delete.center());
+                assert!(app.palette.theme_palette().2.is_empty());
+                app.palette_tab(false);
+                assert_eq!(
+                    app.editor.resolved(&app.palette).unwrap_err(),
+                    "Linked palette swatch 'Accent' is missing"
+                );
+                assert_eq!(
+                    app.editor.project.as_ref().unwrap().assignments,
+                    assignments
+                );
+                app.palette_tab(true);
+                app.click("Undo");
+                app.palette_tab(false);
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#ABCDEF");
+            },
+        );
+    }
+
+    #[test]
+    fn override_remains_independent_of_source_changes_and_source_deletion() {
+        isolated(
+            "override_remains_independent_of_source_changes_and_source_deletion",
+            |root| {
+                let mut app = linked_app(root);
+                app.edit("#ABCDEFFF", "#556677");
+                assert_eq!(
+                    app.editor.project.as_ref().unwrap().assignments["ink"],
+                    Assignment::Override("#556677FF".into())
+                );
+                app.click("Undo");
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#ABCDEF");
+                app.click("Redo");
+                app.palette_tab(true);
+                app.edit("#ABCDEFFF", "#998877");
+                app.edit("Accent", "Different name");
+                app.click("Save palette");
+                app.palette_tab(false);
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#556677");
+                app.palette_tab(true);
+                app.click("Delete");
+                app.click("Confirm delete");
+                assert!(app.palette.theme_palette().0.is_none());
+                app.palette_tab(false);
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#556677");
+                app.click("Undo");
+                assert_eq!(
+                    app.editor.resolved(&app.palette).unwrap_err(),
+                    "Open the project's saved source palette before resolving links"
+                );
+                app.click("Redo");
+                assert_eq!(app.editor.resolved(&app.palette).unwrap()["ink"], "#556677");
+            },
+        );
+    }
+
+    #[test]
+    fn runtime_png_asset_is_painted_and_reload_recovers_from_corrupt_asset() {
+        isolated(
+            "runtime_png_asset_is_painted_and_reload_recovers_from_corrupt_asset",
+            |root| {
+                install_package(root);
+                let package = root.join("data/swatch-board/plugins/runtime-fixture");
+                fs::create_dir(package.join("assets")).unwrap();
+                let asset = package.join("assets/pixel.png");
+                let pixel = image::RgbaImage::from_pixel(2, 3, image::Rgba([20, 80, 160, 255]));
+                pixel.save(&asset).unwrap();
+                let scene_path = package.join("scenes.json");
+                let mut scenes: serde_json::Value =
+                    serde_json::from_slice(&fs::read(&scene_path).unwrap()).unwrap();
+                scenes[0]["nodes"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(serde_json::json!({
+                        "id":"picture", "kind":"image", "rect":[220,20,100,100],
+                        "asset":"assets/pixel.png"
+                    }));
+                fs::write(&scene_path, serde_json::to_vec(&scenes).unwrap()).unwrap();
+                let mut app = Headless::new();
+                app.frame(vec![]);
+                app.click("Select plugin");
+                app.click("Runtime fixture");
+                assert!(app.editor.error.is_none(), "{:?}", app.editor.error);
+                let texture = &app.editor.textures["assets/pixel.png"];
+                assert_eq!(texture.size(), [2, 3]);
+                assert!(app.painted_textures.contains(&texture.id()));
+                let project = app.editor.project.clone();
+
+                fs::write(&asset, b"not a PNG").unwrap();
+                app.click("Reload Plugins");
+                assert!(app.editor.textures.is_empty());
+                assert!(app.editor.error.as_ref().unwrap().contains("invalid PNG"));
+                assert_eq!(app.editor.project, project);
+                pixel.save(&asset).unwrap();
+                app.click("Reload Plugins");
+                assert!(app.editor.error.is_none(), "{:?}", app.editor.error);
+                let texture = &app.editor.textures["assets/pixel.png"];
+                assert_eq!(texture.size(), [2, 3]);
+                assert!(app.painted_textures.contains(&texture.id()));
+                assert_eq!(app.editor.project, project);
+            },
+        );
     }
 
     #[test]

@@ -25,7 +25,7 @@ Wayland development packages, plus the libclang tooling used by their bindings.
 To start the tray, build the executables and run them from the same directory:
 
 ```sh
-cargo build --locked -p swatch-board-picker -p swatch-board-tray -p swatch-board-history -p swatch-board-config -p swatch-board
+cargo build --locked --workspace
 ./target/debug/swatch-board-tray
 ```
 
@@ -195,9 +195,10 @@ variables are errors. API 1 accepts bounded PNG assets and validates references,
 relative paths, output sizes, and templates. Rhai and executable plugins are not
 supported. See the [plugin-authoring guide](docs/plugin-authoring.md) for the
 package contract, minimal multi-scene example, template compatibility, resource
-limits, and acceptance checklist. **Security limitation:** template intermediate
-allocations are not memory-contained; use only reviewed, trusted templates until
-the remaining rendering isolation work is complete.
+limits, and acceptance checklist. Rendering uses the required sibling
+`swatch-board-theme-worker` executable with memory, CPU, wall-clock, and message
+limits. The helper provides resource containment, not a filesystem/network
+sandbox; templates receive no filesystem/network/process hooks.
 
 Preview rendered files before exporting to an existing directory. Existing files
 are replaced only when the overwrite confirmation is checked. Files are staged

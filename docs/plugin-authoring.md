@@ -145,12 +145,26 @@ are at most 2048 by 2048 with at most 16 MiB of decoded data. API 1 allows at mo
 100,000-unit fuel budget. These are implementation ceilings, not recommended
 package sizes; keep previews small.
 
-**Current security limitation:** fuel and the output writer do not bound
-intermediate MiniJinja allocations (for example, string multiplication inside a
-capture block). Rendering currently runs inside Board, so a hostile template can
-exhaust its memory. Until resource-limited rendering or a sufficiently restricted
-language is implemented, use only templates you have reviewed and trust. The
-untrusted-third-party-package hardening gate is not passed.
+Rendering runs in a fresh `swatch-board-theme-worker` process per request, not
+inside Board. Build the complete workspace before tests or development runs;
+install the helper beside Board. There is no in-process fallback if the helper
+is missing. Debug test executables under `deps/` can locate it one directory up.
+
+Before parsing input, the helper sets a 64 MiB address-space limit, a two-second
+CPU limit, and disables core dumps. The parent enforces a three-second wall-clock
+deadline with nonblocking duplex pipes and kills/reaps the child on failure.
+Request and response JSON are each capped at 16 MiB; returned output content is
+limited to 4 MiB per file and 8 MiB total, with declared filenames and formats
+validated again by the parent. Limit failures are reported without modifying
+exports; normal subsequent renders remain available. These fixed budgets may
+reject otherwise valid large packages.
+
+This contains intermediate MiniJinja allocation failures and runaway rendering,
+but is **not a filesystem/network sandbox**. The helper starts with a cleared
+environment and receives template/role data rather than plugin paths; the host
+supplies no filesystem/network/process template hooks. It still has ordinary OS
+permissions. Do not describe resource limits as complete sandboxing or protection
+against an arbitrary native-code execution vulnerability.
 
 Paths must be safe relative paths, with no empty, `.` or `..` components,
 backslashes, or absolute paths. Template paths start with `templates/` and end
