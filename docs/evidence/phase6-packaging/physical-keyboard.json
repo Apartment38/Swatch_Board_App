@@ -34,6 +34,17 @@
     "retest_binary": "target/phase6-physical/retest-stage/usr/bin/swatch-board",
     "artifact_note": "Retest is a newly built release executable, not the previous Arch package. The previous recipe/source pin and distributed local package do not yet include this repair."
   },
+  "round_3_settings_invalid": {
+    "evidence_type": "user-reported keyboard interaction plus filesystem readback",
+    "user_report": "all tests passed",
+    "duplicate_shortcut_error": "passed",
+    "settings_file_unchanged": true,
+    "settings_file_absent_before_and_after": true,
+    "autostart_entry_absent": true,
+    "settings_pid": 29048,
+    "isolated_config_and_private_bus": "verified",
+    "scope": "Duplicate-shortcut rejection only; valid-save persistence/reopen pending"
+  },
   "settings_idle_sample": {
     "elapsed_seconds": 10.00187395500052,
     "pss_kib": 32092,
@@ -53,7 +64,7 @@
     "limitations": "One observation with Wayland diagnostics enabled; scheduled runs are not wakeups; endpoint sampling cannot exclude short-lived intervening threads"
   },
   "remaining": [
-    "Settings keyboard navigation and error handling",
+    "Settings valid-save persistence and reopen",
     "Remaining process-by-process resource and normal-close cleanup measurements",
     "Other release qualification gates in current-handoff.md"
   ]

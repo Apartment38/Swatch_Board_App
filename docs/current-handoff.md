@@ -228,11 +228,15 @@ corrected-build tests passed: keyboard invalid Apply error with unchanged color,
 valid `#E06C75FF` with error recovery, keyboard Undo/Redo, and mouse Apply of
 `#98C379FF` with Undo/Redo. The exact running executable, starttime and SHA-256
 were reverified after that report. These physical observations are user-reported,
-not native automated input assertions; they accept this Mixer round only. Next:
-Settings keyboard-only duplicate-shortcut rejection, valid save/readback/reopen,
-and normal-close process cleanup. No tray is running on the private bus, so a
-valid save should persist settings but report tray reload failure. Leave autostart
-off and do not retry/approve shortcut assignments. Settings PID 8925 was
+not native automated input assertions; they accept this Mixer round only. The
+user also reported the keyboard-only duplicate-shortcut Settings round passed.
+Filesystem readback confirmed no settings file before or after the rejected Save
+and no autostart entry. Settings PID 29048 and Board PID 17804 were verified using
+the corrected stage, isolated config and private bus. Next: correct Show history
+to `Meta+Shift+H`, keep Pick color `Meta+Shift+C`, set Displayed colors to 12, save,
+close/reopen Settings and confirm persistence. No tray is running on the private
+bus, so a valid save should persist settings but report tray reload failure. Leave
+autostart off and do not retry/approve shortcut assignments. Settings PID 8925 was
 measured idle over 10.001874 seconds: PSS 32,092 KiB, private clean+dirty 27,356 KiB,
 10,073,549 ns CPU and 75 scheduled runs across 15 stable endpoint threads. The raw
 sample is `target/phase6-physical/settings-idle.json`; the same sampling limitations
