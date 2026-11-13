@@ -187,7 +187,7 @@ The obsolete KWin ColorPicker implementation, `--native`, and `--repeat` were re
 
 ## Phase 6 packaging and documentation checkpoint
 
-**Physical acceptance in progress; first keyboard round passed by user report.**
+**Physical acceptance in progress; Board navigation and corrected Mixer retest passed by user report.**
 Source payload commit `64212c8` and pinned/container-verified Arch packaging
 commit `1d4457d` are local; nothing was pushed. The task-owned Arch container was
 removed after verification; package/build logs remain in `target/phase6-release/`.
@@ -205,7 +205,7 @@ results, not native automated input assertions or a full accessibility audit.
 Durable summary: `evidence/phase6-packaging/physical-keyboard.json`.
 The user subsequently reported keyboard navigation working but Apply, Undo and
 Redo appearing ineffective with keyboard and mouse; Settings opened. This second
-round is **failed/pending corrected-build retest**, not accepted. An input-driven
+round initially failed and was held pending corrected-build retest. An input-driven
 regression at the default Board geometry reproduced invalid Apply being processed
 while its diagnostic was below the clipped scroll area. Moving Mixer errors above
 the scrolling details made that test go RED-to-GREEN. A separate characterization
@@ -223,8 +223,16 @@ exact original PIDs 5133 and 8925 were verified absent. The corrected Board is n
 running as PID 17804 (starttime 1200534 clock ticks) from the retest stage with the
 same isolated data and a new private bus. Executable SHA-256 matches the recorded
 retest artifact; native Wayland identity was verified. Launch identity is saved in
-`target/phase6-physical/retest-start.json`. Retest invalid Apply feedback, valid
-`#E06C75FF`, Undo and Redo with keyboard and mouse. Settings PID 8925 was
+`target/phase6-physical/retest-start.json`. The user then reported all assigned
+corrected-build tests passed: keyboard invalid Apply error with unchanged color,
+valid `#E06C75FF` with error recovery, keyboard Undo/Redo, and mouse Apply of
+`#98C379FF` with Undo/Redo. The exact running executable, starttime and SHA-256
+were reverified after that report. These physical observations are user-reported,
+not native automated input assertions; they accept this Mixer round only. Next:
+Settings keyboard-only duplicate-shortcut rejection, valid save/readback/reopen,
+and normal-close process cleanup. No tray is running on the private bus, so a
+valid save should persist settings but report tray reload failure. Leave autostart
+off and do not retry/approve shortcut assignments. Settings PID 8925 was
 measured idle over 10.001874 seconds: PSS 32,092 KiB, private clean+dirty 27,356 KiB,
 10,073,549 ns CPU and 75 scheduled runs across 15 stable endpoint threads. The raw
 sample is `target/phase6-physical/settings-idle.json`; the same sampling limitations

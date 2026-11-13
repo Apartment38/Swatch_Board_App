@@ -15,12 +15,21 @@
   "round_2": {
     "evidence_type": "user-reported physical interactions",
     "user_report": "Keyboard navigation is working. Activating Apply, Undo, and Redo buttons does not do anything; mouse clicks also appear ineffective. Settings is open.",
-    "status": "failed-pending-retest",
+    "status": "passed-on-corrected-release-by-user-report",
+    "corrected_retest": {
+      "user_report": "All tests passed",
+      "keyboard_invalid_apply_visible_error_and_unchanged_color": "passed",
+      "keyboard_apply_E06C75FF_and_error_recovery": "passed",
+      "keyboard_undo_redo": "passed",
+      "mouse_apply_98C379FF_and_undo_redo": "passed",
+      "artifact_identity": "Running PID, starttime and executable SHA-256 reverified after user report",
+      "scope": "Assigned Mixer retest only; not full Phase 6 acceptance"
+    },
     "original_process_cleanup": "User closed both windows; original Board PID 5133 and Settings PID 8925 verified absent",
     "corrected_release_launch": {"pid": 17804, "starttime_ticks": 1200534, "native_wayland": true, "private_session_bus": true, "same_isolated_data": true},
     "investigation": "Input-driven regression reproduced invalid Apply being processed while its error text was clipped below the scroll area. Error placement was repaired. Separate real field/pointer/Tab/Enter tests pass Apply/Undo/Redo using a changed color. Original valid test value #247AC3FF equalled the default and did not require a new undo entry; this does not disprove the user's physical report.",
     "next_valid_test_color": "#E06C75FF",
-    "automated_repair_checks": "180 workspace tests passed, 1 ignored; strict Clippy, formatting, debug/release build passed. Physical corrected-build acceptance is not yet passed.",
+    "automated_repair_checks": "180 workspace tests passed, 1 ignored; strict Clippy, formatting, debug/release build passed. Subsequent corrected-build physical Mixer retest passed by user report, recorded separately.",
     "retest_binary_sha256": "e30d70e77e53ee66ded15ed4f84bf7927360c80adfebe68d79309f298a5e4551",
     "retest_binary": "target/phase6-physical/retest-stage/usr/bin/swatch-board",
     "artifact_note": "Retest is a newly built release executable, not the previous Arch package. The previous recipe/source pin and distributed local package do not yet include this repair."
@@ -44,7 +53,6 @@
     "limitations": "One observation with Wayland diagnostics enabled; scheduled runs are not wakeups; endpoint sampling cannot exclude short-lived intervening threads"
   },
   "remaining": [
-    "Keyboard editing, validation error recovery, undo/redo",
     "Settings keyboard navigation and error handling",
     "Remaining process-by-process resource and normal-close cleanup measurements",
     "Other release qualification gates in current-handoff.md"
