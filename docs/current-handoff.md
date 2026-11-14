@@ -232,11 +232,28 @@ not native automated input assertions; they accept this Mixer round only. The
 user also reported the keyboard-only duplicate-shortcut Settings round passed.
 Filesystem readback confirmed no settings file before or after the rejected Save
 and no autostart entry. Settings PID 29048 and Board PID 17804 were verified using
-the corrected stage, isolated config and private bus. Next: correct Show history
-to `Meta+Shift+H`, keep Pick color `Meta+Shift+C`, set Displayed colors to 12, save,
-close/reopen Settings and confirm persistence. No tray is running on the private
-bus, so a valid save should persist settings but report tray reload failure. Leave
-autostart off and do not retry/approve shortcut assignments. Settings PID 8925 was
+the corrected stage, isolated config and private bus. After an interruption, the
+last valid-save test was restarted (`swatch-settings-retest-1`); no old test
+processes or saved config remained at restart. Corrected Board PID 21350 and
+Settings PID 21569 started on the same new private bus. The user reported all
+valid-save/reopen tests passed. File readback verified Displayed colors 12,
+Pick `Meta+Shift+C`, Show history `Meta+Shift+H`, autostart false, with no autostart
+entry. Settings PID 21569 exited normally and was absent; reopened Settings PID
+21904 was verified using the same isolated configuration/private bus. Persisted
+config SHA-256 is recorded in `physical-keyboard.json`. The expected no-tray apply
+failure message is user-reported, while persisted values/process identity are
+machine-verified. No live shortcut assignment or portal grant was requested.
+
+A final 10.012056-second idle interval recorded Board PSS 34,572 KiB/private
+31,212 KiB and 6,273,830 ns CPU across 15 stable threads; reopened Settings PSS
+30,323 KiB/private 26,964 KiB and 9,503,100 ns CPU across 11 stable threads. Board
+and Settings recorded 162 and 85 scheduled runs respectively, not wakeups.
+Endpoint thread sampling cannot exclude short-lived intervening threads;
+diagnostics remained enabled. Raw samples: `target/phase6-physical/corrected-idle-samples.json`.
+**Next:** user closes Settings and Board normally; verify exact process start
+identities are gone and no staged helpers remain. Both windows are deliberately
+left open pending that request. Package refresh and other release gates remain
+open. Earlier Settings PID 8925 was
 measured idle over 10.001874 seconds: PSS 32,092 KiB, private clean+dirty 27,356 KiB,
 10,073,549 ns CPU and 75 scheduled runs across 15 stable endpoint threads. The raw
 sample is `target/phase6-physical/settings-idle.json`; the same sampling limitations
