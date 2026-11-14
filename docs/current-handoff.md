@@ -187,7 +187,7 @@ The obsolete KWin ColorPicker implementation, `--native`, and `--repeat` were re
 
 ## Phase 6 packaging and documentation checkpoint
 
-**Physical acceptance in progress; Board navigation and corrected Mixer retest passed by user report.**
+**Physical Board/Settings round passed, including corrected Mixer input and normal-close cleanup.**
 Source payload commit `64212c8` and pinned/container-verified Arch packaging
 commit `1d4457d` are local; nothing was pushed. The task-owned Arch container was
 removed after verification; package/build logs remain in `target/phase6-release/`.
@@ -250,10 +250,16 @@ A final 10.012056-second idle interval recorded Board PSS 34,572 KiB/private
 and Settings recorded 162 and 85 scheduled runs respectively, not wakeups.
 Endpoint thread sampling cannot exclude short-lived intervening threads;
 diagnostics remained enabled. Raw samples: `target/phase6-physical/corrected-idle-samples.json`.
-**Next:** user closes Settings and Board normally; verify exact process start
-identities are gone and no staged helpers remain. Both windows are deliberately
-left open pending that request. Package refresh and other release gates remain
-open. Earlier Settings PID 8925 was
+The user closed both windows normally. Process start-identity checks verified
+Board PID 21350 and Settings PID 21904 are gone; a complete scan found no process
+executing any original/retest-stage binary. SQLite integrity was `ok`, Displayed
+colors remained 12, and no autostart entry existed. Raw closure result:
+`target/phase6-physical/final-close-result.json`. No acceptance window or helper
+remains. This accepts the assigned physical Board/Settings round, not all Phase 6
+release qualifications. Package `0.1.0-2` is being rebuilt in a fresh Arch container
+from repair source `efb069a24472e6336eedfe00ba729fc5585a5d8d`, job
+`swatch-release-refresh-1`; the previous local `0.1.0-1` package lacks the repair.
+Earlier Settings PID 8925 was
 measured idle over 10.001874 seconds: PSS 32,092 KiB, private clean+dirty 27,356 KiB,
 10,073,549 ns CPU and 75 scheduled runs across 15 stable endpoint threads. The raw
 sample is `target/phase6-physical/settings-idle.json`; the same sampling limitations

@@ -1,5 +1,5 @@
 {
-  "status": "in-progress",
+  "status": "board-settings-physical-round-passed-other-release-gates-open",
   "artifact": "swatch-board-0.1.0-1-x86_64.pkg.tar.zst",
   "source_commit": "64212c8c16f610791e38dbed7f7c99f636309351",
   "desktop": "physical KDE Plasma Wayland",
@@ -86,8 +86,18 @@
     "stable_thread_scheduled_runs": 161,
     "limitations": "One observation with Wayland diagnostics enabled; scheduled runs are not wakeups; endpoint sampling cannot exclude short-lived intervening threads"
   },
+  "final_normal_close": {
+    "user_report": "closed",
+    "board_pid": 21350,
+    "settings_pid": 21904,
+    "original_process_start_identities_gone": true,
+    "staged_executable_processes_remaining": [],
+    "database_integrity": "ok",
+    "saved_display_limit": 12,
+    "autostart_entry_absent": true,
+    "scope": "No Board/Settings/staged helper remains; no claim about unrelated processes or system-wide memory"
+  },
   "remaining": [
-    "Remaining process-by-process resource and normal-close cleanup measurements",
-    "Other release qualification gates in current-handoff.md"
+    "Remaining other-process resource measurements and release qualification gates in current-handoff.md"
   ]
 }
