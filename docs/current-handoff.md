@@ -256,9 +256,24 @@ executing any original/retest-stage binary. SQLite integrity was `ok`, Displayed
 colors remained 12, and no autostart entry existed. Raw closure result:
 `target/phase6-physical/final-close-result.json`. No acceptance window or helper
 remains. This accepts the assigned physical Board/Settings round, not all Phase 6
-release qualifications. Package `0.1.0-2` is being rebuilt in a fresh Arch container
-from repair source `efb069a24472e6336eedfe00ba729fc5585a5d8d`, job
-`swatch-release-refresh-1`; the previous local `0.1.0-1` package lacks the repair.
+release qualifications. Package `0.1.0-2` rebuilt successfully in a fresh Arch
+container from repair source `efb069a24472e6336eedfe00ba729fc5585a5d8d` (job
+`swatch-release-refresh-1`). All 180 tests passed (one ignored), strict Clippy,
+container installation, installed picker help/version, all four installed-plugin
+golden renders, complete plugin/schema/license byte inventory and mandatory
+metadata checks passed. Namcap has no errors; dependency/interpreter warnings and
+split-debug no-symbol warnings remain recorded. Container host mounts were empty,
+and the container was removed after verification. Source came from a local Git
+bundle, not a public remote fetch. The unsigned package is
+`target/phase6-release/refreshed/swatch-board-0.1.0-2-x86_64.pkg.tar.zst`, SHA-256
+`bb35ca3c5e0224033f5a41b27bfafea09bf8b14c741d72a674df79042edb320c`.
+The previous local `0.1.0-1` candidate lacks the repair and is superseded.
+Current package evidence: `evidence/phase6-packaging/refresh-checks.json`.
+The host-built release physical round and container-built package checks are
+separate; container package bytes were not GUI-tested. The tray normal-dependency
+graph excludes eframe, egui, MiniJinja, theme-core and PipeWire. That is static
+architecture evidence, not fresh tray memory/wakeup data. No acceptance app or
+helper remains running. Neither source nor package was pushed/published.
 Earlier Settings PID 8925 was
 measured idle over 10.001874 seconds: PSS 32,092 KiB, private clean+dirty 27,356 KiB,
 10,073,549 ns CPU and 75 scheduled runs across 15 stable endpoint threads. The raw
@@ -327,13 +342,21 @@ and missing validators. Parent verified full workspace build/tests/Clippy/fmt an
 the staged release gate. The Docker result does not constitute official devtools
 clean-chroot qualification, physical desktop acceptance or bitwise reproducibility.
 
-**Phase 6 is not fully accepted.** Remaining gates include fresh physical
-keyboard-only/accessibility and per-process resource/cleanup measurements,
-dependency redistribution/license-notice audit, independent reproducibility,
-official clean-chroot qualification, and any advertised non-x86_64/distro coverage.
+**Phase 6 is not fully accepted for public release.** The assigned Board/Settings
+keyboard, validation, persistence and cleanup rounds passed. Remaining work includes
+broader assistive-technology/keyboard coverage, fresh tray/picker/history resource
+measurements where required, dependency redistribution/license-notice audit,
+independent reproducibility and official clean-chroot qualification, plus any
+advertised non-x86_64/distro support. The conservative dependency inventory is in
+`evidence/phase6-packaging/dependency-license-inventory.json`: declarations and
+candidate notice paths are not compliance approval, and some crate archives omit
+notice files. The package currently installs the project's MIT license only;
+complete third-party/font notice obligations before public redistribution. Do not
+publish this local development artifact as release-qualified.
 The safe compositor substitute remains private-KWin restart/recovery plus normal
 manual logout/login. Never restart the live KWin service. See `testing.md` and
-`release.md`; prior physical successes remain historical, not new Phase 6 results.
+`release.md`; Phase 1–5 physical successes remain historical, while the new
+Board/Settings results are separately recorded above.
 
 ## Acceptance evidence
 

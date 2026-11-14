@@ -1,0 +1,168 @@
+{
+  "status": "inventory-only-not-license-compliance-approval",
+  "scope": "Third-party packages returned by cargo metadata --offline --locked --filter-platform x86_64-unknown-linux-gnu; conservative resolver inventory, not proof every package is shipped",
+  "packages": 313,
+  "missing_license_declarations": [],
+  "license_declaration_counts": {
+    "(MIT OR Apache-2.0) AND OFL-1.1 AND Ubuntu-font-1.0": 1,
+    "(MIT OR Apache-2.0) AND Unicode-3.0": 1,
+    "0BSD OR MIT OR Apache-2.0": 1,
+    "Apache-2.0": 15,
+    "Apache-2.0 AND MIT": 1,
+    "Apache-2.0 OR BSL-1.0": 1,
+    "Apache-2.0 OR MIT": 28,
+    "Apache-2.0 WITH LLVM-exception": 1,
+    "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT": 4,
+    "Apache-2.0/MIT": 2,
+    "BSD-2-Clause OR Apache-2.0 OR MIT": 2,
+    "BSD-3-Clause": 1,
+    "BSD-3-Clause OR Apache-2.0": 2,
+    "CC0-1.0": 1,
+    "ISC": 1,
+    "MIT": 67,
+    "MIT OR Apache-2.0": 138,
+    "MIT OR Apache-2.0 OR Zlib": 6,
+    "MIT OR Zlib OR Apache-2.0": 2,
+    "MIT/Apache-2.0": 11,
+    "Unicode-3.0": 18,
+    "Unlicense": 1,
+    "Unlicense OR MIT": 4,
+    "Zlib": 2,
+    "Zlib OR Apache-2.0 OR MIT": 2
+  },
+  "candidate_notice_files": 530,
+  "packages_without_candidate_notice_file": [
+    {
+      "name": "accesskit",
+      "version": "0.17.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/AccessKit/accesskit"
+    },
+    {
+      "name": "codespan-reporting",
+      "version": "0.11.1",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/brendanzab/codespan"
+    },
+    {
+      "name": "cookie-factory",
+      "version": "0.3.3",
+      "license": "MIT",
+      "repository": "https://github.com/rust-bakery/cookie-factory"
+    },
+    {
+      "name": "ecolor",
+      "version": "0.31.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/emilk/egui"
+    },
+    {
+      "name": "eframe",
+      "version": "0.31.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/emilk/egui/tree/master/crates/eframe"
+    },
+    {
+      "name": "egui",
+      "version": "0.31.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/emilk/egui"
+    },
+    {
+      "name": "egui-wgpu",
+      "version": "0.31.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/emilk/egui/tree/master/crates/egui-wgpu"
+    },
+    {
+      "name": "egui-winit",
+      "version": "0.31.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/emilk/egui/tree/master/crates/egui-winit"
+    },
+    {
+      "name": "egui_glow",
+      "version": "0.31.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/emilk/egui/tree/master/crates/egui_glow"
+    },
+    {
+      "name": "emath",
+      "version": "0.31.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/emilk/egui/tree/master/crates/emath"
+    },
+    {
+      "name": "epaint",
+      "version": "0.31.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/emilk/egui/tree/master/crates/epaint"
+    },
+    {
+      "name": "gl_generator",
+      "version": "0.14.0",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/brendanzab/gl-rs/"
+    },
+    {
+      "name": "gpu-alloc",
+      "version": "0.6.2",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/zakarumych/gpu-alloc"
+    },
+    {
+      "name": "gpu-alloc-types",
+      "version": "0.3.1",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/zakarumych/gpu-alloc"
+    },
+    {
+      "name": "gpu-descriptor",
+      "version": "0.3.2",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/zakarumych/gpu-descriptor"
+    },
+    {
+      "name": "gpu-descriptor-types",
+      "version": "0.2.0",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/zakarumych/gpu-descriptor"
+    },
+    {
+      "name": "hexf-parse",
+      "version": "0.2.1",
+      "license": "CC0-1.0",
+      "repository": "https://github.com/lifthrasiir/hexf"
+    },
+    {
+      "name": "khronos_api",
+      "version": "3.1.0",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/brendanzab/gl-rs/"
+    },
+    {
+      "name": "naga",
+      "version": "24.0.0",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/gfx-rs/wgpu/tree/trunk/naga"
+    },
+    {
+      "name": "profiling",
+      "version": "1.0.18",
+      "license": "MIT OR Apache-2.0",
+      "repository": "https://github.com/aclysma/profiling"
+    },
+    {
+      "name": "spirv",
+      "version": "0.3.0+sdk-1.3.268.0",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/gfx-rs/rspirv"
+    }
+  ],
+  "limitations": [
+    "Filename-based discovery only, not a legal or SPDX expression audit",
+    "Some crate archives omit top-level upstream notices; obtain exact-version notices before redistribution",
+    "Static dependency/font redistribution obligations and installed notice coverage remain unverified",
+    "No synthesized license texts or declarations are substituted for missing upstream files"
+  ]
+}

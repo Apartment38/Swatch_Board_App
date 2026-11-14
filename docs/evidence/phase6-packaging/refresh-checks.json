@@ -1,0 +1,85 @@
+{
+  "status": "refreshed-arch-package-automated-checks-passed-full-phase6-still-open",
+  "source_commit": "efb069a24472e6336eedfe00ba729fc5585a5d8d",
+  "pkgver": "0.1.0",
+  "pkgrel": 2,
+  "archive_identity_checks": {
+    "pkginfo_version": "0.1.0-2",
+    "buildinfo_matches_current_recipe": true,
+    "recipe_sha256": "9afbfe4e4a03bfa078007069fcb33418f8b0c9df9f2c0642b59565e65bbb4dbe",
+    "required_binaries_present": 6,
+    "archive_checksum_matches_recorded_artifact": true
+  },
+  "artifact": {
+    "filename": "swatch-board-0.1.0-2-x86_64.pkg.tar.zst",
+    "path": "target/phase6-release/refreshed/swatch-board-0.1.0-2-x86_64.pkg.tar.zst",
+    "size_bytes": 18265821,
+    "sha256": "bb35ca3c5e0224033f5a41b27bfafea09bf8b14c741d72a674df79042edb320c",
+    "signed": false,
+    "published": false
+  },
+  "build": {
+    "job": "swatch-release-refresh-1",
+    "image": "archlinux:base@sha256:d4594bb2300cba11f41c2f27923eb56f63d9988909c402f9c95517d1e362c899",
+    "host_mounts": [],
+    "source_acquisition": "Exact local Git bundle with makepkg-specific URL rewrite; public source fetch was not verified",
+    "toolchain": [
+      "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Arch Linux rust 1:1.99.1-4)",
+      "rust 1:1.99.1-4",
+      "clang 23.1.5-1",
+      "clang-libs 23.1.5-1",
+      "pipewire 1:1.6.11-1",
+      "libpipewire 1:1.6.11-1",
+      "wayland 1.26.0-1",
+      "libxkbcommon 1.13.2-1"
+    ],
+    "fresh_target_and_cargo_cache": true,
+    "workspace_tests": {
+      "passed": 180,
+      "failed": 0,
+      "ignored": 1,
+      "suites": 23
+    },
+    "strict_workspace_clippy": "passed",
+    "container_install": "passed",
+    "installed_picker_help_version": "passed",
+    "installed_plugin_golden_renders": [
+      "ghostty",
+      "zed",
+      "kde",
+      "example-terminal"
+    ],
+    "installed_plugin_schema_license_byte_inventory": "passed",
+    "desktop_appstream_validation": "passed",
+    "namcap_errors": [],
+    "namcap_warnings": [
+      "swatch-board W: Unused shared library '/usr/lib64/ld-linux-x86-64.so.2' by file ('usr/bin/swatch-board')",
+      "swatch-board W: Unused shared library '/usr/lib64/ld-linux-x86-64.so.2' by file ('usr/bin/swatch-board-config')",
+      "swatch-board W: Unused shared library '/usr/lib64/ld-linux-x86-64.so.2' by file ('usr/bin/swatch-board-history')",
+      "swatch-board W: Unused shared library '/usr/lib64/ld-linux-x86-64.so.2' by file ('usr/bin/swatch-board-picker')",
+      "swatch-board W: Unused shared library '/usr/lib64/ld-linux-x86-64.so.2' by file ('usr/bin/swatch-board-theme-worker')",
+      "swatch-board W: Unused shared library '/usr/lib64/ld-linux-x86-64.so.2' by file ('usr/bin/swatch-board-tray')",
+      "swatch-board W: Dependency libgcc detected and implicitly satisfied (libraries ['usr/lib/libgcc_s.so.1'] needed in files ['usr/bin/swatch-board-history', 'usr/bin/swatch-board-tray', 'usr/bin/swatch-board-picker', 'usr/bin/swatch-board-theme-worker', 'usr/bin/swatch-board', 'usr/bin/swatch-board-config'])",
+      "swatch-board W: Dependency libpipewire detected and implicitly satisfied (libraries ['usr/lib/libpipewire-0.3.so.0'] needed in files ['usr/bin/swatch-board-picker'])",
+      "swatch-board W: Dependency included, but may not be needed ('gcc-libs')",
+      "swatch-board W: Dependency included, but may not be needed ('libglvnd')",
+      "swatch-board W: Dependency included, but may not be needed ('pipewire')"
+    ],
+    "split_debug_warning": "No debugging symbols reported by makepkg's default split-debug step; main package built and installed successfully",
+    "container_removed": true
+  },
+  "physical_acceptance": {
+    "source": "docs/evidence/phase6-packaging/physical-keyboard.json",
+    "scope": "User-operated host-built release from the same repaired Rust source; not GUI testing of the newly container-built package bytes",
+    "normal_close_and_no_staged_processes": "verified"
+  },
+  "host_release_gate": "8 packaging tests, mandatory metadata validation, all four real helper golden renders and data inventory passed",
+  "tray_architecture_check": "Normal-dependency graph excludes eframe, egui, minijinja, theme-core and PipeWire; static graph evidence, not a memory/wakeup measurement",
+  "remaining_release_gates": [
+    "Dependency redistribution notices/license audit (inventory recorded separately; not approved for public distribution)",
+    "Official devtools clean-chroot qualification and reproducibility comparison",
+    "Fresh tray/picker/history resource coverage where required; existing measurements remain historical",
+    "Any advertised aarch64/Fedora/openSUSE support requires separate qualification",
+    "Explicit authorization before source publication or package signing/release"
+  ]
+}

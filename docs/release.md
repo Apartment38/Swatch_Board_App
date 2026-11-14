@@ -3,7 +3,7 @@
 ## Arch Linux first
 
 `packaging/arch/PKGBUILD` is the initial distro recipe. It pins the application
-source payload to `64212c8c16f610791e38dbed7f7c99f636309351` and fetches Rust dependencies according to
+source payload to `efb069a24472e6336eedfe00ba729fc5585a5d8d` (`0.1.0-2`) and fetches Rust dependencies according to
 `Cargo.lock`; the compiler and platform libraries are supplied by the build
 system. This is a locked source build, not a claim of bit-for-bit reproducibility.
 The Git source uses `SKIP` because makepkg verifies the fixed commit instead of
@@ -21,16 +21,25 @@ linker. This was reproduced in the isolated build and fixed before packaging.
 KDE's XDG portal is an optional runtime integration, and `kscreen` is only used
 by the documented output-selection fallback.
 
-A fresh Arch Docker container built the pinned payload, ran 178 tests and strict
-Clippy, produced the package, installed it **inside the container**, and passed
-installed picker, four-plugin golden, data inventory and metadata checks. No
-host Cargo cache/target or desktop sockets were mounted. A local Git bundle
-supplied the unpushed source revision via a makepkg Git URL rewrite; this is not
-a test of public source availability. The source commit must be pushed only
-when explicitly authorised before remote package consumers can fetch it.
-See `docs/evidence/phase6-packaging/checks.json` for the image digest, versions,
-package checksum, and remaining warnings. This container run is not the official
-devtools clean-chroot qualification or a physical desktop test.
+A fresh Arch Docker container built the repaired payload, ran **180 tests**
+(one intentionally ignored) and strict Clippy, produced `0.1.0-2`, installed it
+**inside the container**, and passed installed picker, all four plugin golden,
+complete plugin/schema/license byte-inventory and metadata checks. The physical
+Board/Settings keyboard/mouse, save/reopen, validation and cleanup round passed
+using a host-built release from the same repaired Rust source; the newly
+container-built package bytes were not themselves GUI-tested. No host Cargo
+cache/target, desktop sockets or other host mounts were provided to the container.
+A local Git bundle supplied the unpushed source revision via a makepkg Git URL
+rewrite; this is not a test of public source availability. Push only when
+explicitly authorised before remote package consumers need the source.
+
+Current evidence: `docs/evidence/phase6-packaging/refresh-checks.json` and
+`physical-keyboard.json`. `checks.json` describes the earlier `0.1.0-1` baseline,
+which does not contain the Mixer feedback repair and is superseded as a package
+candidate. The unsigned local artifact is under
+`target/phase6-release/refreshed/swatch-board-0.1.0-2-x86_64.pkg.tar.zst`.
+The build container was removed. Container verification is not official devtools
+clean-chroot qualification or bit-for-bit reproducibility.
 
 Build recipe verification in a clean Arch chroot is a release gate:
 
@@ -41,8 +50,14 @@ namcap PKGBUILD swatch-board-*.pkg.tar.zst
 ```
 
 Review dependency licenses before every release. `Cargo.lock` pins versions
-and checksums, but does not constitute an SPDX license audit. No license audit
-or clean-room reproducibility comparison has been completed for Phase 6.
+and checksums, but does not constitute an SPDX/license-notice audit. The recorded
+`dependency-license-inventory.json` enumerates metadata declarations and candidate
+notice-file gaps only; some upstream crate archives omit their own notice files.
+The installed project MIT license is not proof that all bundled code/font
+redistribution obligations are satisfied. Obtain and review the exact-version
+third-party notices before public distribution. **This local artifact is not
+approved for public release.** Neither a legal/notice audit nor an independent
+reproducibility comparison has been completed.
 
 ## Local release verification
 

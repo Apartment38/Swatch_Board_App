@@ -1,7 +1,7 @@
 pkgbase = swatch-board
 	pkgdesc = KDE Plasma Wayland color picker, palette editor, and theme exporter
 	pkgver = 0.1.0
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/Apartment38/Swatch_Board_App
 	arch = x86_64
 	arch = aarch64
@@ -21,7 +21,7 @@ pkgbase = swatch-board
 	optdepends = xdg-desktop-portal-kde: screen capture and global shortcut portal backend
 	optdepends = kscreen: primary-output fallback when the pointer output is unavailable
 	options = !lto
-	source = swatch-board::git+https://github.com/Apartment38/Swatch_Board_App.git#commit=64212c8c16f610791e38dbed7f7c99f636309351
+	source = swatch-board::git+https://github.com/Apartment38/Swatch_Board_App.git#commit=efb069a24472e6336eedfe00ba729fc5585a5d8d
 	sha256sums = SKIP
 
 pkgname = swatch-board
