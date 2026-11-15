@@ -6,6 +6,11 @@
   with access to its session D-Bus and a running KWin ColorPicker service.
   KWin handles the selection interface and cancellation; the picker does not
   use the screen-capture portal.
+- **Magnification remains after picking:** normal pick, cancel, error and
+  graceful stop restore app-owned effect changes, but forced termination or
+  compositor failure can prevent cleanup. Use KDE's Meta+0 shortcut or
+  Desktop Effects settings to recover. KDE controls Magnifier appearance;
+  the picker has no radius or zoom options.
 - **No shortcut prompt appears:** check that the KDE XDG portal backend is
   running and that the tray has access to the graphical session's D-Bus.
   Authorization dialogs are manual. Do not restart KWin or change desktop

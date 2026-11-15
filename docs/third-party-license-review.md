@@ -4,7 +4,7 @@ The detailed review below applies to the pre-KWin-picker lockfile with SHA-256
 `210d1cc0deea8a0c78d7c74b05d69ba358e34b7ea81e034c9c5e5d0268b0e035`.
 The KWin cutover removed 25 registry packages and preserved the remaining 406
 notice sections unchanged; it added no registry packages. The new lockfile SHA-256
-is `6a0fb3f9871021866d56f3cab308e4acdd9dcd84c0384504e508c5e86e97e175`.
+is `de5fb7c472802e6f953e193d97046270bcbc32813d7df596d7bba7013d080c05`.
 The dependency trees and binary linkage observations below are historical, not
 fresh qualification of the replacement picker or a release approval.
 

@@ -3,12 +3,19 @@
 ## KWin picker cutover
 
 The custom ScreenCast/PipeWire magnifier is replaced by KWin's native
-`org.kde.KWin` ColorPicker D-Bus interface. KWin manages selection and
-cancellation; the picker needs neither a screen-capture portal nor a desktop
-entry. The tray still uses the GlobalShortcuts portal. Legacy magnifier settings
-are migrated rather than retained as runtime options. Native desktop acceptance
-of this replacement is pending; the picker acceptance and capture evidence below
-describe the previous implementation and do not qualify the replacement.
+`org.kde.KWin` ColorPicker and cursor-centered Magnifier. KDE manages selection,
+cancellation and magnifier appearance; picking needs no ScreenCast prompt,
+screen-capture portal or desktop entry. The tray still uses the GlobalShortcuts
+portal. Legacy magnifier radius and zoom settings are migrated rather than
+retained as runtime options.
+
+An inactive loaded Zoom effect is temporarily replaced by Magnifier and restored;
+already-active user magnification is left alone. Normal pick, cancel, error and
+graceful stop restore app-owned changes. Forced termination or compositor failure
+can prevent cleanup; recover with KDE's Meta+0 shortcut or Desktop Effects
+settings. Native selection, cancellation and multioutput acceptance remain
+pending; the older picker acceptance and capture evidence below do not qualify
+the replacement.
 
 Verification: workspace debug build, 30 targeted picker/config/tray/storage tests,
 11 packaging checks, targeted all-targets strict Clippy and workspace rustfmt
@@ -18,6 +25,14 @@ desktop. The live KWin interface was introspected and exposes `pick → (u)`.
 Removed the obsolete capture core, native overlay probes and Wayland fixtures;
 stored RGBA channels now belong to storage. The lockfile drops 25 registry
 packages, and their notice sections were removed without changing retained text.
+
+Magnifier verification: 17 picker/tray tests, targeted strict Clippy, rustfmt and
+the workspace debug build passed. On KWin 6.8.2, a throwaway client using the
+production lifecycle displayed KDE's cursor-centered 2× loupe (Spectacle capture:
+ignored `target/native-magnifier-smoke.png`). Fresh D-Bus readback after normal
+completion confirmed Magnifier unloaded and the previous Zoom effect loaded at
+`targetZoom: 1`. This verifies the native effect lifecycle, not a full color-pick
+or multioutput acceptance round. The throwaway example was removed.
 
 
 ## UX gauntlet — stopped at user boundary

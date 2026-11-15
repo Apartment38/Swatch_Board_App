@@ -6,7 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-tokio.workspace = true
+tokio = { workspace = true, features = ["signal"] }
 zbus.workspace = true
 
 [dev-dependencies]

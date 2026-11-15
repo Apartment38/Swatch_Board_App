@@ -1,3 +1,4 @@
+mod magnifier;
 mod native;
 
 use std::error::Error;
@@ -9,7 +10,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         (None, None) => {}
         (Some(argument), None) if argument == "--help" || argument == "-h" => {
             println!(
-                "Swatch Board Picker — native KDE color picker\n\nUsage: swatch-board-picker\n       swatch-board-picker --help | --version\n\nSelect with left click or Enter; cancel with Escape or right click.\nKWin owns selection; no screen-sharing portal is used."
+                "Swatch Board Picker — native KDE color picker\n\nUsage: swatch-board-picker\n       swatch-board-picker --help | --version\n\nSelect with left click or Enter; cancel with Escape or right click.\nKDE magnifies the cursor area while picking, then restores the previous effect.\nExisting active desktop magnification is preserved. No screen-sharing portal is used."
             );
             return Ok(());
         }

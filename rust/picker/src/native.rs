@@ -8,8 +8,38 @@ pub enum Outcome {
 }
 
 pub async fn pick() -> zbus::Result<Outcome> {
+    use tokio::signal::unix::{SignalKind, signal};
+    use zbus::fdo::{RequestNameFlags, RequestNameReply};
+
     let connection = Connection::session().await?;
-    pick_on(&connection).await
+    if connection
+        .request_name_with_flags(
+            "org.apartment38.SwatchBoard.Picker1",
+            RequestNameFlags::DoNotQueue.into(),
+        )
+        .await?
+        != RequestNameReply::PrimaryOwner
+    {
+        return Err(Error::Failure(
+            "A Swatch Board pick is already in progress".into(),
+        ));
+    }
+    let mut terminate = signal(SignalKind::terminate()).map_err(Error::from)?;
+    let mut interrupt = signal(SignalKind::interrupt()).map_err(Error::from)?;
+    let mut magnifier = crate::magnifier::Magnifier::start(&connection).await?;
+    let result = tokio::select! {
+        result = pick_on(&connection) => result,
+        _ = terminate.recv() => Ok(Outcome::Cancelled),
+        _ = interrupt.recv() => Ok(Outcome::Cancelled),
+    };
+    let restored = magnifier.restore().await;
+    match (result, restored) {
+        (result, Ok(())) => result,
+        (Ok(_), Err(error)) => Err(error),
+        (Err(error), Err(cleanup)) => Err(Error::Failure(format!(
+            "{error}; restoring KDE magnification: {cleanup}"
+        ))),
+    }
 }
 
 async fn pick_on(connection: &Connection) -> zbus::Result<Outcome> {

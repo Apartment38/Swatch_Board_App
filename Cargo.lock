@@ -2936,6 +2936,7 @@ dependencies = [
  "ashpd",
  "futures-util",
  "ksni",
+ "libc",
  "serde",
  "swatch-board-clipboard",
  "swatch-board-color",

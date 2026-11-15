@@ -52,11 +52,18 @@ To run the picker directly from a KDE Plasma Wayland desktop session:
 cargo run --offline --locked -p swatch-board-picker
 ```
 
-The picker invokes KWin's native ColorPicker over the session bus. KWin manages
-the selection interface, keyboard input and cancellation; no screen-capture
-portal or picker desktop entry is required. The selected `#RRGGBB` value goes to
-stdout. When run directly the picker does not update history or clipboard; use
-the tray for those actions.
+The picker invokes KWin's native ColorPicker over the session bus and uses KDE's
+cursor-centered Magnifier while picking. KDE controls its appearance; there are
+no picker radius or zoom options. No ScreenCast prompt, screen-capture portal or
+picker desktop entry is required. The selected `#RRGGBB` value goes to stdout.
+When run directly the picker does not update history or clipboard; use the tray
+for those actions.
+
+An inactive loaded Zoom effect is temporarily replaced by Magnifier and restored
+afterward; already-active user magnification is left alone. Normal selection,
+cancellation, errors and graceful stops restore changes made by the picker.
+Forced termination or compositor failure can prevent cleanup: use KDE's Meta+0
+shortcut or Desktop Effects settings to recover.
 
 Inspect the CLI without opening a capture session:
 
