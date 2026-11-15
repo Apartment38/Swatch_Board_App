@@ -304,7 +304,15 @@ impl App {
         canvas.fill(0);
         if self.started && self.selected_output == Some(i) {
             rect(canvas, (width, height), x, y, w, h, 0xff20242a);
-            text(canvas, width, height, x + 8, y + 8, "HISTORY", 0xffffffff);
+            text(
+                canvas,
+                width,
+                height,
+                x + 8,
+                y + 8,
+                "Recent colors",
+                0xffffffff,
+            );
             if self.entries.is_empty() {
                 text(
                     canvas,
@@ -312,7 +320,7 @@ impl App {
                     height,
                     x + 8,
                     y + 32,
-                    "NO HISTORY",
+                    "Pick a color to start your history",
                     0xffdddddd,
                 );
             }
@@ -324,7 +332,7 @@ impl App {
                 let xx = x + 8 + (n % self.opts.columns) as i32 * cw;
                 let yy = y + 28 + (n / self.opts.columns) as i32 * ch;
                 if index == self.selected {
-                    rect(canvas, (width, height), xx, yy, cw - 4, ch - 4, 0xffffffff);
+                    rect(canvas, (width, height), xx, yy, cw - 4, ch - 4, 0xff296b91);
                 }
                 let color = u32::from_str_radix(
                     entry.1.trim_start_matches('#').get(..6).unwrap_or("000000"),
@@ -351,11 +359,11 @@ impl App {
                 );
             }
             let status = if self.status.is_empty() {
-                "ENTER COPY  ESC CLOSE"
+                "Click a color to copy  ·  Enter: copy  ·  Esc: close"
             } else {
                 &self.status
             };
-            text(canvas, width, height, x + 8, y + h - 16, status, 0xffffffff);
+            text(canvas, width, height, x + 8, y + h - 24, status, 0xffffffff);
         }
         let surface = self.shields[i].layer.wl_surface();
         if buffer.attach_to(surface).is_err() {
@@ -470,13 +478,57 @@ fn rect(c: &mut [u8], (width, height): (i32, i32), x: i32, y: i32, w: i32, h: i3
         }
     }
 }
-fn text(c: &mut [u8], w: i32, h: i32, mut x: i32, y: i32, s: &str, color: u32) {
+fn text(c: &mut [u8], w: i32, h: i32, x: i32, y: i32, s: &str, color: u32) {
+    use ab_glyph::{Font, ScaleFont};
+    static FONT: std::sync::OnceLock<Option<ab_glyph::FontArc>> = std::sync::OnceLock::new();
+    let font = FONT.get_or_init(|| {
+        // Fontconfig resolves installed system fonts, including user overrides.
+        let output = std::process::Command::new("fc-match")
+            .args(["-s", "-f", "%{file}\n", "sans-serif"])
+            .output()
+            .ok()?;
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .find_map(|path| ab_glyph::FontArc::try_from_vec(std::fs::read(path).ok()?).ok())
+    });
+    let Some(font) = font else {
+        bitmap_text(c, w, h, x, y, s, color);
+        return;
+    };
+    let scaled = font.as_scaled(17.0);
+    let mut cursor = x as f32;
+    for ch in s.chars() {
+        let id = scaled.glyph_id(ch);
+        let glyph =
+            id.with_scale_and_position(17.0, ab_glyph::point(cursor, y as f32 + scaled.ascent()));
+        if let Some(outlined) = font.outline_glyph(glyph) {
+            let bounds = outlined.px_bounds();
+            outlined.draw(|gx, gy, coverage| {
+                let px = bounds.min.x as i32 + gx as i32;
+                let py = bounds.min.y as i32 + gy as i32;
+                if px < 0 || py < 0 || px >= w || py >= h {
+                    return;
+                }
+                let offset = ((py * w + px) * 4) as usize;
+                let old = u32::from_le_bytes(c[offset..offset + 4].try_into().unwrap());
+                let mut blended = 0xff000000;
+                for shift in [0, 8, 16] {
+                    let a = ((old >> shift) & 255) as f32;
+                    let b = ((color >> shift) & 255) as f32;
+                    blended |= ((a + (b - a) * coverage).round() as u32) << shift;
+                }
+                c[offset..offset + 4].copy_from_slice(&blended.to_le_bytes());
+            });
+        }
+        cursor += scaled.h_advance(id);
+    }
+}
+fn bitmap_text(c: &mut [u8], w: i32, h: i32, mut x: i32, y: i32, s: &str, color: u32) {
     for ch in s.to_ascii_uppercase().chars() {
         if x + 6 >= w {
             break;
         }
-        let bits = glyph(ch);
-        for (row, b) in bits.iter().enumerate() {
+        for (row, b) in glyph(ch).iter().enumerate() {
             for col in 0..5 {
                 if b & (1 << (4 - col)) != 0 {
                     rect(c, (w, h), x + col, y + row as i32, 1, 1, color);
