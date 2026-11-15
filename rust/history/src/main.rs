@@ -303,7 +303,7 @@ impl App {
         };
         canvas.fill(0);
         if self.started && self.selected_output == Some(i) {
-            rect(canvas, (width, height), x, y, w, h, 0xff20242a);
+            popup_frame(canvas, (width, height), x, y, w, h);
             text(
                 canvas,
                 width,
@@ -468,6 +468,23 @@ impl App {
         );
         self.redraw_all();
     }
+}
+
+fn popup_frame(c: &mut [u8], size: (i32, i32), x: i32, y: i32, w: i32, h: i32) {
+    let (width, height) = size;
+    // Layer surfaces have no compositor decoration: paint a soft, premultiplied
+    // shadow into the transparent shield to lift the popup above the desktop.
+    for yy in (y - 12).max(0)..(y + h + 20).min(height) {
+        for xx in (x - 16).max(0)..(x + w + 16).min(width) {
+            let dx = (x - xx).max(xx - (x + w - 1)).max(0) as f32;
+            let dy = (y + 4 - yy).max(yy - (y + h + 3)).max(0) as f32;
+            let alpha = (30.0 * (-(dx * dx + dy * dy) / 50.0).exp()).round() as u32;
+            let p = ((yy * width + xx) * 4) as usize;
+            c[p..p + 4].copy_from_slice(&(alpha << 24).to_le_bytes());
+        }
+    }
+    rect(c, size, x, y, w, h, 0xff41464c);
+    rect(c, size, x + 1, y + 1, w - 2, h - 2, 0xff20242a);
 }
 
 fn rect(c: &mut [u8], (width, height): (i32, i32), x: i32, y: i32, w: i32, h: i32, color: u32) {
