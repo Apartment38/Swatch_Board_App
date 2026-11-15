@@ -340,6 +340,18 @@ impl App {
                     (self.palette.view, self.palette.view_text)
                 };
                 rect(canvas, (width, height), xx, yy, cw - 4, ch - 4, background);
+                if index == self.selected {
+                    // Separate the focus accent from a matching swatch, using
+                    // the scheme's contrasting selection foreground.
+                    for (dx, dy, w, h) in [
+                        (1, 1, cw - 6, 1),
+                        (1, ch - 6, cw - 6, 1),
+                        (1, 1, 1, ch - 6),
+                        (cw - 6, 1, 1, ch - 6),
+                    ] {
+                        rect(canvas, (width, height), xx + dx, yy + dy, w, h, foreground);
+                    }
+                }
                 let color = u32::from_str_radix(
                     entry.1.trim_start_matches('#').get(..6).unwrap_or("000000"),
                     16,
