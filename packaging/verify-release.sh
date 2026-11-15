@@ -42,6 +42,8 @@ for category in ("plugins", "schemas"):
             raise RuntimeError(f"{category}/{relative}: installed bytes differ")
 if (prefix / "share/licenses/swatch-board/LICENSE").read_bytes() != (source / "LICENSE").read_bytes():
     raise RuntimeError("installed license differs")
+if (prefix / "share/licenses/swatch-board/THIRD_PARTY_NOTICES.txt").read_bytes() != (source / "THIRD_PARTY_NOTICES.txt").read_bytes():
+    raise RuntimeError("installed third-party notices differ")
 for name in ("ghostty", "zed", "kde", "example-terminal"):
     plugin = prefix / "share/swatch-board/plugins" / name
     manifest = json.loads((plugin / "manifest.json").read_text())

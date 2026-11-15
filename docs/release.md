@@ -49,13 +49,30 @@ makechrootpkg -c -r "$CHROOT"
 namcap PKGBUILD swatch-board-*.pkg.tar.zst
 ```
 
-Review dependency licenses before every release. `Cargo.lock` pins versions
+Review dependency licenses before every release. `THIRD_PARTY_NOTICES.txt` is a
+conservative collection for all 431 registry packages in the current lockfile,
+including build-time and non-Linux dependencies. It contains matching license,
+copyright and notice files from checksum-verified crate archives, the egui
+bundled font text files, and where available license files retrieved from the
+exact upstream Git commit recorded in the crate. The installer includes this
+collection alongside the project license. Its presence is not a completed
+license audit: filename-based collection can miss other notices or obligations.
+The collection explicitly marks eight packages for which no notice file was
+found; `hexf-parse` is in the prior Linux inventory and declares CC0-1.0, while
+the remaining marked packages concern Apple, Windows or UEFI targets. Confirm
+actual shipped dependencies, inspect missing upstream material and all bundled
+native libraries and fonts, and review applicable license obligations before
+distribution. Recollect and review the notices whenever the lockfile changes.
+The Arch recipe still pins an older source commit, so its pin must be updated to
+a commit containing the notice collection before a package can include it.
+
+`Cargo.lock` pins versions
 and checksums, but does not constitute an SPDX/license-notice audit. The recorded
 `dependency-license-inventory.json` enumerates metadata declarations and candidate
 notice-file gaps only; some upstream crate archives omit their own notice files.
 The installed project MIT license is not proof that all bundled code/font
 redistribution obligations are satisfied. Obtain and review the exact-version
-third-party notices before public distribution. **This local artifact is not
+remaining third-party notices before public distribution. **This local artifact is not
 approved for public release.** Neither a legal/notice audit nor an independent
 reproducibility comparison has been completed.
 

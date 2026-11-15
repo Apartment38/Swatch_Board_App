@@ -51,6 +51,7 @@ install -m 644 "$root/share/icons/hicolor/scalable/apps/org.apartment38.SwatchBo
 install -m 644 "$root/share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml" \
     "$destdir$prefix/share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml"
 install -m 644 "$root/LICENSE" "$destdir$prefix/share/licenses/swatch-board/LICENSE"
+install -m 644 "$root/THIRD_PARTY_NOTICES.txt" "$destdir$prefix/share/licenses/swatch-board/THIRD_PARTY_NOTICES.txt"
 install -d "$destdir$prefix/share/swatch-board/plugins" "$destdir$prefix/share/swatch-board/schemas"
 cp -R "$root/plugins/." "$destdir$prefix/share/swatch-board/plugins/"
 cp -R "$root/schemas/." "$destdir$prefix/share/swatch-board/schemas/"

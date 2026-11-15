@@ -47,6 +47,8 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(metainfo.is_file())
         self.assertIn("<id>org.apartment38.SwatchBoard.Board</id>", metainfo.read_text())
         self.assertTrue((prefix / "share/swatch-board/plugins/example-terminal/manifest.json").is_file())
+        notices = prefix / "share/licenses/swatch-board/THIRD_PARTY_NOTICES.txt"
+        self.assertEqual(notices.read_bytes(), (ROOT / "THIRD_PARTY_NOTICES.txt").read_bytes())
 
     def test_missing_worker_fails_before_writing_stage(self):
         (self.bindir / "swatch-board-theme-worker").unlink()
