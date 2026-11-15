@@ -8,6 +8,7 @@ rust-version.workspace = true
 [dependencies]
 tokio = { workspace = true, features = ["signal"] }
 zbus.workspace = true
+swatch-board-config-core = { path = "../config-core" }
 
 [dev-dependencies]
 zbus = { workspace = true, features = ["p2p", "tokio"] }

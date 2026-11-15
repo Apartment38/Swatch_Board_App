@@ -2,9 +2,10 @@
 
 Build beautiful palettes with swatches.
 
-Swatch Board is a Rust-only KDE Plasma Wayland color utility. The tray, history,
-settings, Board shell, Color Mixer, and Palette Editor have passed target-desktop
-acceptance. The replacement native KWin picker still needs desktop acceptance.
+Swatch Board is a KDE Plasma Wayland color utility with a Rust frontend and a
+GPL-2.0-or-later C++ KWin effect. The tray, history, settings, Board shell,
+Color Mixer, and Palette Editor have passed target-desktop acceptance. The
+replacement picker still needs desktop acceptance.
 The Theme Generator's runtime-authored external-plugin workflow has passed native
 KDE Wayland acceptance; this does not establish physical testing of every bundled
 target plugin. See the [current handoff](docs/current-handoff.md).
@@ -16,10 +17,14 @@ cargo build --offline --workspace --locked
 cargo test --offline --workspace --locked
 cargo fmt --all -- --check
 cargo clippy --offline --workspace --all-targets --locked -- -D warnings
+cmake -S kwin -B target/kwin -DCMAKE_BUILD_TYPE=Release
+cmake --build target/kwin
 ```
 
-Offline commands require the pinned dependencies to be cached already. A first
-build on a fresh machine needs network access and Wayland development packages.
+Offline commands require cached Rust dependencies. A fresh build needs network
+access, a C++ compiler, CMake, extra-cmake-modules, Qt 6 and matching KWin
+development headers/libraries, Vulkan headers, and Wayland development packages. KWin's effect
+ABI depends on the installed KWin version: rebuild the plugin after KWin changes.
 
 ## Run the tray
 
@@ -52,19 +57,12 @@ To run the picker directly from a KDE Plasma Wayland desktop session:
 cargo run --offline --locked -p swatch-board-picker
 ```
 
-The picker invokes KWin's native ColorPicker over the session bus and uses KDE's
-cursor-centered Magnifier at a minimum of 8× while picking, rounded up using KDE's
-zoom steps. KDE controls its appearance and native cursor; there are no picker
-radius or zoom options. No ScreenCast prompt, screen-capture portal or
-picker desktop entry is required. The selected `#RRGGBB` value goes to stdout.
-When run directly the picker does not update history or clipboard; use the tray
-for those actions.
-
-An inactive loaded Zoom effect is temporarily replaced by Magnifier and restored
-afterward; already-active user magnification is left alone. Normal selection,
-cancellation, errors and graceful stops restore changes made by the picker.
-Forced termination or compositor failure can prevent cleanup: use KDE's Meta+0
-shortcut or Desktop Effects settings to recover.
+The required KWin effect displays a crosshair with a square around the current
+pixel, a live color swatch and `#RRGGBB`. Configure integer `picker_zoom` in
+Settings (1–32, default 4), or use `--zoom` for a direct pick. There is no
+ScreenCast prompt, screen-capture portal, or fallback picker. The selected
+`#RRGGBB` goes to stdout; direct picking does not update history or clipboard.
+The tray's GlobalShortcuts integration still uses the desktop portal.
 
 Inspect the CLI without opening a capture session:
 
@@ -73,7 +71,7 @@ Inspect the CLI without opening a capture session:
 ./target/debug/swatch-board-picker --version
 ```
 
-The picker requires access to the KDE session D-Bus and KWin ColorPicker service.
+The picker requires the installed matching KWin plugin and KDE session D-Bus.
 The other desktop components also require the Wayland session.
 
 ## History and clipboard settings
@@ -89,6 +87,7 @@ auto_copy = true
 clipboard_format = "hex"
 pick_shortcut = "Meta+Shift+C"
 history_shortcut = "Meta+Shift+H"
+picker_zoom = 4
 hide_board_while_picking = false
 autostart = false
 version = 1
@@ -115,12 +114,13 @@ conflict check. KDE's system shortcut settings also provide an explicit fallback
 when the portal is unavailable. Autostart uses one per-user XDG desktop entry.
 The Board applies the hide preference to picks started from its own window.
 
-For a staged installation, build release binaries and use
-`PREFIX=/usr DESTDIR=/tmp/swatch-board-stage bash packaging/install.sh`.
-The installer includes notices from the active Rust toolchain; when installing
-previously built binaries, set `RUST_LICENSE_DIR` to the `share/doc/rust`
-directory from the toolchain that built them. See `docs/release.md` for the
-distribution review requirements.
+Build the effect as above and first verify it in an isolated KWin session. System
+plugin installation and loading require user confirmation; never restart live
+KWin. For staging use `PREFIX=/usr DESTDIR=/tmp/swatch-board-stage
+bash packaging/install.sh`. The installer requires the built effect and installs
+it under Qt's plugin root; `QT_PLUGIN_DIR` overrides discovery and `EFFECT_LIB`
+overrides its build path. Set `RUST_LICENSE_DIR` to the build toolchain's
+`share/doc/rust` if it is no longer active. See `docs/release.md`.
 
 ## Run the Board
 
@@ -234,8 +234,7 @@ supported.
 The Arch-first PKGBUILD, locked source-build notes, staged installation and
 installed theme-worker smoke check are in [release documentation](docs/release.md).
 The local release smoke is `packaging/verify-release.sh`; it builds all six
-release executables, stages them under a temporary prefix, and verifies a real
-installed-helper render against `plugins/example-terminal/`. It does not start
-desktop applications. See the [test matrix](docs/testing.md) for verified KDE
-coverage and outstanding distro/physical gates, and the
+release executables and the effect, stages them, and verifies installed payload
+and helper rendering. It does not start desktop applications. See the
+[test matrix](docs/testing.md) for coverage and outstanding gates, and the
 [troubleshooting guide](docs/troubleshooting.md) for recovery steps.

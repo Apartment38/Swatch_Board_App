@@ -2,45 +2,39 @@
 
 ## KWin picker cutover
 
-The custom ScreenCast/PipeWire magnifier is replaced by KWin's native
-`org.kde.KWin` ColorPicker and cursor-centered Magnifier. KDE manages selection,
-cancellation and magnifier appearance; picking needs no ScreenCast prompt,
-screen-capture portal or desktop entry. The tray still uses the GlobalShortcuts
-portal. Legacy magnifier radius and zoom settings are migrated rather than
-retained as runtime options.
+The picker now targets a required custom KWin effect: crosshair with a square
+around the current pixel, live swatch and HEX, and integer `picker_zoom` 1–32
+(default 4; Settings or CLI `--zoom`). It uses no ScreenCast portal or fallback;
+the tray still uses GlobalShortcuts. Build against the installed KWin ABI and
+rebuild after KWin changes. Verify in an isolated KWin first; system plugin
+installation/loading requires user confirmation. Never restart live KWin.
 
-An inactive loaded Zoom effect is temporarily replaced by Magnifier and restored;
-already-active user magnification is left alone. Normal pick, cancel, error and
-graceful stop restore app-owned changes. Forced termination or compositor failure
-can prevent cleanup; recover with KDE's Meta+0 shortcut or Desktop Effects
-settings. Native selection, cancellation and multioutput acceptance remain
-pending; the older picker acceptance and capture evidence below do not qualify
-the replacement.
+Verification on KWin 6.8.2: the effect built and loaded in an isolated two-output
+virtual compositor. Actual framebuffer/input tests covered live swatch/HEX,
+the one-physical-pixel cursor square, 1×/4×/8×/32× selection, both outputs, Escape,
+right-click, client death, caller-scoped cancellation, no click-through, and
+restored application input. A separate 1.5× scale scenario verified the physical
+pixel square and Enter selection; removing the active output cancelled cleanly.
+The actual Settings UI showed 4× by default, saved 8×, and a picker with no CLI
+override loaded that saved value. Durable synthetic-scene evidence:
+`docs/evidence/kwin-picker/integration.json` and adjacent screenshots.
 
-Verification: workspace debug build, 30 targeted picker/config/tray/storage tests,
-11 packaging checks, targeted all-targets strict Clippy and workspace rustfmt
-check passed. Private peer-D-Bus tests cover QColor's `(u)` wire representation,
-channel decoding, cancellation and compositor errors; they do not invoke the live
-desktop. The live KWin interface was introspected and exposes `pick → (u)`.
-Removed the obsolete capture core, native overlay probes and Wayland fixtures;
-stored RGBA channels now belong to storage. The lockfile drops 25 registry
-packages, and their notice sections were removed without changing retained text.
+Workspace debug build, 17 targeted Rust tests, 12 packaging tests, targeted strict
+Clippy and formatting passed. Staged installation used the real effect and all
+six executables, with matching Arch Rust toolchain notices. Vulkan headers were
+downloaded into ignored build storage; the Arch recipe now declares them.
 
-Magnifier verification: 17 picker/tray tests, targeted strict Clippy, rustfmt and
-the workspace debug build passed. On KWin 6.8.2, a throwaway client using the
-production lifecycle displayed KDE's cursor-centered 2× loupe (Spectacle capture:
-ignored `target/native-magnifier-smoke.png`). Fresh D-Bus readback after normal
-completion confirmed Magnifier unloaded and the previous Zoom effect loaded at
-`targetZoom: 1`. This verifies the native effect lifecycle, not a full color-pick
-or multioutput acceptance round. The throwaway example was removed.
+After explicit user approval and interactive administrator authentication, the
+effect and its GPL license were installed into the system Qt plugin/license
+directories, and the effect loaded into the live KWin without restarting it.
+A live 4× overlay screenshot was inspected; automatic cancellation left `active`
+false. The updated tray and Board are running for user testing. The live image
+is ignored `target/custom-picker-live-desktop.png`, not committed desktop content.
+All private test processes were stopped and throwaway driver/scripts removed.
 
-Zoom increase: picker-owned magnification now reaches at least 8× using KDE's
-Zoom In steps (8.599633919999999× with the tested default 1.2 factor). Existing
-active accessibility magnification remains untouched. The user chose to retain
-KWin's native cursor rather than add a compositor extension for a pixel-square
-crosshair. Eleven standalone picker tests, targeted strict Clippy, formatting
-and the picker build passed. The live higher-zoom appearance is captured in
-ignored `target/native-magnifier-8x-smoke.png`.
+Screen-lock, HDR and transformed-output acceptance remain untested. Broader
+physical selection/multioutput acceptance and release qualification remain open.
+Earlier picker and magnifier evidence below is historical.
 
 
 ## UX gauntlet — stopped at user boundary

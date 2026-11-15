@@ -1,4 +1,4 @@
-//! Use the same compositor-owned picker as Plasma's color picker widget.
+//! Prompt-free selection provided by the matching Swatch Board KWin effect.
 use zbus::{Connection, Error, Proxy};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -7,7 +7,7 @@ pub enum Outcome {
     Cancelled,
 }
 
-pub async fn pick() -> zbus::Result<Outcome> {
+pub async fn pick(zoom: u32) -> zbus::Result<Outcome> {
     use tokio::signal::unix::{SignalKind, signal};
     use zbus::fdo::{RequestNameFlags, RequestNameReply};
 
@@ -26,37 +26,58 @@ pub async fn pick() -> zbus::Result<Outcome> {
     }
     let mut terminate = signal(SignalKind::terminate()).map_err(Error::from)?;
     let mut interrupt = signal(SignalKind::interrupt()).map_err(Error::from)?;
-    let mut magnifier = crate::magnifier::Magnifier::start(&connection).await?;
-    let result = tokio::select! {
-        result = pick_on(&connection) => result,
-        _ = terminate.recv() => Ok(Outcome::Cancelled),
-        _ = interrupt.recv() => Ok(Outcome::Cancelled),
-    };
-    let restored = magnifier.restore().await;
-    match (result, restored) {
-        (result, Ok(())) => result,
-        (Ok(_), Err(error)) => Err(error),
-        (Err(error), Err(cleanup)) => Err(Error::Failure(format!(
-            "{error}; restoring KDE magnification: {cleanup}"
-        ))),
+    load_effect(&connection).await?;
+    let proxy = effect_proxy(&connection).await?;
+    tokio::select! {
+        result = pick_on(&proxy, zoom) => result,
+        _ = terminate.recv() => cancel(&proxy).await,
+        _ = interrupt.recv() => cancel(&proxy).await,
     }
 }
 
-async fn pick_on(connection: &Connection) -> zbus::Result<Outcome> {
-    let proxy = Proxy::new(
+async fn load_effect(connection: &Connection) -> zbus::Result<()> {
+    let effects = Proxy::new(
         connection,
         "org.kde.KWin",
-        "/ColorPicker",
-        "org.kde.kwin.ColorPicker",
+        "/Effects",
+        "org.kde.kwin.Effects",
     )
     .await?;
-    // QColor is a struct containing QRgb (0xAARRGGBB), not a bare uint32.
-    // The outer tuple is the D-Bus method's argument list.
-    let result: zbus::Result<((u32,),)> = proxy.call("pick", &()).await;
+    let loaded: bool = effects
+        .call("isEffectLoaded", &("swatchboardpicker",))
+        .await?;
+    if !loaded {
+        let loaded: bool = effects.call("loadEffect", &("swatchboardpicker",)).await?;
+        if !loaded {
+            return Err(Error::Failure(
+                "KWin could not load the Swatch Board picker effect. Install the effect built against your running KWin version.".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+async fn effect_proxy(connection: &Connection) -> zbus::Result<Proxy<'_>> {
+    Proxy::new(
+        connection,
+        "org.kde.KWin",
+        "/org/apartment38/SwatchBoard/Picker",
+        "org.apartment38.SwatchBoard.PickerEffect1",
+    )
+    .await
+}
+
+async fn cancel(proxy: &Proxy<'_>) -> zbus::Result<Outcome> {
+    proxy.call::<_, _, ()>("cancel", &()).await?;
+    Ok(Outcome::Cancelled)
+}
+
+async fn pick_on(proxy: &Proxy<'_>, zoom: u32) -> zbus::Result<Outcome> {
+    let result: zbus::Result<u32> = proxy.call("pick", &(zoom,)).await;
     match result {
-        Ok(((argb,),)) => Ok(Outcome::Selected(argb & 0x00ff_ffff)),
+        Ok(argb) => Ok(Outcome::Selected(argb & 0x00ff_ffff)),
         Err(Error::MethodError(name, _, _))
-            if name.as_str() == "org.kde.kwin.ColorPicker.Error.Cancelled" =>
+            if name.as_str() == "org.apartment38.SwatchBoard.Picker.Error.Cancelled" =>
         {
             Ok(Outcome::Cancelled)
         }
@@ -69,7 +90,7 @@ mod tests {
     use super::*;
 
     #[derive(Debug, zbus::DBusError)]
-    #[zbus(prefix = "org.kde.kwin.ColorPicker.Error")]
+    #[zbus(prefix = "org.apartment38.SwatchBoard.Picker.Error")]
     enum PickerError {
         Cancelled(String),
         Failed(String),
@@ -79,13 +100,16 @@ mod tests {
         reply: Result<u32, bool>,
     }
 
-    #[zbus::interface(name = "org.kde.kwin.ColorPicker")]
+    #[zbus::interface(name = "org.apartment38.SwatchBoard.PickerEffect1")]
     impl Picker {
         #[zbus(name = "pick")]
-        async fn pick(&self) -> Result<((u32,),), PickerError> {
+        async fn pick(&self, zoom: u32) -> Result<u32, PickerError> {
+            if !(1..=32).contains(&zoom) {
+                return Err(PickerError::Failed("invalid zoom".into()));
+            }
             match self.reply {
-                Ok(argb) => Ok(((argb,),)),
-                Err(true) => Err(PickerError::Cancelled("Color picking got cancelled".into())),
+                Ok(argb) => Ok(argb),
+                Err(true) => Err(PickerError::Cancelled("Color picking cancelled".into())),
                 Err(false) => Err(PickerError::Failed(
                     "Color picking is already in progress".into(),
                 )),
@@ -94,7 +118,6 @@ mod tests {
     }
 
     async fn request(reply: Result<u32, bool>) -> zbus::Result<Outcome> {
-        // A private peer connection cannot reach the user's compositor or portals.
         let (server, client) = tokio::net::UnixStream::pair().unwrap();
         let guid = zbus::Guid::generate();
         let (server, client) = tokio::join!(
@@ -102,17 +125,18 @@ mod tests {
                 .server(guid)
                 .unwrap()
                 .p2p()
-                .serve_at("/ColorPicker", Picker { reply })
+                .serve_at("/org/apartment38/SwatchBoard/Picker", Picker { reply })
                 .unwrap()
                 .build(),
             zbus::connection::Builder::unix_stream(client).p2p().build(),
         );
         let _server = server.unwrap();
-        pick_on(&client.unwrap()).await
+        let client = client.unwrap();
+        pick_on(&effect_proxy(&client).await?, 4).await
     }
 
     #[tokio::test]
-    async fn decodes_qcolor_struct_without_swapping_channels_or_copying_alpha() {
+    async fn decodes_selected_color_without_swapping_channels_or_copying_alpha() {
         assert_eq!(
             request(Ok(0xff247ac3)).await.unwrap(),
             Outcome::Selected(0x247ac3)
@@ -126,10 +150,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn compositor_failures_are_not_treated_as_cancellation() {
+    async fn effect_failures_are_not_treated_as_cancellation() {
         assert!(
             matches!(request(Err(false)).await, Err(Error::MethodError(name, _, _))
-            if name.as_str() == "org.kde.kwin.ColorPicker.Error.Failed")
+            if name.as_str() == "org.apartment38.SwatchBoard.Picker.Error.Failed")
         );
     }
 }

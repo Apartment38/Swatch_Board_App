@@ -1,0 +1,10 @@
+{
+    "KPlugin": {
+        "Id": "swatchboardpicker",
+        "Name": "Swatch Board Picker",
+        "Description": "Interactive pixel color picker for Swatch Board",
+        "License": "GPL-2.0-or-later",
+        "EnabledByDefault": false
+    },
+    "X-KDE-Ordering": 99
+}

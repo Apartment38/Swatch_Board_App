@@ -473,7 +473,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         history_child = None;
                     }
-                    match Command::new(picker_path()).stdout(Stdio::piped()).kill_on_drop(true).spawn() {
+                    match Command::new(picker_path()).arg("--zoom").arg(config.picker_zoom.to_string()).stdout(Stdio::piped()).kill_on_drop(true).spawn() {
                         Ok(child) => {
                             let tx = requests.clone();
                             let stop = shutdown_rx.clone();

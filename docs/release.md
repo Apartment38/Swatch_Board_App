@@ -2,18 +2,20 @@
 
 ## Arch Linux first
 
-`packaging/arch/PKGBUILD` is the initial distro recipe. It pins the application
-source payload to `efb069a24472e6336eedfe00ba729fc5585a5d8d` (`0.1.0-2`) and fetches Rust dependencies according to
-`Cargo.lock`; the compiler and platform libraries are supplied by the build
-system. This is a locked source build, not a claim of bit-for-bit reproducibility.
+`packaging/arch/PKGBUILD` is the initial distro recipe. Its current source pin
+predates the KWin effect cutover and must be updated at the next source
+checkpoint. The recipe fetches Rust dependencies according to `Cargo.lock`;
+the build system supplies the compiler and platform libraries. This is a locked
+source build, not a claim of bit-for-bit reproducibility.
 The Git source uses `SKIP` because makepkg verifies the fixed commit instead of
 an archive checksum. A release maintainer must set `_commit` to the full commit
 containing the release sources before publishing the recipe, then inspect the
 resulting `.SRCINFO` and source revision. Do not use a moving branch or tag as
 the source pin.
 
-The recipe's native build requirements are Rust/Cargo, Git, pkgconf, Wayland
-and libxkbcommon development metadata. Runtime dependencies include glibc,
+The recipe's native build requirements are Rust/Cargo, a C++ compiler, CMake,
+extra-cmake-modules, Qt 6 and matching KWin development headers, Git, pkgconf,
+Vulkan headers, Wayland and libxkbcommon development metadata. Runtime dependencies include glibc,
 GCC runtime, KWin, libglvnd, and hicolor-icon-theme. The latter is required for
 the installed icon hierarchy. `options=('!lto')` is deliberate: Arch's GCC LTO
 C objects for bundled SQLite cannot be consumed by Rust's LLVM linker.
@@ -63,10 +65,9 @@ trees do not select any of them; `hexf-parse` is an optional dependency in the
 broader metadata inventory and declares CC0-1.0. See
 `docs/third-party-license-review.md` for the scope and evidence. Recollect and
 review the notices whenever the lockfile, target or features change.
-The Arch `0.1.0-3` recipe pins the local native-picker source checkpoint
-`c1bd7bfd396e8199acd727a043ef6287949ee11c`, including the notice collection.
-That source has not been pushed, and this package revision has not been built or
-release-qualified.
+The `0.1.0-3` source pin `c1bd7bfd396e8199acd727a043ef6287949ee11c`
+does not contain the new effect. The new recipe and package are not
+release-qualified; update the pin and `.SRCINFO` only at a source checkpoint.
 
 `Cargo.lock` pins versions
 and checksums, but does not constitute an SPDX/license-notice audit. The recorded
@@ -94,25 +95,32 @@ cargo build --workspace --locked --offline
 cargo test --workspace --all-targets --locked --offline
 cargo clippy --workspace --all-targets --locked --offline -- -D warnings
 cargo fmt --all -- --check
+cmake -S kwin -B target/kwin -DCMAKE_BUILD_TYPE=Release
+cmake --build target/kwin
 packaging/verify-release.sh
 ```
 
-`verify-release.sh` builds the release workspace, runs installer contract tests,
-stages the actual release executables, checks the installed picker help/version,
-and invokes the installed theme worker for all four installed plugin golden
-fixtures. It verifies all installed plugin/schema bytes and the license. It
+`verify-release.sh` builds the release workspace and KWin effect, runs installer
+contract tests, stages the actual payload, checks the installed picker
+help/version, and invokes the installed theme worker for all four plugin golden
+fixtures. It verifies effect, license, and installed plugin/schema bytes. It
 does not launch a GUI, open D-Bus, alter desktop settings, or grant portal
 permissions. Desktop-file and AppStream validators are mandatory: missing tools
 fail the gate before building. This local gate is not a clean-chroot build or
 physical desktop acceptance.
 
-For a distro build, install the six executables beside each other. The theme
-worker is an internal helper and intentionally has no desktop launcher. The
-installer places plugins and schemas under `share/swatch-board`, the icon in
-the hicolor scalable application directory, five launchers in
-`share/applications`, AppStream data in `share/metainfo`, and the MIT license in
-`share/licenses/swatch-board`. Autostart remains opt-in and uses one per-user
-XDG desktop entry; no system service or second autostart mechanism is installed.
+Install the six executables beside each other; the theme worker has no desktop
+launcher. Install the required `target/kwin/lib/swatchboardpicker.so` under the
+Qt plugin root at `kwin/effects/plugins/swatchboardpicker.so`. The installer
+discovers the root using Qt tooling or pkg-config; `QT_PLUGIN_DIR` overrides it,
+`EFFECT_LIB` overrides the built effect, and `DESTDIR` stages absolute paths.
+`PREFIX` controls binaries and data. Missing effects fail installation. The
+payload also includes plugins, schemas, five launchers, icon, AppStream data,
+MIT and `kwin/LICENSE` GPL-2.0-or-later licenses, and Rust notices.
+Test the built plugin in an isolated KWin first. System installation and loading
+require user confirmation; never restart live KWin. KWin's effect ABI is tied to
+the installed version: rebuild against matching development files after upgrades.
+Autostart remains opt-in via one per-user XDG desktop entry.
 
 ## Version policy
 
@@ -134,7 +142,7 @@ XDG desktop entry; no system service or second autostart mechanism is installed.
 
 ## Compatibility targets and release gates
 
-The supported physical target is KDE Plasma 6 on Wayland with KWin ColorPicker.
+The supported physical target is KDE Plasma 6 on Wayland with the custom KWin effect.
 The tray's global shortcuts require a working GlobalShortcuts portal. Native
 acceptance of the replacement picker is pending. Fedora and openSUSE are
 compatibility targets to evaluate after Arch; their package names, portal

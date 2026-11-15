@@ -23,6 +23,8 @@ class InstallerTests(unittest.TestCase):
             path = self.bindir / name
             path.write_text("#!/bin/sh\nexit 99\n")
             path.chmod(0o755)
+        self.effect = self.root / "effect.so"
+        self.effect.write_bytes(b"test effect")
         self.stage = self.root / "stage"
         self.rust_notices = self.root / "rust-notices"
         (self.rust_notices / "licenses").mkdir(parents=True)
@@ -34,7 +36,8 @@ class InstallerTests(unittest.TestCase):
         return subprocess.run(
             ["bash", str(ROOT / "packaging/install.sh")],
             env={**os.environ, "PREFIX": "/usr/local", "DESTDIR": str(self.stage),
-                 "BINDIR": str(self.bindir), "RUST_LICENSE_DIR": str(self.rust_notices)},
+                 "BINDIR": str(self.bindir), "RUST_LICENSE_DIR": str(self.rust_notices),
+                 "EFFECT_LIB": str(self.effect), "QT_PLUGIN_DIR": "/opt/qt/plugins"},
             capture_output=True, text=True, check=False,
         )
 
@@ -43,6 +46,10 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         prefix = self.stage / "usr/local"
         self.assertEqual(sorted(p.name for p in (prefix / "bin").iterdir()), sorted(BINARIES))
+        effect = self.stage / "opt/qt/plugins/kwin/effects/plugins/swatchboardpicker.so"
+        self.assertEqual(effect.read_bytes(), self.effect.read_bytes())
+        self.assertEqual((prefix / "share/licenses/swatch-board/KWIN-LICENSE").read_bytes(),
+                         (ROOT / "kwin/LICENSE").read_bytes())
         worker = prefix / "bin/swatch-board-theme-worker"
         self.assertTrue(os.access(worker, os.X_OK))
         entries = list((prefix / "share/applications").glob("*.desktop"))
@@ -77,6 +84,13 @@ class InstallerTests(unittest.TestCase):
         result = self.install()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("swatch-board-theme-worker", result.stderr)
+        self.assertFalse(self.stage.exists())
+
+    def test_missing_effect_fails_before_writing_stage(self):
+        self.effect.unlink()
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Missing KWin effect", result.stderr)
         self.assertFalse(self.stage.exists())
 
 

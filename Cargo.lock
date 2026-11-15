@@ -2904,6 +2904,7 @@ dependencies = [
 name = "swatch-board-picker"
 version = "0.1.0"
 dependencies = [
+ "swatch-board-config-core",
  "tokio",
  "zbus",
 ]

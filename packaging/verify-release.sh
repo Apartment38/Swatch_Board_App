@@ -12,8 +12,12 @@ stage=$(mktemp -d "${TMPDIR:-/tmp}/swatch-release.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 cd "$root"
 cargo build --release --offline --workspace --locked
+cmake -S kwin -B target/kwin -DCMAKE_BUILD_TYPE=Release
+cmake --build target/kwin
 python3 -m unittest discover -s packaging -p 'test_*.py'
-PREFIX=/usr DESTDIR="$stage" BINDIR="$root/target/release" bash packaging/install.sh
+PREFIX=/usr DESTDIR="$stage" BINDIR="$root/target/release" QT_PLUGIN_DIR=/usr/lib/qt6/plugins bash packaging/install.sh
+cmp "$root/target/kwin/lib/swatchboardpicker.so" "$stage/usr/lib/qt6/plugins/kwin/effects/plugins/swatchboardpicker.so"
+cmp "$root/kwin/LICENSE" "$stage/usr/share/licenses/swatch-board/KWIN-LICENSE"
 bin="$stage/usr/bin"
 for name in swatch-board-picker swatch-board-tray swatch-board-history \
             swatch-board-config swatch-board swatch-board-theme-worker; do

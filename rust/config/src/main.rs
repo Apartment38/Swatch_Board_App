@@ -155,6 +155,12 @@ impl eframe::App for Settings {
                     number(ui, "Columns", &mut self.config.history_columns, 1..=12);
                     number(ui, "Rows", &mut self.config.history_rows, 1..=12);
                     ui.separator();
+                    ui.heading("Picker");
+                    ui.horizontal(|ui| {
+                        ui.label("Zoom");
+                        ui.add(egui::DragValue::new(&mut self.config.picker_zoom).range(1..=32).suffix("×"));
+                    });
+                    ui.separator();
                     ui.heading("Clipboard");
                     ui.checkbox(&mut self.config.auto_copy, "Automatically copy picked colors");
                     egui::ComboBox::from_label("Format").selected_text(&self.config.clipboard_format).show_ui(ui, |ui| {
