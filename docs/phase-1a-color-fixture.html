@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Swatch Board Phase 1A Pixel Fixture</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font: 16px/1.4 system-ui, sans-serif;
+        background: #17191d;
+        color: #f5f5f5;
+      }
+      body {
+        margin: 0;
+        padding: 28px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.5rem;
+      }
+      p {
+        margin: 0 0 22px;
+        color: #c5cad3;
+      }
+      main {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(180px, 1fr));
+        gap: 14px;
+        max-width: 1240px;
+      }
+      figure {
+        margin: 0;
+        overflow: hidden;
+        border: 1px solid #ffffff40;
+        border-radius: 10px;
+        background: #242830;
+      }
+      .swatch {
+        height: 220px;
+        background: var(--swatch);
+      }
+      figcaption {
+        padding: 10px 12px;
+        font: 600 15px/1.2 ui-monospace, monospace;
+      }
+      @media (max-width: 820px) {
+        main { grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Phase 1A pixel fixture</h1>
+    <p>Run the picker, move over a swatch's center, and compare its readout and returned value.</p>
+    <main aria-label="Flat color samples">
+      <figure style="--swatch: #ff0000"><div class="swatch"></div><figcaption>#FF0000</figcaption></figure>
+      <figure style="--swatch: #00ff00"><div class="swatch"></div><figcaption>#00FF00</figcaption></figure>
+      <figure style="--swatch: #0000ff"><div class="swatch"></div><figcaption>#0000FF</figcaption></figure>
+      <figure style="--swatch: #3a2f2d"><div class="swatch"></div><figcaption>#3A2F2D</figcaption></figure>
+      <figure style="--swatch: #f2c14e"><div class="swatch"></div><figcaption>#F2C14E</figcaption></figure>
+      <figure style="--swatch: #21a0a0"><div class="swatch"></div><figcaption>#21A0A0</figcaption></figure>
+      <figure style="--swatch: #8b5cf6"><div class="swatch"></div><figcaption>#8B5CF6</figcaption></figure>
+      <figure style="--swatch: #f4f1de"><div class="swatch"></div><figcaption>#F4F1DE</figcaption></figure>
+    </main>
+  </body>
+</html>

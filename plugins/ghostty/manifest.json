@@ -1,0 +1,17 @@
+{
+  "id": "ghostty",
+  "name": "Ghostty",
+  "version": "1.0.0",
+  "api_version": 1,
+  "target": "ghostty",
+  "target_versions": [
+    "1.x"
+  ],
+  "outputs": [
+    {
+      "path": "swatch-board",
+      "template": "templates/theme.j2",
+      "format": "ghostty"
+    }
+  ]
+}

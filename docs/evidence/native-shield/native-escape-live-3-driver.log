@@ -1,0 +1,31 @@
+fake-input version=6 action=Key(1); requests are not proof of compositor authorization or delivery
+requests flushed and compositor roundtrip completed; verify fixture/picker logs for effect
+host_app_registered=org.apartment38.SwatchBoard.NativeProbe
+global_shortcuts_version=2
+mode=authorize; requesting preferred_trigger=Escape (no fallback)
+session_handle=Session("/org/freedesktop/portal/desktop/session/1_317/ashpd_g718itvHv7")
+bound_shortcut_id=cancel-native-pick; actual_trigger_description="Esc"
+waiting_for_activation_seconds=30; manually press Escape only if authorized
+observed_shortcut_id=cancel-native-pick; observed_session_handle=/org/freedesktop/portal/desktop/session/1_317/ashpd_g718itvHv7; bound_trigger_description="Esc"
+activation_observed=true; confirm actual trigger and unchanged overlay focus separately
+session_close=ok
+
+fake-input version=6 action=Key(1); requests are not proof of compositor authorization or delivery
+requests flushed and compositor roundtrip completed; verify fixture/picker logs for effect
+{
+  "probe_exit": 0,
+  "activation_observed": true,
+  "session_closed": true,
+  "fixture_remained_alive_during_global_escape": true,
+  "fixture_exit_after_session_close": 0,
+  "escape_reached_fixture_after_close": true,
+  "fixture_events": [
+    "EVENT n=1 unix_ms=1792597513004 elapsed_ms=5 output_scale=2 buffer_scale_remains=1 focused=false presses=0 releases=0 motions=0 keyboard_enters=0 keyboard_leaves=0",
+    "EVENT n=2 unix_ms=1792597513004 elapsed_ms=5 configure size=900x650 state=WindowState(0x0) focused=false presses=0 releases=0 motions=0 keyboard_enters=0 keyboard_leaves=0",
+    "EVENT n=3 unix_ms=1792597513012 elapsed_ms=13 pointer_enter local_x=560.988 local_y=561.988 focused=false presses=0 releases=0 motions=0 keyboard_enters=0 keyboard_leaves=0",
+    "EVENT n=4 unix_ms=1792597513012 elapsed_ms=13 keyboard_enter focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0",
+    "EVENT n=5 unix_ms=1792597513012 elapsed_ms=13 configure size=900x650 state=WindowState(ACTIVATED) focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0",
+    "EVENT n=6 unix_ms=1792597514021 elapsed_ms=1022 key_press KeyEvent { time: 95695113, raw_code: 1, keysym: XK_Escape, utf8: Some(\"\\u{1b}\") } focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0",
+    "EVENT n=7 unix_ms=1792597514021 elapsed_ms=1022 shutdown focused=true presses=0 releases=0 motions=0 keyboard_enters=1 keyboard_leaves=0"
+  ]
+}

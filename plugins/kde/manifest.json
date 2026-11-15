@@ -1,0 +1,18 @@
+{
+  "id": "kde",
+  "name": "KDE Plasma",
+  "version": "1.0.0",
+  "api_version": 1,
+  "target": "kde",
+  "target_versions": [
+    "5",
+    "6"
+  ],
+  "outputs": [
+    {
+      "path": "SwatchBoard.colors",
+      "template": "templates/theme.j2",
+      "format": "kde"
+    }
+  ]
+}

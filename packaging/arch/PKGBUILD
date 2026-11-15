@@ -1,0 +1,41 @@
+# Maintainer: Swatch Board contributors
+pkgname=swatch-board
+pkgver=0.1.0
+pkgrel=2
+pkgdesc='KDE Plasma Wayland color picker, palette editor, and theme exporter'
+arch=('x86_64' 'aarch64')
+url='https://github.com/Apartment38/Swatch_Board_App'
+license=('MIT')
+# GCC bytecode from bundled SQLite cannot be linked by Rust's LLVM linker.
+options=('!lto')
+depends=('gcc-libs' 'glibc' 'hicolor-icon-theme' 'libglvnd' 'pipewire')
+makedepends=('cargo' 'clang' 'git' 'libxkbcommon' 'pkgconf' 'rust' 'wayland')
+optdepends=('xdg-desktop-portal-kde: screen capture and global shortcut portal backend'
+            'kscreen: primary-output fallback when the pointer output is unavailable')
+_commit=efb069a24472e6336eedfe00ba729fc5585a5d8d
+source=("swatch-board::git+https://github.com/Apartment38/Swatch_Board_App.git#commit=${_commit}")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$srcdir/swatch-board"
+  cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
+}
+
+build() {
+  cd "$srcdir/swatch-board"
+  CARGO_NET_OFFLINE=true cargo build --release --workspace --locked
+}
+
+check() {
+  cd "$srcdir/swatch-board"
+  # Tests launch the normal sibling helper, not Cargo's test harness binary.
+  CARGO_NET_OFFLINE=true cargo build --workspace --locked
+  CARGO_NET_OFFLINE=true cargo test --workspace --all-targets --locked
+  CARGO_NET_OFFLINE=true cargo clippy --workspace --all-targets --locked -- -D warnings
+}
+
+package() {
+  cd "$srcdir/swatch-board"
+  PREFIX=/usr DESTDIR="$pkgdir" BINDIR="$srcdir/swatch-board/target/release" \
+    bash packaging/install.sh
+}

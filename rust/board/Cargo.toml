@@ -1,0 +1,22 @@
+[package]
+name = "swatch-board"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+eframe = { version = "=0.31.1", default-features = false, features = ["default_fonts", "glow", "wayland", "x11", "persistence"] }
+futures-util = "=0.3.34"
+serde = { version = "1", features = ["derive"] }
+swatch-board-color = { path = "../color" }
+swatch-board-config-core = { path = "../config-core" }
+swatch-board-ipc = { path = "../ipc" }
+swatch-board-storage = { path = "../storage" }
+swatch-board-theme-core = { path = "../theme-core" }
+serde_json = "1"
+image = { version = "0.25", default-features = false, features = ["png"] }
+tokio = { workspace = true, features = ["process"] }
+zbus.workspace = true
+raw-window-handle = "=0.6.2"
+wayland-client = { version = "=0.31.15", features = ["system"] }

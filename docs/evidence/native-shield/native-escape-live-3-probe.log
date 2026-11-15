@@ -1,0 +1,9 @@
+host_app_registered=org.apartment38.SwatchBoard.NativeProbe
+global_shortcuts_version=2
+mode=authorize; requesting preferred_trigger=Escape (no fallback)
+session_handle=Session("/org/freedesktop/portal/desktop/session/1_317/ashpd_g718itvHv7")
+bound_shortcut_id=cancel-native-pick; actual_trigger_description="Esc"
+waiting_for_activation_seconds=30; manually press Escape only if authorized
+observed_shortcut_id=cancel-native-pick; observed_session_handle=/org/freedesktop/portal/desktop/session/1_317/ashpd_g718itvHv7; bound_trigger_description="Esc"
+activation_observed=true; confirm actual trigger and unchanged overlay focus separately
+session_close=ok

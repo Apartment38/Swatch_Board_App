@@ -1,0 +1,1 @@
+EVENT n=19 unix_ms=1792634635539 elapsed_ms=102988 pointer_leave local_x=450.000 local_y=150.000 focused=true presses=1 releases=1 motions=2 keyboard_enters=3 keyboard_leaves=2

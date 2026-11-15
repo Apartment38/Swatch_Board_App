@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Swatch Board History
+Comment=View and copy recent colors
+Exec=swatch-board-history
+Icon=org.apartment38.SwatchBoard
+Terminal=false
+Categories=Utility;
+StartupNotify=false

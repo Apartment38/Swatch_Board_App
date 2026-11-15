@@ -1,0 +1,163 @@
+   Compiling swatch-board-picker v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/picker)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.31s
+     Running unittests src/main.rs (target/debug/deps/swatch_board_picker-7f5b43dce48da358)
+
+running 50 tests
+test capture::tests::decodes_all_negotiated_channel_orders_and_alpha ... ok
+test capture::tests::cursor_metadata_requires_valid_id_and_frame_bounds_not_hotspot ... ok
+test capture::tests::decodes_consecutive_frames_without_reusing_previous_pixels ... ok
+test capture::tests::cursor_only_update_reuses_image_without_refreshing_video_age ... ok
+test capture::tests::feed_replaces_backlog_with_latest_frame_per_stream ... ok
+test capture::tests::feed_only_accepts_authorized_streams_during_capture ... ok
+test capture::tests::feed_wait_wakes_for_publication_and_close ... ok
+test capture::tests::rejects_unnegotiated_pixel_formats ... ok
+test capture::tests::skips_stride_padding_between_rows ... ok
+test capture::tests::rejects_malformed_dimensions_strides_and_buffers ... ok
+test capture::tests::stop_request_or_dropped_sender_ends_capture ... ok
+test capture::tests::terminal_stream_states_report_failure_without_initial_disconnect_false_alarm ... ok
+test native::authority_tests::changed_empty_or_ambiguous_escape_assignment_fails_closed ... ok
+test native::authority_tests::left_without_presented_sample_is_error_not_cancelled_success ... ok
+test native::authority_tests::paired_right_release_cancels_but_waits_for_every_other_observed_button ... ok
+test native::authority_tests::timeout_with_observed_buttons_held_never_returns_a_successful_decision ... ok
+test native::authority_tests::unpaired_release_cannot_confirm_or_cancel ... ok
+test native::routing_tests::lens_geometry_uses_actual_target_frame_at_fractional_scales ... ok
+test native::routing_tests::pointer_output_routes_by_authorized_origin_not_sorted_stream_id ... ok
+test native::routing_tests::portal_fractional_rounding_uses_wayland_geometry_with_one_pixel_bound ... ok
+test native::routing_tests::protected_neighborhood_and_pixels_use_target_scale_with_negative_origin ... ok
+test native::routing_tests::rapid_output_retarget_preserves_hide_ticket_and_latest_target_barrier ... ok
+test native::closure_tests::startup_denial_still_closes_shortcut_session_and_reports_both_errors ... ok
+test native_guard::tests::only_genuine_presented_commit_authorizes_exact_sample_identity ... ok
+test native_guard::tests::history_never_evicts_unpresented_rectangles_at_bound ... ok
+test native_guard::tests::hide_invalidates_late_feedback_and_requires_strict_post_receipt_video ... ok
+test native_guard::tests::output_switch_requires_target_stream_video_not_other_stream_or_metadata ... ok
+test native_guard::tests::retarget_cannot_reauthorize_old_stream_feedback_even_before_hide_submission ... ok
+test native_guard::tests::repeated_identical_footprint_does_not_exhaust_history ... ok
+test options::tests::defaults_and_adjustable_magnifier_options ... ok
+test options::tests::explicit_repeated_acceptance_runs_are_bounded ... ok
+test options::tests::informational_options_must_stand_alone ... ok
+test options::tests::native_is_explicit_and_rejects_repeats_before_any_portal ... ok
+test options::tests::native_retains_magnifier_bounds_and_diagnostics ... ok
+test options::tests::rejects_non_utf8_without_panicking ... ok
+test options::tests::rejects_missing_invalid_duplicate_and_excessive_values ... ok
+test overlay::tests::configure_validates_each_nonzero_dimension_independently ... ok
+test overlay::tests::renderer_errors_record_concrete_failure_before_quitting ... ok
+test overlay::tests::source_mapping_rejects_invalid_geometry_and_avoids_overflow ... ok
+test overlay::tests::center_marker_contrasts_on_a_white_source ... ok
+test portal::tests::empty_streams_are_rejected ... ok
+test overlay::tests::painted_center_retains_source_interior_and_visible_marker_at_supported_zooms ... ok
+test selection::tests::qrgb_is_argb_not_rgba_and_preserves_alpha ... ok
+test portal::tests::setup_failure_closes_once_and_preserves_original_error ... ok
+test tests::changing_content_mismatch_cannot_be_reported_as_success ... ok
+test tests::early_successful_overlay_exit_fails_closed_even_with_matching_sample ... ok
+test tests::no_displayed_sample_cannot_be_reported_as_success ... ok
+test portal::tests::successful_setup_does_not_close_session ... ok
+test selection::tests::cancellation_requires_exact_method_error_name ... ok
+test overlay::tests::source_pointer_maps_all_physical_edges_inside_logical_output ... ok
+
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/branding.rs (target/debug/deps/branding-81cc685add457cbb)
+
+running 4 tests
+test cargo_packages_use_swatch_board_names ... ok
+test unknown_arguments_fail_without_starting_capture ... ok
+test version_identifies_swatch_board_without_starting_capture ... ok
+test help_identifies_swatch_board_without_starting_capture ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests ../../spikes/001-native-cancel/main.rs (target/debug/examples/phase1a_cancel_probe-e17a111884245472)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests ../../spikes/003-clean-overlay/main.rs (target/debug/examples/phase1a_clean_overlay_probe-ad070bc0baeb6d57)
+
+running 21 tests
+test capture::tests::cursor_metadata_requires_valid_id_and_frame_bounds_not_hotspot ... ok
+test capture::tests::feed_only_accepts_authorized_streams_during_capture ... ok
+test capture::tests::cursor_only_update_reuses_image_without_refreshing_video_age ... ok
+test capture::tests::rejects_malformed_dimensions_strides_and_buffers ... ok
+test capture::tests::decodes_consecutive_frames_without_reusing_previous_pixels ... ok
+test capture::tests::rejects_unnegotiated_pixel_formats ... ok
+test clock_tests::native_clock_read_is_positive_and_nondecreasing ... ok
+test capture::tests::decodes_all_negotiated_channel_orders_and_alpha ... ok
+test guard::tests::every_submitted_rectangle_remains_contaminating ... ok
+test capture::tests::skips_stride_padding_between_rows ... ok
+test capture::tests::feed_replaces_backlog_with_latest_frame_per_stream ... ok
+test capture::tests::terminal_stream_states_report_failure_without_initial_disconnect_false_alarm ... ok
+test guard::tests::receipt_cutoff_rejects_video_queued_after_presentation_but_before_receipt ... ok
+test capture::tests::stop_request_or_dropped_sender_ends_capture ... ok
+test guard::tests::history_exhaustion_never_evicts_old_contamination ... ok
+test portal::tests::empty_streams_are_rejected ... ok
+test guard::tests::missing_pts_is_fail_closed ... ok
+test guard::tests::hidden_barrier_requires_presented_hide_then_strictly_new_video ... ok
+test capture::tests::feed_wait_wakes_for_publication_and_close ... ok
+test portal::tests::successful_setup_does_not_close_session ... ok
+test portal::tests::setup_failure_closes_once_and_preserves_original_error ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/phase1a_fixture.rs (target/debug/examples/phase1a_fixture-a83d61f50fb33bdf)
+
+running 1 test
+test fixture_cli_tests::fullscreen_output_is_explicit_and_preserves_exact_name ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/phase1a_input.rs (target/debug/examples/phase1a_input-56b5e64edc7154e1)
+
+running 1 test
+test tests::persistent_test_device_duration_is_bounded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests ../../spikes/002-native-shield/main.rs (target/debug/examples/phase1a_shield_probe-1cb93d9d8f8e7b9b)
+
+running 18 tests
+test capture::tests::cursor_metadata_requires_valid_id_and_frame_bounds_not_hotspot ... ok
+test capture::tests::cursor_only_update_reuses_image_without_refreshing_video_age ... ok
+test capture::tests::decodes_consecutive_frames_without_reusing_previous_pixels ... ok
+test capture::tests::feed_replaces_backlog_with_latest_frame_per_stream ... ok
+test capture::tests::feed_only_accepts_authorized_streams_during_capture ... ok
+test capture::tests::rejects_malformed_dimensions_strides_and_buffers ... ok
+test capture::tests::rejects_unnegotiated_pixel_formats ... ok
+test capture::tests::stop_request_or_dropped_sender_ends_capture ... ok
+test capture::tests::decodes_all_negotiated_channel_orders_and_alpha ... ok
+test capture::tests::terminal_stream_states_report_failure_without_initial_disconnect_false_alarm ... ok
+test capture::tests::feed_wait_wakes_for_publication_and_close ... ok
+test capture::tests::skips_stride_padding_between_rows ... ok
+test tests::mapping_uses_wayland_fractional_geometry ... ok
+test portal::tests::successful_setup_does_not_close_session ... ok
+test tests::sentinel_center_magenta_and_outside_transparent ... ok
+test portal::tests::empty_streams_are_rejected ... ok
+test tests::large_cursor_buffer_preserves_sentinel_coordinates ... ok
+test portal::tests::setup_failure_closes_once_and_preserves_original_error ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/swatch_board_picker_core-54aca110a974080a)
+
+running 9 tests
+test tests::magnifier_expands_source_pixels_without_interpolation ... ok
+test tests::maps_all_output_transforms_with_negative_origin ... ok
+test tests::maps_rotated_stream_geometry ... ok
+test tests::rejects_invalid_geometry_and_frame_coordinates ... ok
+test tests::maps_negative_origin_and_fractional_scale ... ok
+test tests::maps_required_display_scales_to_exact_source_pixels ... ok
+test tests::samples_checkerboard_and_gradient_without_interpolation ... ok
+test tests::rejects_non_finite_output_geometry ... ok
+test tests::rejects_non_finite_desktop_coordinates ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/lens_placement.rs (target/debug/deps/lens_placement-c792e6cf3cef9af4)
+
+running 3 tests
+test lens_keeps_entire_source_neighborhood_clear_at_edges_and_corners ... ok
+test narrow_output_uses_vertical_space ... ok
+test no_safe_placement_is_reported_instead_of_capturing_the_lens ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

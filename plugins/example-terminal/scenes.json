@@ -1,0 +1,7 @@
+[
+  {"id":"main", "title":"Terminal", "width":420, "height":230, "nodes":[
+    {"id":"background", "kind":"background", "rect":[0,0,420,230], "role":"background"},
+    {"id":"title", "kind":"text", "rect":[24,18,360,30], "role":"foreground", "text":"Example Terminal"},
+    {"id":"prompt", "kind":"rect", "rect":[24,68,372,42], "role":"accent", "text":"$ swatch-board"}
+  ]}
+]

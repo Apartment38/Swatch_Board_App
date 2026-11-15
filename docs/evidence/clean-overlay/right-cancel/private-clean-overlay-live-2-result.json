@@ -1,0 +1,36 @@
+{
+  "gate": "spike_only_not_phase1a",
+  "probe_exit": 0,
+  "origin": [
+    62.0,
+    77.0
+  ],
+  "target": [
+    606,
+    227
+  ],
+  "old_lens_pixel_rgb": [
+    0,
+    0,
+    255
+  ],
+  "uncovered_target_rgb": [
+    255,
+    255,
+    255
+  ],
+  "action": "cancel",
+  "displayed_verified_color": "#FFFFFF",
+  "selected_color": null,
+  "hide_barrier_ns": 132056979530914,
+  "clean_video_pts_ns": 132057144717714,
+  "clean_video_after_hide": true,
+  "fixture_baseline": "EVENT n=6 unix_ms=1792633872945 elapsed_ms=867 button_release code=272 local_x=738.000 local_y=423.000 focused=true presses=1 releases=1 motions=0 keyboard_enters=1 keyboard_leaves=0",
+  "fixture_final": "EVENT n=9 unix_ms=1792633876716 elapsed_ms=4638 pointer_enter local_x=544.000 local_y=150.000 focused=true presses=1 releases=1 motions=1 keyboard_enters=1 keyboard_leaves=0",
+  "session_closed": true,
+  "events": [
+    "MOVE_INTO_OLD_LENS (606, 227)",
+    "GUARD_HIDE_PRESENTED barrier_ns=132056979530914 presented_ns=132056978051054 commit=9 generation=1",
+    "GUARD_CLEAN_FRAME pts_ns=132057144717714"
+  ]
+}

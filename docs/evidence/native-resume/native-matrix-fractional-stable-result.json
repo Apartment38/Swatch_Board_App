@@ -1,0 +1,53 @@
+{
+  "case": "native-matrix-fractional-stable",
+  "exit": 0,
+  "stdout": "#FFFFFF",
+  "counts_before": [
+    {
+      "presses": 1,
+      "releases": 1,
+      "keyboard_enters": 3,
+      "keyboard_leaves": 2
+    },
+    {
+      "presses": 0,
+      "releases": 0,
+      "keyboard_enters": 1,
+      "keyboard_leaves": 1
+    }
+  ],
+  "counts_after": [
+    {
+      "presses": 1,
+      "releases": 1,
+      "keyboard_enters": 3,
+      "keyboard_leaves": 2
+    },
+    {
+      "presses": 0,
+      "releases": 0,
+      "keyboard_enters": 1,
+      "keyboard_leaves": 1
+    }
+  ],
+  "transitions": [
+    {
+      "cutoff_ns": 2718801508166,
+      "video_pts_ns": 2719033224572,
+      "stream": 56
+    },
+    {
+      "cutoff_ns": 2719102836948,
+      "video_pts_ns": 2719116557902,
+      "stream": 48
+    }
+  ],
+  "pre_capture_output": [
+    "1024x768@60.00",
+    "586x439",
+    "1.75"
+  ],
+  "capture_output_stable": true,
+  "sessions_closed": true,
+  "gate": "partial_not_phase1a"
+}

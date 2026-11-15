@@ -1,0 +1,16 @@
+{
+  "case": "native-performance-active-capture",
+  "picker_pid": 42647,
+  "elapsed_at_measurement_seconds": 20,
+  "rss_kib": 43632,
+  "pss_kib": 28767,
+  "private_clean_kib": 4472,
+  "private_dirty_kib": 13972,
+  "uss_kib": 18444,
+  "swap_kib": 0,
+  "lifetime_cpu_percent_at_measurement": 3.4,
+  "cancel": "right-click",
+  "picker_exited_within_seconds": 2,
+  "sessions_closed": true,
+  "notes": "One private two-output KWin virtual-backend observation. This is a recorded measurement, not a performance target or idle-tray measurement."
+}

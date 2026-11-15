@@ -1,0 +1,17 @@
+[
+  {
+    "id": "surface",
+    "title": "Surface",
+    "default": "#202830"
+  },
+  {
+    "id": "accent",
+    "title": "Accent",
+    "default": "#81A1C1"
+  },
+  {
+    "id": "ink",
+    "title": "Text",
+    "default": "#FFFFFF"
+  }
+]

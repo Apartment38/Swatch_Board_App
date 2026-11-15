@@ -1,0 +1,40 @@
+{
+  "portal_denial": {
+    "result": "Portal request was cancelled",
+    "capture_started": false,
+    "missing_session_close_error_suppressed_as_already_closed": true
+  },
+  "portal_restoration": {
+    "result": "capture authorized after denial, then right-click cancelled",
+    "global_shortcuts_session_closed": true,
+    "screencast_session_closed": true
+  },
+  "slow_frame": {
+    "injection": "private KWin process paused for 4 seconds, then resumed",
+    "result": "stale capture image",
+    "shields_cleaned": 2,
+    "global_shortcuts_session_closed": true,
+    "screencast_session_closed": true
+  },
+  "backend_loss": {
+    "injection": "private PipeWire server terminated after presented readiness",
+    "result": "PipeWire stream disconnected after connecting",
+    "shields_cleaned": 2,
+    "global_shortcuts_session_closed": true,
+    "screencast_session_state": "already closed after private backend teardown"
+  },
+  "hotplug": {
+    "injection": "disabled private Virtual-1 while native selection was active",
+    "result": "fail closed after output/layer removal",
+    "shields_cleaned": 2,
+    "global_shortcuts_session_closed": true,
+    "screencast_session_closed": true
+  },
+  "startup": {
+    "scope": "private 1024x768 KWin virtual output",
+    "authorized_monotonic_ns": 24308918495899,
+    "first_presented_monotonic_ns": 24308982360974,
+    "authorization_to_first_presented_ns": 63865075,
+    "authorization_to_first_presented_ms": 63.865075
+  }
+}

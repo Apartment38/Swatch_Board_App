@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Swatch Board
+Comment=Live Wayland magnifying color picker
+Exec=swatch-board-picker
+Icon=org.apartment38.SwatchBoard
+Terminal=false
+Categories=Graphics;
+StartupNotify=false
+NoDisplay=true

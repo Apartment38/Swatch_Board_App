@@ -1,0 +1,36 @@
+{
+  "case": "native-held-button-failure",
+  "picker_exit": 1,
+  "input_exit": 0,
+  "counts_before": [
+    {
+      "presses": 14,
+      "releases": 14,
+      "keyboard_enters": 13,
+      "keyboard_leaves": 12
+    },
+    {
+      "presses": 0,
+      "releases": 0,
+      "keyboard_enters": 1,
+      "keyboard_leaves": 1
+    }
+  ],
+  "counts_after_release": [
+    {
+      "presses": 14,
+      "releases": 14,
+      "keyboard_enters": 13,
+      "keyboard_leaves": 12
+    },
+    {
+      "presses": 0,
+      "releases": 0,
+      "keyboard_enters": 1,
+      "keyboard_leaves": 1
+    }
+  ],
+  "held_cleanup_warning": true,
+  "sessions_closed": true,
+  "gate": "partial_not_phase1a"
+}

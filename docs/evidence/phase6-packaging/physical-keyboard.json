@@ -1,0 +1,103 @@
+{
+  "status": "board-settings-physical-round-passed-other-release-gates-open",
+  "artifact": "swatch-board-0.1.0-1-x86_64.pkg.tar.zst",
+  "source_commit": "64212c8c16f610791e38dbed7f7c99f636309351",
+  "desktop": "physical KDE Plasma Wayland",
+  "state_isolation": "Separate HOME/config/data/cache/state and private session bus under target/phase6-physical; packaged Board executable; no tray/picker launched",
+  "round_1": {
+    "evidence_type": "user-reported physical interactions",
+    "user_report": "All three tests passed",
+    "visible_focus_and_tab_shift_tab_traversal": "passed",
+    "keyboard_activation_of_all_three_board_tabs": "passed",
+    "keyboard_color_history_toggle_off_and_on": "passed",
+    "scope": "Only the assigned first round; not general screen-reader or complete keyboard accessibility acceptance"
+  },
+  "round_2": {
+    "evidence_type": "user-reported physical interactions",
+    "user_report": "Keyboard navigation is working. Activating Apply, Undo, and Redo buttons does not do anything; mouse clicks also appear ineffective. Settings is open.",
+    "status": "passed-on-corrected-release-by-user-report",
+    "corrected_retest": {
+      "user_report": "All tests passed",
+      "keyboard_invalid_apply_visible_error_and_unchanged_color": "passed",
+      "keyboard_apply_E06C75FF_and_error_recovery": "passed",
+      "keyboard_undo_redo": "passed",
+      "mouse_apply_98C379FF_and_undo_redo": "passed",
+      "artifact_identity": "Running PID, starttime and executable SHA-256 reverified after user report",
+      "scope": "Assigned Mixer retest only; not full Phase 6 acceptance"
+    },
+    "original_process_cleanup": "User closed both windows; original Board PID 5133 and Settings PID 8925 verified absent",
+    "corrected_release_launch": {"pid": 17804, "starttime_ticks": 1200534, "native_wayland": true, "private_session_bus": true, "same_isolated_data": true},
+    "investigation": "Input-driven regression reproduced invalid Apply being processed while its error text was clipped below the scroll area. Error placement was repaired. Separate real field/pointer/Tab/Enter tests pass Apply/Undo/Redo using a changed color. Original valid test value #247AC3FF equalled the default and did not require a new undo entry; this does not disprove the user's physical report.",
+    "next_valid_test_color": "#E06C75FF",
+    "automated_repair_checks": "180 workspace tests passed, 1 ignored; strict Clippy, formatting, debug/release build passed. Subsequent corrected-build physical Mixer retest passed by user report, recorded separately.",
+    "retest_binary_sha256": "e30d70e77e53ee66ded15ed4f84bf7927360c80adfebe68d79309f298a5e4551",
+    "retest_binary": "target/phase6-physical/retest-stage/usr/bin/swatch-board",
+    "artifact_note": "Retest is a newly built release executable, not the previous Arch package. The previous recipe/source pin and distributed local package do not yet include this repair."
+  },
+  "round_3_settings_invalid": {
+    "evidence_type": "user-reported keyboard interaction plus filesystem readback",
+    "user_report": "all tests passed",
+    "duplicate_shortcut_error": "passed",
+    "settings_file_unchanged": true,
+    "settings_file_absent_before_and_after": true,
+    "autostart_entry_absent": true,
+    "settings_pid": 29048,
+    "isolated_config_and_private_bus": "verified",
+    "scope": "Duplicate-shortcut rejection only; valid-save persistence/reopen accepted separately in round 4"
+  },
+  "round_4_settings_save_reopen": {
+    "evidence_type": "user-reported keyboard interaction plus file and process readback",
+    "user_report": "all tests passed",
+    "status": "passed",
+    "history_display_limit": 12,
+    "pick_shortcut": "Meta+Shift+C",
+    "history_shortcut": "Meta+Shift+H",
+    "autostart": false,
+    "autostart_entry_absent": true,
+    "original_settings_pid": 21569,
+    "original_settings_process_gone": true,
+    "reopened_settings_pid": 21904,
+    "board_pid": 21350,
+    "isolated_config_and_private_bus": "verified",
+    "config_sha256": "882096dbd96e8bd84c28ba710561c6bbf22673a44941cf835ade0052b44a502d",
+    "expected_no_tray_apply_failure": "user-reported expected message; persisted values verified independently"
+  },
+  "corrected_release_idle_samples": {
+    "elapsed_seconds": 10.01205611199839,
+    "board": {"pss_kib": 34572, "private_clean_dirty_kib": 31212, "stable_threads": 15, "stable_thread_cpu_ns": 6273830, "stable_thread_scheduled_runs": 162},
+    "settings": {"pss_kib": 30323, "private_clean_dirty_kib": 26964, "stable_threads": 11, "stable_thread_cpu_ns": 9503100, "stable_thread_scheduled_runs": 85},
+    "limitations": "Single shared interval with diagnostic logging; short-lived threads between endpoints cannot be excluded; scheduled runs are not wakeups"
+  },
+  "settings_idle_sample": {
+    "elapsed_seconds": 10.00187395500052,
+    "pss_kib": 32092,
+    "private_clean_dirty_kib": 27356,
+    "stable_threads": 15,
+    "stable_thread_cpu_ns": 10073549,
+    "stable_thread_scheduled_runs": 75,
+    "limitations": "One sample with diagnostics enabled, no tray on private session bus; endpoint sampling; scheduled runs are not wakeups"
+  },
+  "initial_board_idle_sample": {
+    "elapsed_seconds": 10.001137118000031,
+    "pss_kib": 37229,
+    "private_clean_dirty_kib": 31364,
+    "stable_threads": 15,
+    "stable_thread_cpu_ns": 6608746,
+    "stable_thread_scheduled_runs": 161,
+    "limitations": "One observation with Wayland diagnostics enabled; scheduled runs are not wakeups; endpoint sampling cannot exclude short-lived intervening threads"
+  },
+  "final_normal_close": {
+    "user_report": "closed",
+    "board_pid": 21350,
+    "settings_pid": 21904,
+    "original_process_start_identities_gone": true,
+    "staged_executable_processes_remaining": [],
+    "database_integrity": "ok",
+    "saved_display_limit": 12,
+    "autostart_entry_absent": true,
+    "scope": "No Board/Settings/staged helper remains; no claim about unrelated processes or system-wide memory"
+  },
+  "remaining": [
+    "Remaining other-process resource measurements and release qualification gates in current-handoff.md"
+  ]
+}

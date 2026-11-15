@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://swatch-board.local/schemas/scenes.schema.json",
+  "title": "Swatch Board preview scenes, API 1",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "required": [
+      "id",
+      "title",
+      "width",
+      "height",
+      "nodes"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]*$",
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1
+      },
+      "width": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      },
+      "height": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      },
+      "nodes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "kind",
+            "rect"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]*$",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "kind": {
+              "enum": [
+                "window",
+                "dialog",
+                "rect",
+                "background",
+                "border",
+                "text",
+                "syntax",
+                "list",
+                "tab",
+                "icon",
+                "image"
+              ]
+            },
+            "rect": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "number",
+                  "minimum": 0
+                }
+              ],
+              "minItems": 4,
+              "maxItems": 4,
+              "description": "x, y, width, height in scene coordinates"
+            },
+            "role": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "text_role": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "border_role": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "asset": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Safe relative path within the plugin or chosen export directory; absolute paths, traversal, and symlinks are forbidden."
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "font_size": {
+              "type": "number",
+              "minimum": 0
+            },
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    [
+      {
+        "id": "main",
+        "title": "Main",
+        "width": 800,
+        "height": 480,
+        "nodes": [
+          {
+            "id": "canvas",
+            "kind": "rect",
+            "rect": [
+              0,
+              0,
+              800,
+              480
+            ],
+            "role": "background"
+          },
+          {
+            "id": "open",
+            "kind": "tab",
+            "rect": [
+              20,
+              20,
+              140,
+              40
+            ],
+            "role": "background",
+            "text": "Open menu",
+            "target": "menu"
+          }
+        ]
+      },
+      {
+        "id": "menu",
+        "title": "Menu",
+        "width": 800,
+        "height": 480,
+        "nodes": [
+          {
+            "id": "back",
+            "kind": "tab",
+            "rect": [
+              20,
+              20,
+              140,
+              40
+            ],
+            "role": "background",
+            "text": "Back",
+            "target": "main"
+          }
+        ]
+      }
+    ]
+  ]
+}

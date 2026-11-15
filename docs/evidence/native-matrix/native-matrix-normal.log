@@ -1,0 +1,98 @@
+Experimental native backend: not a Phase 1A pass; single selected capture output only
+Connecting to the ScreenCast portal
+Creating the ScreenCast portal session
+Requesting monitor selection and capture authorization
+Starting the authorized ScreenCast streams
+Opening the PipeWire remote
+PipeWire stream 56 changed from Unconnected to Connecting
+PipeWire stream 48 changed from Unconnected to Connecting
+PipeWire stream 56 changed from Connecting to Paused
+PipeWire stream 48 changed from Connecting to Paused
+PipeWire stream 56 negotiated VideoFormat::BGRA 1024x768
+Requested PipeWire cursor metadata for stream 56
+PipeWire stream 56 changed from Paused to Streaming
+PipeWire stream 48 negotiated VideoFormat::BGRA 1024x768
+Requested PipeWire cursor metadata for stream 48
+PipeWire stream 48 changed from Paused to Streaming
+Native experimental selection active: left release confirms presented lens, right release/Escape cancels; no current-scene RGB equality claim
+PRESENTATION_CLOCK clock_id=1 required_CLOCK_MONOTONIC=1
+OUTPUT name=Some("Virtual-0") origin=(0, 0) logical=(1024, 768)
+OUTPUT name=Some("Virtual-1") origin=(1024, 0) logical=(1024, 768)
+SHIELD_MAPPED output=0 transparent=true full_input=true keyboard=None
+SHIELD_MAPPED output=1 transparent=true full_input=true keyboard=None
+POINTER_ENTER id=16 local=(732,734) source=wl_pointer
+LENS_REQUESTED normal_layer=true cursor_role=false keyboard=None empty_input=true buffer=160
+NATIVE_DIAGNOSTIC stream=48 source=(512,227) color=[237, 237, 255] frame_age_ms=Some(16) cursor_age_ms=Some(16) video_pts=133982794640688
+LENS_SUBMIT commit=1 rect=(526,147,160,160) source=(512,227) color=#EDEDFF pts_ns=133982794640688 generation=0
+LENS_PRESENTED commit=1 color=#EDEDFF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(133982794640688) presented_ns=133982827974020 generation=0
+NATIVE_DIAGNOSTIC stream=48 source=(512,227) color=[40, 40, 255] frame_age_ms=Some(17) cursor_age_ms=Some(17) video_pts=133982911307350
+LENS_SUBMIT commit=2 rect=(526,147,160,160) source=(512,227) color=#2828FF pts_ns=133982911307350 generation=0
+LENS_PRESENTED commit=2 color=#2828FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(133982911307350) presented_ns=133982944640682 generation=0
+NATIVE_DIAGNOSTIC stream=48 source=(512,227) color=[0, 0, 255] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=133983027974012
+LENS_SUBMIT commit=3 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=133983027974012 generation=0
+LENS_PRESENTED commit=3 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(133983027974012) presented_ns=133983061307344 generation=0
+GUARD_HIDE_SUBMIT commit=4 generation=1 mapped=true transparent_buffer=true
+POINTER_ENTER id=16 local=(122,150) source=wl_pointer
+GUARD_HIDE_PRESENTED barrier_ns=133983129775220 presented_ns=133983127974008 commit=4 generation=1
+GUARD_CLEAN_FRAME pts_ns=133983377973998 stream=56
+LENS_REQUESTED normal_layer=true cursor_role=false keyboard=None empty_input=true buffer=160
+NATIVE_DIAGNOSTIC stream=56 source=(122,150) color=[255, 0, 0] frame_age_ms=Some(5) cursor_age_ms=Some(5) video_pts=133983377973998
+LENS_SUBMIT commit=5 rect=(1160,70,160,160) source=(122,150) color=#FF0000 pts_ns=133983377973998 generation=1
+LENS_PRESENTED commit=5 color=#FF0000 source=Some(PixelPoint { x: 122, y: 150 }) video_pts=Some(133983377973998) presented_ns=133983394640664 generation=1
+NATIVE_DIAGNOSTIC stream=56 source=(122,150) color=[255, 0, 0] frame_age_ms=Some(0) cursor_age_ms=Some(0) video_pts=133983494640660
+LENS_SUBMIT commit=6 rect=(1160,70,160,160) source=(122,150) color=#FF0000 pts_ns=133983494640660 generation=1
+LENS_PRESENTED commit=6 color=#FF0000 source=Some(PixelPoint { x: 122, y: 150 }) video_pts=Some(133983494640660) presented_ns=133983511307326 generation=1
+NATIVE_DIAGNOSTIC stream=56 source=(122,150) color=[255, 0, 0] frame_age_ms=Some(14) cursor_age_ms=Some(14) video_pts=133983594640656
+LENS_SUBMIT commit=7 rect=(1160,70,160,160) source=(122,150) color=#FF0000 pts_ns=133983594640656 generation=1
+LENS_PRESENTED commit=7 color=#FF0000 source=Some(PixelPoint { x: 122, y: 150 }) video_pts=Some(133983594640656) presented_ns=133983627973988 generation=1
+NATIVE_DIAGNOSTIC stream=56 source=(122,150) color=[255, 0, 0] frame_age_ms=Some(76) cursor_age_ms=Some(76) video_pts=133983644640654
+LENS_SUBMIT commit=8 rect=(1160,70,160,160) source=(122,150) color=#FF0000 pts_ns=133983644640654 generation=1
+LENS_PRESENTED commit=8 color=#FF0000 source=Some(PixelPoint { x: 122, y: 150 }) video_pts=Some(133983644640654) presented_ns=133983744640650 generation=1
+NATIVE_DIAGNOSTIC stream=56 source=(122,150) color=[255, 0, 0] frame_age_ms=Some(79) cursor_age_ms=Some(79) video_pts=133983744640650
+LENS_SUBMIT commit=9 rect=(1160,70,160,160) source=(122,150) color=#FF0000 pts_ns=133983744640650 generation=1
+LENS_PRESENTED commit=9 color=#FF0000 source=Some(PixelPoint { x: 122, y: 150 }) video_pts=Some(133983744640650) presented_ns=133983844640646 generation=1
+NATIVE_DIAGNOSTIC stream=56 source=(122,150) color=[255, 0, 0] frame_age_ms=Some(28) cursor_age_ms=Some(28) video_pts=133983911307310
+LENS_SUBMIT commit=10 rect=(1160,70,160,160) source=(122,150) color=#FF0000 pts_ns=133983911307310 generation=1
+LENS_PRESENTED commit=10 color=#FF0000 source=Some(PixelPoint { x: 122, y: 150 }) video_pts=Some(133983911307310) presented_ns=133983961307308 generation=1
+NATIVE_DIAGNOSTIC stream=56 source=(122,150) color=[255, 0, 0] frame_age_ms=Some(76) cursor_age_ms=Some(76) video_pts=133983961307308
+LENS_SUBMIT commit=11 rect=(1160,70,160,160) source=(122,150) color=#FF0000 pts_ns=133983961307308 generation=1
+LENS_PRESENTED commit=11 color=#FF0000 source=Some(PixelPoint { x: 122, y: 150 }) video_pts=Some(133983961307308) presented_ns=133984061307304 generation=1
+NATIVE_DIAGNOSTIC stream=56 source=(122,150) color=[255, 0, 0] frame_age_ms=Some(94) cursor_age_ms=Some(94) video_pts=133984061307304
+LENS_SUBMIT commit=12 rect=(1160,70,160,160) source=(122,150) color=#FF0000 pts_ns=133984061307304 generation=1
+LENS_PRESENTED commit=12 color=#FF0000 source=Some(PixelPoint { x: 122, y: 150 }) video_pts=Some(133984061307304) presented_ns=133984161307300 generation=1
+GUARD_HIDE_SUBMIT commit=13 generation=2 mapped=true transparent_buffer=true
+POINTER_ENTER id=16 local=(606,227) source=wl_pointer
+GUARD_HIDE_PRESENTED barrier_ns=133984179578456 presented_ns=133984177973966 commit=13 generation=2
+GUARD_CLEAN_FRAME pts_ns=133984311307294 stream=48
+LENS_REQUESTED normal_layer=true cursor_role=false keyboard=None empty_input=true buffer=160
+NATIVE_DIAGNOSTIC stream=48 source=(606,227) color=[255, 255, 255] frame_age_ms=Some(9) cursor_age_ms=Some(9) video_pts=133984311307294
+LENS_SUBMIT commit=14 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=133984311307294 generation=2
+LENS_PRESENTED commit=14 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(133984311307294) presented_ns=133984327973960 generation=2
+NATIVE_DIAGNOSTIC stream=48 source=(606,227) color=[255, 255, 255] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=133984411307290
+LENS_SUBMIT commit=15 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=133984411307290 generation=2
+LENS_PRESENTED commit=15 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(133984411307290) presented_ns=133984444640622 generation=2
+NATIVE_DIAGNOSTIC stream=48 source=(606,227) color=[255, 255, 255] frame_age_ms=Some(4) cursor_age_ms=Some(4) video_pts=133984527973952
+LENS_SUBMIT commit=16 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=133984527973952 generation=2
+LENS_PRESENTED commit=16 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(133984527973952) presented_ns=133984544640618 generation=2
+NATIVE_DIAGNOSTIC stream=48 source=(606,227) color=[255, 255, 255] frame_age_ms=Some(61) cursor_age_ms=Some(61) video_pts=133984577973950
+LENS_SUBMIT commit=17 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=133984577973950 generation=2
+LENS_PRESENTED commit=17 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(133984577973950) presented_ns=133984661307280 generation=2
+NATIVE_DIAGNOSTIC stream=48 source=(606,227) color=[255, 255, 255] frame_age_ms=Some(109) cursor_age_ms=Some(109) video_pts=133984644640614
+LENS_SUBMIT commit=18 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=133984644640614 generation=2
+LENS_PRESENTED commit=18 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(133984644640614) presented_ns=133984761307276 generation=2
+NATIVE_DIAGNOSTIC stream=48 source=(606,227) color=[255, 255, 255] frame_age_ms=Some(10) cursor_age_ms=Some(10) video_pts=133984844640606
+LENS_SUBMIT commit=19 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=133984844640606 generation=2
+LENS_PRESENTED commit=19 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(133984844640606) presented_ns=133984861307272 generation=2
+NATIVE_DIAGNOSTIC stream=48 source=(606,227) color=[255, 255, 255] frame_age_ms=Some(93) cursor_age_ms=Some(93) video_pts=133984861307272
+LENS_SUBMIT commit=20 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=133984861307272 generation=2
+LENS_PRESENTED commit=20 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(133984861307272) presented_ns=133984961307268 generation=2
+NATIVE_DIAGNOSTIC stream=48 source=(606,227) color=[255, 255, 255] frame_age_ms=Some(109) cursor_age_ms=Some(109) video_pts=133984961307268
+LENS_SUBMIT commit=21 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=133984961307268 generation=2
+LENS_PRESENTED commit=21 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(133984961307268) presented_ns=133985077973930 generation=2
+NATIVE_RELEASE button=272 outcome=Some(Ok(Selected(Sample { stream_id: 48, source: (606, 227), color: [255, 255, 255], video_pts: 133984961307268 }))) held={}
+END reason=release_or_error selected=true history=1
+CLEANUP shields=2 lens_destroyed=true pointers_released=true keyboard_objects=0
+WAYLAND_CLEANUP flush=Ok(()) result=None
+GlobalShortcuts session closed
+ScreenCast session closed
+Native selected compositor-presented sample stream=48 source=(606, 227) video_pts=133984961307268

@@ -1,0 +1,115 @@
+{
+  "status": "physical_external_plugin_workflow_passed",
+  "native_wayland_launch_verified": true,
+  "fixture_authored_after_build_and_launch": true,
+  "normal_data_untouched": true,
+  "fixture_path": "/home/erick/Projects/Swatch_Board_App/target/phase5-physical/data/swatch-board/plugins/physical-fixture",
+  "observations": [
+    {
+      "stage": "first_round",
+      "user_report": "All tests passed",
+      "scope": "runtime plugin reload, hidden submenu navigation, history drag, Accent text edit, undo/redo, save"
+    },
+    {
+      "stage": "purple_saved_readback",
+      "verified": true,
+      "assignments": {
+        "accent": {
+          "kind": "Override",
+          "value": "#A344CCFF"
+        }
+      }
+    },
+    {
+      "stage": "palette_drop_fix_relaunch",
+      "commit": "fe8d491",
+      "pid": 89662,
+      "native_wayland": true,
+      "status": "awaiting_physical_retest"
+    },
+    {
+      "stage": "physical_palette_drop_retest",
+      "user_report": "That succeeded",
+      "verified_draft_assignment": {
+        "kind": "Override",
+        "value": "#81A1C1FF"
+      },
+      "commit": "fe8d491"
+    },
+    {
+      "stage": "manual_link_selection",
+      "user_report": "Done",
+      "draft_palette_id": "d142b0c5-0246-4d5c-985a-c8858cbab807",
+      "accent_assignment": {
+        "kind": "Link",
+        "value": "Accent"
+      }
+    },
+    {
+      "stage": "physical_palette_link_propagation",
+      "user_report": "success: bottom Accent edited to #46B878; preview and Roles updated; link retained",
+      "verified_draft_assignment": {
+        "kind": "Link",
+        "value": "Accent"
+      }
+    },
+    {
+      "stage": "export_layout_relaunch",
+      "commit": "d4395bf",
+      "status": "awaiting_physical_export_retest"
+    },
+    {
+      "stage": "physical_export_after_layout_fix",
+      "user_report": "Finished. The preview is now accessible.",
+      "verified_file": "/home/erick/Projects/Swatch_Board_App/target/phase5-physical/export/acceptance-theme.txt",
+      "verified_content": "surface=#202830\naccent=#46B878\ntext=#FFFFFF\n",
+      "saved_link_retained": true
+    },
+    {
+      "stage": "physical_overwrite_refusal",
+      "user_report": "Success",
+      "verified_unchanged": true,
+      "baseline": {
+        "inode": 6033175,
+        "mtime_ns": 1794454101186598348,
+        "sha256": "5b6157dea1c4f110183a97a8ba291fc98d2c7245fbae8b23b3b29ecd6ef831d0"
+      }
+    },
+    {
+      "stage": "confirmed_overwrite_and_close",
+      "user_report": "done",
+      "replacement_verified": true,
+      "expected_content_verified": true,
+      "board_process_exited": true,
+      "saved_link_and_scene_verified": true
+    },
+    {
+      "stage": "final_native_reopen_and_close",
+      "user_report": "Success",
+      "board_process_exited": true,
+      "database_integrity": "ok",
+      "saved_scene_and_link_verified": true,
+      "export_sha256": "5b6157dea1c4f110183a97a8ba291fc98d2c7245fbae8b23b3b29ecd6ef831d0"
+    }
+  ],
+  "saved_project_readback": [
+    {
+      "id": "b382c912-997c-4343-b499-1e2ca81da55f",
+      "name": "Physical acceptance",
+      "plugin_id": "physical-fixture",
+      "plugin_version": "1.0",
+      "palette_id": null,
+      "scene": "submenu",
+      "payload": "{\"version\":1,\"id\":\"\",\"name\":\"Physical acceptance\",\"plugin_id\":\"physical-fixture\",\"plugin_version\":\"1.0\",\"palette_id\":null,\"scene\":\"submenu\",\"assignments\":{\"accent\":{\"kind\":\"Override\",\"value\":\"#24B3C1FF\"}},\"dirty\":false}",
+      "dirty": 0
+    }
+  ],
+  "scope": "Native KDE Wayland runtime-authored fixture workflow; user-operated GUI observations with deterministic database and filesystem verification. Not full automated desktop input, picker reacceptance, or physical testing of all bundled target plugins.",
+  "source_checkpoint": "d4395bf",
+  "limitations": [
+    "GUI actions were performed by the user; cua-driver native KWin target-bound input is unavailable.",
+    "History and palette were synthetic isolated fixtures, not new physical picker captures.",
+    "Ghostty, Zed and KDE packages have automated golden coverage; this run physically tested the newly authored fixture package only.",
+    "No live themes were applied, and normal user data and settings were not modified."
+  ]
+}

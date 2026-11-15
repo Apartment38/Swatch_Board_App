@@ -1,0 +1,177 @@
+Swatch Board picker Phase 1A prototype
+Connecting to the ScreenCast portal
+Creating the ScreenCast portal session
+Requesting monitor selection and capture authorization
+Starting the authorized ScreenCast streams
+Opening the PipeWire remote
+Acceptance preparation window: 3 seconds before first pick
+Picker round 1 of 10
+PipeWire stream 108 changed from Unconnected to Connecting
+PipeWire stream 108 changed from Connecting to Paused
+PipeWire stream 108 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 108
+PipeWire stream 108 changed from Paused to Streaming
+Live capture ready: stream=108 frame=2880x1800 pointer=Some(PixelPoint { x: 2420, y: 1071 })
+Magnifier output: stream=108 origin=(0, 0) logical=(1646, 1029) frame=2880x1800 surface=200 buffer=350 scale=1.7495
+Magnifier ready; KWin owns selection (left click/Enter, right click/Escape)
+Lens sample: stream=108 source=(1453, 615) RGB=#0000FF video_age=7ms cursor_age=Some(7)ms pts=Some(46176564819604)
+Lens sample: stream=108 source=(1529, 719) RGB=#0000FF video_age=4ms cursor_age=Some(4)ms pts=Some(46176773152929)
+Lens sample: stream=108 source=(1538, 777) RGB=#0000FF video_age=9ms cursor_age=Some(9)ms pts=Some(46176964819588)
+Lens sample: stream=108 source=(1538, 777) RGB=#0000FF video_age=5ms cursor_age=Some(5)ms pts=Some(46177164819580)
+Capture and overlay helpers stopped
+KWin selected #0000FF
+Last displayed center stream=108 at (1538, 777) was #0000FF; frame_age=35ms pts=Some(46177256486243); RGB match=true
+Picker round 2 of 10
+PipeWire stream 108 changed from Unconnected to Connecting
+PipeWire stream 108 changed from Connecting to Paused
+PipeWire stream 108 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 108
+PipeWire stream 108 changed from Paused to Streaming
+Live capture ready: stream=108 frame=2880x1800 pointer=Some(PixelPoint { x: 1538, y: 777 })
+Magnifier output: stream=108 origin=(0, 0) logical=(1646, 1029) frame=2880x1800 surface=200 buffer=350 scale=1.7495
+Magnifier ready; KWin owns selection (left click/Enter, right click/Escape)
+Lens sample: stream=108 source=(858, 581) RGB=#FF0000 video_age=18ms cursor_age=Some(18)ms pts=Some(46177556486231)
+Lens sample: stream=108 source=(858, 579) RGB=#FF0000 video_age=1ms cursor_age=Some(1)ms pts=Some(46177781486222)
+Lens sample: stream=108 source=(857, 576) RGB=#FF0000 video_age=18ms cursor_age=Some(18)ms pts=Some(46177964819548)
+Lens sample: stream=108 source=(857, 576) RGB=#FF0000 video_age=16ms cursor_age=Some(16)ms pts=Some(46178173152873)
+Capture and overlay helpers stopped
+KWin selected #FF0000
+Last displayed center stream=108 at (857, 576) was #FF0000; frame_age=42ms pts=Some(46178223152871); RGB match=true
+Picker round 3 of 10
+PipeWire stream 108 changed from Unconnected to Connecting
+PipeWire stream 108 changed from Connecting to Paused
+PipeWire stream 108 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 108
+PipeWire stream 108 changed from Paused to Streaming
+Live capture ready: stream=108 frame=2880x1800 pointer=Some(PixelPoint { x: 857, y: 576 })
+Magnifier output: stream=108 origin=(0, 0) logical=(1646, 1029) frame=2880x1800 surface=200 buffer=350 scale=1.7495
+Magnifier ready; KWin owns selection (left click/Enter, right click/Escape)
+Lens sample: stream=108 source=(1151, 590) RGB=#00FF00 video_age=1ms cursor_age=Some(1)ms pts=Some(46178548152858)
+Lens sample: stream=108 source=(1151, 590) RGB=#00FF00 video_age=6ms cursor_age=Some(6)ms pts=Some(46178731486184)
+Lens sample: stream=108 source=(1151, 590) RGB=#00FF00 video_age=12ms cursor_age=Some(12)ms pts=Some(46178931486176)
+Lens sample: stream=108 source=(1151, 590) RGB=#00FF00 video_age=4ms cursor_age=Some(4)ms pts=Some(46179156486167)
+Capture and overlay helpers stopped
+KWin selected #00FF00
+Last displayed center stream=108 at (1151, 590) was #00FF00; frame_age=23ms pts=Some(46179248152830); RGB match=true
+Picker round 4 of 10
+PipeWire stream 108 changed from Unconnected to Connecting
+PipeWire stream 108 changed from Connecting to Paused
+PipeWire stream 108 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 108
+PipeWire stream 108 changed from Paused to Streaming
+Live capture ready: stream=108 frame=2880x1800 pointer=Some(PixelPoint { x: 1151, y: 590 })
+Magnifier output: stream=108 origin=(0, 0) logical=(1646, 1029) frame=2880x1800 surface=200 buffer=350 scale=1.7495
+Magnifier ready; KWin owns selection (left click/Enter, right click/Escape)
+Lens sample: stream=108 source=(1725, 590) RGB=#FFFFFF video_age=0ms cursor_age=Some(0)ms pts=Some(46179548152818)
+Lens sample: stream=108 source=(1725, 590) RGB=#FFFFFF video_age=0ms cursor_age=Some(0)ms pts=Some(46179748152810)
+Lens sample: stream=108 source=(1725, 590) RGB=#FFFFFF video_age=5ms cursor_age=Some(5)ms pts=Some(46179948152802)
+Lens sample: stream=108 source=(1725, 590) RGB=#FFFFFF video_age=5ms cursor_age=Some(5)ms pts=Some(46180148152794)
+Capture and overlay helpers stopped
+KWin selected #FFFFFF
+Last displayed center stream=108 at (1725, 590) was #FFFFFF; frame_age=32ms pts=Some(46180239819457); RGB match=true
+Picker round 5 of 10
+PipeWire stream 108 changed from Unconnected to Connecting
+PipeWire stream 108 changed from Connecting to Paused
+PipeWire stream 108 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 108
+PipeWire stream 108 changed from Paused to Streaming
+Live capture ready: stream=108 frame=2880x1800 pointer=Some(PixelPoint { x: 1725, y: 590 })
+Magnifier output: stream=108 origin=(0, 0) logical=(1646, 1029) frame=2880x1800 surface=200 buffer=350 scale=1.7495
+Magnifier ready; KWin owns selection (left click/Enter, right click/Escape)
+Lens sample: stream=108 source=(2012, 590) RGB=#000000 video_age=11ms cursor_age=Some(11)ms pts=Some(46180514819446)
+Lens sample: stream=108 source=(2012, 590) RGB=#000000 video_age=7ms cursor_age=Some(7)ms pts=Some(46180723152771)
+Lens sample: stream=108 source=(2012, 590) RGB=#000000 video_age=7ms cursor_age=Some(7)ms pts=Some(46180923152763)
+Lens sample: stream=108 source=(2012, 590) RGB=#000000 video_age=11ms cursor_age=Some(11)ms pts=Some(46181098152756)
+Capture and overlay helpers stopped
+KWin selected #000000
+Last displayed center stream=108 at (2012, 590) was #000000; frame_age=27ms pts=Some(46181231486084); RGB match=true
+Picker round 6 of 10
+PipeWire stream 108 changed from Unconnected to Connecting
+PipeWire stream 108 changed from Connecting to Paused
+PipeWire stream 108 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 108
+PipeWire stream 108 changed from Paused to Streaming
+Live capture ready: stream=108 frame=2880x1800 pointer=Some(PixelPoint { x: 2012, y: 590 })
+Magnifier output: stream=108 origin=(0, 0) logical=(1646, 1029) frame=2880x1800 surface=200 buffer=350 scale=1.7495
+Magnifier ready; KWin owns selection (left click/Enter, right click/Escape)
+Lens sample: stream=108 source=(738, 905) RGB=#FFFFFF video_age=4ms cursor_age=Some(4)ms pts=Some(46181539819405)
+Lens sample: stream=108 source=(738, 905) RGB=#FFFFFF video_age=6ms cursor_age=Some(6)ms pts=Some(46181739819397)
+Lens sample: stream=108 source=(738, 905) RGB=#FFFFFF video_age=4ms cursor_age=Some(4)ms pts=Some(46181923152723)
+Lens sample: stream=108 source=(738, 905) RGB=#FFFFFF video_age=9ms cursor_age=Some(9)ms pts=Some(46182148152714)
+Capture and overlay helpers stopped
+KWin selected #FFFFFF
+Last displayed center stream=108 at (738, 905) was #FFFFFF; frame_age=42ms pts=Some(46182256486043); RGB match=true
+Picker round 7 of 10
+PipeWire stream 108 changed from Unconnected to Connecting
+PipeWire stream 108 changed from Connecting to Paused
+PipeWire stream 108 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 108
+PipeWire stream 108 changed from Paused to Streaming
+Live capture ready: stream=108 frame=2880x1800 pointer=Some(PixelPoint { x: 738, y: 905 })
+Magnifier output: stream=108 origin=(0, 0) logical=(1646, 1029) frame=2880x1800 surface=200 buffer=350 scale=1.7495
+Magnifier ready; KWin owns selection (left click/Enter, right click/Escape)
+Lens sample: stream=108 source=(773, 905) RGB=#000000 video_age=1ms cursor_age=Some(1)ms pts=Some(46182564819364)
+Lens sample: stream=108 source=(773, 905) RGB=#000000 video_age=3ms cursor_age=Some(3)ms pts=Some(46182764819356)
+Lens sample: stream=108 source=(773, 905) RGB=#000000 video_age=8ms cursor_age=Some(8)ms pts=Some(46182964819348)
+Lens sample: stream=108 source=(773, 905) RGB=#000000 video_age=1ms cursor_age=Some(1)ms pts=Some(46183164819340)
+Capture and overlay helpers stopped
+KWin selected #000000
+Last displayed center stream=108 at (773, 905) was #000000; frame_age=41ms pts=Some(46183248152670); RGB match=true
+Picker round 8 of 10
+PipeWire stream 108 changed from Unconnected to Connecting
+PipeWire stream 108 changed from Connecting to Paused
+PipeWire stream 108 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 108
+PipeWire stream 108 changed from Paused to Streaming
+Live capture ready: stream=108 frame=2880x1800 pointer=Some(PixelPoint { x: 773, y: 905 })
+Magnifier output: stream=108 origin=(0, 0) logical=(1646, 1029) frame=2880x1800 surface=200 buffer=350 scale=1.7495
+Magnifier ready; KWin owns selection (left click/Enter, right click/Escape)
+Lens sample: stream=108 source=(1438, 590) RGB=#0000FF video_age=10ms cursor_age=Some(10)ms pts=Some(46183589819323)
+Lens sample: stream=108 source=(1438, 590) RGB=#0000FF video_age=13ms cursor_age=Some(13)ms pts=Some(46183773152649)
+Lens sample: stream=108 source=(1438, 590) RGB=#0000FF video_age=19ms cursor_age=Some(19)ms pts=Some(46183973152641)
+Lens sample: stream=108 source=(1438, 590) RGB=#0000FF video_age=8ms cursor_age=Some(8)ms pts=Some(46184164819300)
+Capture and overlay helpers stopped
+KWin color selection cancelled
+Picker round 9 of 10
+PipeWire stream 108 changed from Unconnected to Connecting
+PipeWire stream 108 changed from Connecting to Paused
+PipeWire stream 108 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 108
+PipeWire stream 108 changed from Paused to Streaming
+Live capture ready: stream=108 frame=2880x1800 pointer=Some(PixelPoint { x: 1438, y: 590 })
+Magnifier output: stream=108 origin=(0, 0) logical=(1646, 1029) frame=2880x1800 surface=200 buffer=350 scale=1.7495
+Magnifier ready; KWin owns selection (left click/Enter, right click/Escape)
+Lens sample: stream=108 source=(1438, 590) RGB=#0000FF video_age=13ms cursor_age=Some(13)ms pts=Some(46184556485951)
+Lens sample: stream=108 source=(1438, 590) RGB=#0000FF video_age=18ms cursor_age=Some(18)ms pts=Some(46184756485943)
+Lens sample: stream=108 source=(1438, 590) RGB=#0000FF video_age=2ms cursor_age=Some(2)ms pts=Some(46184981485934)
+Lens sample: stream=108 source=(1438, 590) RGB=#0000FF video_age=5ms cursor_age=Some(5)ms pts=Some(46185181485926)
+Capture and overlay helpers stopped
+KWin color selection cancelled
+Picker round 10 of 10
+PipeWire stream 108 changed from Unconnected to Connecting
+PipeWire stream 108 changed from Connecting to Paused
+PipeWire stream 108 negotiated VideoFormat::BGRA 2880x1800
+Requested PipeWire cursor metadata for stream 108
+PipeWire stream 108 changed from Paused to Streaming
+Live capture ready: stream=108 frame=2880x1800 pointer=Some(PixelPoint { x: 1438, y: 590 })
+Magnifier output: stream=108 origin=(0, 0) logical=(1646, 1029) frame=2880x1800 surface=200 buffer=350 scale=1.7495
+Magnifier ready; KWin owns selection (left click/Enter, right click/Escape)
+Lens sample: stream=108 source=(1841, 1133) RGB=#00FFFF video_age=2ms cursor_age=Some(2)ms pts=Some(46185514819246)
+Lens sample: stream=108 source=(1841, 1133) RGB=#00FFFF video_age=13ms cursor_age=Some(13)ms pts=Some(46185706485905)
+Lens sample: stream=108 source=(1841, 1133) RGB=#FF00FF video_age=1ms cursor_age=Some(1)ms pts=Some(46185923152563)
+Lens sample: stream=108 source=(1841, 1133) RGB=#00FFFF video_age=9ms cursor_age=Some(9)ms pts=Some(46186114819222)
+Lens sample: stream=108 source=(1841, 1133) RGB=#FF00FF video_age=5ms cursor_age=Some(5)ms pts=Some(46186314819214)
+Lens sample: stream=108 source=(1841, 1133) RGB=#FF00FF video_age=10ms cursor_age=Some(10)ms pts=Some(46186514819206)
+Lens sample: stream=108 source=(1841, 1133) RGB=#00FFFF video_age=3ms cursor_age=Some(3)ms pts=Some(46186723152531)
+Lens sample: stream=108 source=(1841, 1133) RGB=#FF00FF video_age=9ms cursor_age=Some(9)ms pts=Some(46186906485857)
+Lens sample: stream=108 source=(1841, 1133) RGB=#00FFFF video_age=10ms cursor_age=Some(10)ms pts=Some(46187106485849)
+Lens sample: stream=108 source=(1841, 1133) RGB=#00FFFF video_age=21ms cursor_age=Some(21)ms pts=Some(46187306485841)
+Lens sample: stream=108 source=(1841, 1133) RGB=#FF00FF video_age=6ms cursor_age=Some(6)ms pts=Some(46187523152499)
+Lens sample: stream=108 source=(1841, 1133) RGB=#FF00FF video_age=12ms cursor_age=Some(12)ms pts=Some(46187706485825)
+Lens sample: stream=108 source=(1841, 1133) RGB=#00FFFF video_age=16ms cursor_age=Some(16)ms pts=Some(46187906485817)
+Lens sample: stream=108 source=(1841, 1133) RGB=#00FFFF video_age=5ms cursor_age=Some(5)ms pts=Some(46188123152475)
+Lens sample: stream=108 source=(1841, 1133) RGB=#FF00FF video_age=0ms cursor_age=Some(0)ms pts=Some(46188323152467)
+Capture and overlay helpers stopped
+KWin selected #00FFFF
+Last displayed center stream=108 at (1841, 1133) was #FF00FF; frame_age=39ms pts=Some(46188373152465); RGB match=false
+ScreenCast session closed

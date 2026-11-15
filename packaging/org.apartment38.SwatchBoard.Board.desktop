@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Swatch Board
+Comment=Open the Swatch Board
+Exec=swatch-board
+Icon=org.apartment38.SwatchBoard
+Terminal=false
+Categories=Graphics;
+StartupNotify=false

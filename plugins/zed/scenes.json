@@ -1,0 +1,371 @@
+[
+  {
+    "id": "editor",
+    "title": "Editor",
+    "width": 800,
+    "height": 480,
+    "nodes": [
+      {
+        "id": "back",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          800,
+          480
+        ],
+        "role": "background"
+      },
+      {
+        "id": "sidebar",
+        "kind": "rect",
+        "rect": [
+          0,
+          38,
+          170,
+          410
+        ],
+        "role": "sidebar"
+      },
+      {
+        "id": "files",
+        "kind": "text",
+        "rect": [
+          12,
+          70,
+          145,
+          30
+        ],
+        "role": "muted",
+        "text": "PROJECT"
+      },
+      {
+        "id": "file",
+        "kind": "text",
+        "rect": [
+          18,
+          105,
+          140,
+          30
+        ],
+        "role": "foreground",
+        "text": "main.rs"
+      },
+      {
+        "id": "tab",
+        "kind": "tab",
+        "rect": [
+          170,
+          0,
+          220,
+          38
+        ],
+        "role": "tab_active",
+        "text": "main.rs",
+        "text_role": "foreground"
+      },
+      {
+        "id": "other_tab",
+        "kind": "tab",
+        "rect": [
+          390,
+          0,
+          180,
+          38
+        ],
+        "role": "tab_inactive",
+        "text": "settings.json",
+        "text_role": "muted",
+        "target": "settings"
+      },
+      {
+        "id": "menu",
+        "kind": "tab",
+        "rect": [
+          650,
+          0,
+          150,
+          38
+        ],
+        "role": "surface",
+        "text": "Menu",
+        "text_role": "foreground",
+        "target": "menu"
+      },
+      {
+        "id": "code1",
+        "kind": "syntax",
+        "rect": [
+          200,
+          85,
+          450,
+          30
+        ],
+        "role": "keyword",
+        "text": "fn main() {"
+      },
+      {
+        "id": "code2",
+        "kind": "syntax",
+        "rect": [
+          230,
+          120,
+          450,
+          30
+        ],
+        "role": "string",
+        "text": "\"Hello, theme!\""
+      },
+      {
+        "id": "code3",
+        "kind": "syntax",
+        "rect": [
+          230,
+          155,
+          450,
+          30
+        ],
+        "role": "comment",
+        "text": "// preview"
+      },
+      {
+        "id": "status",
+        "kind": "rect",
+        "rect": [
+          0,
+          448,
+          800,
+          32
+        ],
+        "role": "status",
+        "text": "main  ·  Rust",
+        "text_role": "foreground"
+      }
+    ]
+  },
+  {
+    "id": "menu",
+    "title": "Editor menu",
+    "width": 800,
+    "height": 480,
+    "nodes": [
+      {
+        "id": "back",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          800,
+          480
+        ],
+        "role": "background"
+      },
+      {
+        "id": "panel",
+        "kind": "rect",
+        "rect": [
+          480,
+          40,
+          300,
+          270
+        ],
+        "role": "surface",
+        "border_role": "border"
+      },
+      {
+        "id": "title",
+        "kind": "text",
+        "rect": [
+          500,
+          60,
+          240,
+          30
+        ],
+        "role": "foreground",
+        "text": "File"
+      },
+      {
+        "id": "settings",
+        "kind": "tab",
+        "rect": [
+          500,
+          110,
+          250,
+          35
+        ],
+        "role": "tab_active",
+        "text": "Settings",
+        "text_role": "foreground",
+        "target": "settings"
+      },
+      {
+        "id": "dialog",
+        "kind": "tab",
+        "rect": [
+          500,
+          155,
+          250,
+          35
+        ],
+        "role": "tab_active",
+        "text": "Command palette",
+        "text_role": "foreground",
+        "target": "dialog"
+      },
+      {
+        "id": "close",
+        "kind": "tab",
+        "rect": [
+          500,
+          210,
+          250,
+          35
+        ],
+        "role": "surface",
+        "text": "Close",
+        "text_role": "muted",
+        "target": "editor"
+      }
+    ]
+  },
+  {
+    "id": "dialog",
+    "title": "Command palette",
+    "width": 800,
+    "height": 480,
+    "nodes": [
+      {
+        "id": "back",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          800,
+          480
+        ],
+        "role": "background"
+      },
+      {
+        "id": "dialog",
+        "kind": "dialog",
+        "rect": [
+          180,
+          90,
+          440,
+          260
+        ],
+        "role": "surface",
+        "border_role": "border"
+      },
+      {
+        "id": "title",
+        "kind": "text",
+        "rect": [
+          205,
+          115,
+          390,
+          30
+        ],
+        "role": "foreground",
+        "text": "Command palette"
+      },
+      {
+        "id": "entry",
+        "kind": "rect",
+        "rect": [
+          205,
+          160,
+          390,
+          40
+        ],
+        "role": "selection",
+        "text": "Search commands…",
+        "text_role": "foreground"
+      },
+      {
+        "id": "close",
+        "kind": "tab",
+        "rect": [
+          410,
+          265,
+          180,
+          38
+        ],
+        "role": "tab_active",
+        "text": "Close",
+        "text_role": "foreground",
+        "target": "editor"
+      }
+    ]
+  },
+  {
+    "id": "settings",
+    "title": "Settings",
+    "width": 800,
+    "height": 480,
+    "nodes": [
+      {
+        "id": "back",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          800,
+          480
+        ],
+        "role": "background"
+      },
+      {
+        "id": "tab",
+        "kind": "tab",
+        "rect": [
+          0,
+          0,
+          230,
+          38
+        ],
+        "role": "tab_active",
+        "text": "Settings",
+        "text_role": "foreground"
+      },
+      {
+        "id": "title",
+        "kind": "text",
+        "rect": [
+          40,
+          80,
+          500,
+          35
+        ],
+        "role": "foreground",
+        "text": "Appearance settings"
+      },
+      {
+        "id": "desc",
+        "kind": "text",
+        "rect": [
+          40,
+          130,
+          600,
+          30
+        ],
+        "role": "muted",
+        "text": "Colors shown here are a preview."
+      },
+      {
+        "id": "return",
+        "kind": "tab",
+        "rect": [
+          40,
+          210,
+          190,
+          40
+        ],
+        "role": "accent",
+        "text": "Back to editor",
+        "text_role": "background",
+        "target": "editor"
+      }
+    ]
+  }
+]

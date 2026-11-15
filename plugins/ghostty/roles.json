@@ -1,0 +1,200 @@
+[
+  {
+    "id": "background",
+    "title": "Background",
+    "help": "Background",
+    "default": "#1e1e2e",
+    "alpha": false,
+    "group": "Terminal",
+    "links": []
+  },
+  {
+    "id": "foreground",
+    "title": "Foreground",
+    "help": "Foreground",
+    "default": "#cdd6f4",
+    "alpha": false,
+    "group": "Terminal",
+    "links": []
+  },
+  {
+    "id": "cursor",
+    "title": "Cursor",
+    "help": "Cursor",
+    "default": "#f5e0dc",
+    "alpha": false,
+    "group": "Terminal",
+    "links": []
+  },
+  {
+    "id": "cursor_text",
+    "title": "Cursor text",
+    "help": "Cursor text",
+    "default": "#1e1e2e",
+    "alpha": false,
+    "group": "Terminal",
+    "links": []
+  },
+  {
+    "id": "selection_background",
+    "title": "Selection background",
+    "help": "Selection background",
+    "default": "#585b70",
+    "alpha": false,
+    "group": "Terminal",
+    "links": []
+  },
+  {
+    "id": "selection_foreground",
+    "title": "Selection foreground",
+    "help": "Selection foreground",
+    "default": "#cdd6f4",
+    "alpha": false,
+    "group": "Terminal",
+    "links": []
+  },
+  {
+    "id": "ansi_0",
+    "title": "ANSI 0",
+    "help": "ANSI 0",
+    "default": "#45475a",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_1",
+    "title": "ANSI 1",
+    "help": "ANSI 1",
+    "default": "#f38ba8",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_2",
+    "title": "ANSI 2",
+    "help": "ANSI 2",
+    "default": "#a6e3a1",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_3",
+    "title": "ANSI 3",
+    "help": "ANSI 3",
+    "default": "#f9e2af",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_4",
+    "title": "ANSI 4",
+    "help": "ANSI 4",
+    "default": "#89b4fa",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_5",
+    "title": "ANSI 5",
+    "help": "ANSI 5",
+    "default": "#f5c2e7",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_6",
+    "title": "ANSI 6",
+    "help": "ANSI 6",
+    "default": "#94e2d5",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_7",
+    "title": "ANSI 7",
+    "help": "ANSI 7",
+    "default": "#bac2de",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_8",
+    "title": "ANSI 8",
+    "help": "ANSI 8",
+    "default": "#585b70",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_9",
+    "title": "ANSI 9",
+    "help": "ANSI 9",
+    "default": "#f38ba8",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_10",
+    "title": "ANSI 10",
+    "help": "ANSI 10",
+    "default": "#a6e3a1",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_11",
+    "title": "ANSI 11",
+    "help": "ANSI 11",
+    "default": "#f9e2af",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_12",
+    "title": "ANSI 12",
+    "help": "ANSI 12",
+    "default": "#89b4fa",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_13",
+    "title": "ANSI 13",
+    "help": "ANSI 13",
+    "default": "#f5c2e7",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_14",
+    "title": "ANSI 14",
+    "help": "ANSI 14",
+    "default": "#94e2d5",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  },
+  {
+    "id": "ansi_15",
+    "title": "ANSI 15",
+    "help": "ANSI 15",
+    "default": "#a6adc8",
+    "alpha": false,
+    "group": "ANSI palette",
+    "links": []
+  }
+]

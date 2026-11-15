@@ -1,0 +1,5 @@
+[
+  {"id":"background", "title":"Background", "default":"#202830", "group":"Terminal"},
+  {"id":"foreground", "title":"Foreground", "default":"#E6EAF0", "group":"Terminal"},
+  {"id":"accent", "title":"Accent", "default":"#46B878", "group":"Terminal"}
+]

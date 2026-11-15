@@ -1,0 +1,106 @@
+[
+  {
+    "id": "main",
+    "title": "Main",
+    "width": 600,
+    "height": 300,
+    "nodes": [
+      {
+        "id": "canvas",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          600,
+          300
+        ],
+        "role": "surface"
+      },
+      {
+        "id": "title",
+        "kind": "text",
+        "rect": [
+          20,
+          15,
+          500,
+          35
+        ],
+        "text": "Runtime-installed physical fixture",
+        "text_role": "ink"
+      },
+      {
+        "id": "open",
+        "kind": "tab",
+        "rect": [
+          20,
+          75,
+          350,
+          60
+        ],
+        "role": "accent",
+        "text_role": "ink",
+        "text": "Open hidden submenu",
+        "target": "submenu"
+      }
+    ]
+  },
+  {
+    "id": "submenu",
+    "title": "Hidden submenu",
+    "width": 600,
+    "height": 300,
+    "nodes": [
+      {
+        "id": "canvas",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          600,
+          300
+        ],
+        "role": "surface"
+      },
+      {
+        "id": "hidden",
+        "kind": "text",
+        "rect": [
+          20,
+          10,
+          520,
+          40
+        ],
+        "text": "Hidden submenu is open",
+        "text_role": "ink"
+      },
+      {
+        "id": "drop",
+        "kind": "rect",
+        "rect": [
+          20,
+          65,
+          350,
+          80
+        ],
+        "role": "accent",
+        "text_role": "ink",
+        "text": "Drop a history color here"
+      },
+      {
+        "id": "back",
+        "kind": "tab",
+        "rect": [
+          20,
+          200,
+          220,
+          50
+        ],
+        "role": "surface",
+        "border_role": "accent",
+        "text_role": "ink",
+        "text": "Back to main",
+        "target": "main"
+      }
+    ]
+  }
+]

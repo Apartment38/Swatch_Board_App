@@ -1,0 +1,55 @@
+Connecting to the ScreenCast portal
+Creating the ScreenCast portal session
+Requesting monitor selection and capture authorization
+Starting the authorized ScreenCast streams
+Opening the PipeWire remote
+PipeWire stream 54 changed from Unconnected to Connecting
+PipeWire stream 54 changed from Connecting to Paused
+PipeWire stream 54 negotiated VideoFormat::BGRA 1024x768
+Requested PipeWire cursor metadata for stream 54
+PipeWire stream 54 changed from Paused to Streaming
+CAPTURE_READY stream=54 image=1024x768 portal_origin=(0, 0) portal_size=(1024, 768) pts=Some(131543028071612)
+PREPARE 3s: activate native fixture NOW; no shield yet. No keyboard binding. Active timeout=12s.
+PRESENTATION_CLOCK clock_id=1 required_CLOCK_MONOTONIC=1
+OUTPUT name=Some("Virtual-0") origin=(0, 0) logical=(1024, 768)
+OUTPUT name=Some("Virtual-1") origin=(1024, 0) logical=(1024, 768)
+LENS_REQUESTED normal_layer=true cursor_role=false keyboard=None empty_input=true buffer=160
+SHIELD_MAPPED output=0 transparent=true full_input=true keyboard=None
+SHIELD_MAPPED output=1 transparent=true full_input=true keyboard=None
+POINTER_ENTER id=16 local=(512,227) source=wl_pointer
+LENS_SUBMIT commit=1 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=131545944738162 generation=0
+LENS_PRESENTED commit=1 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(131545944738162) presented_ns=131546061404824 generation=0
+LENS_SUBMIT commit=2 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=131546128071488 generation=0
+LENS_PRESENTED commit=2 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(131546128071488) presented_ns=131546161404820 generation=0
+LENS_SUBMIT commit=3 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=131546228071484 generation=0
+LENS_PRESENTED commit=3 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(131546228071484) presented_ns=131546261404816 generation=0
+LENS_SUBMIT commit=4 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=131546261404816 generation=0
+LENS_PRESENTED commit=4 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(131546261404816) presented_ns=131546361404812 generation=0
+LENS_SUBMIT commit=5 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=131546361404812 generation=0
+LENS_PRESENTED commit=5 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(131546361404812) presented_ns=131546478071474 generation=0
+LENS_SUBMIT commit=6 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=131546478071474 generation=0
+LENS_PRESENTED commit=6 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(131546478071474) presented_ns=131546578071470 generation=0
+LENS_SUBMIT commit=7 rect=(526,147,160,160) source=(512,227) color=#0000FF pts_ns=131546578071470 generation=0
+LENS_PRESENTED commit=7 color=#0000FF source=Some(PixelPoint { x: 512, y: 227 }) video_pts=Some(131546578071470) presented_ns=131546694738132 generation=0
+GUARD_HIDE_SUBMIT commit=8 generation=1 mapped=true transparent_buffer=true
+GUARD_HIDE_PRESENTED barrier_ns=131546778071462 commit=8 generation=1
+GUARD_CLEAN_FRAME pts_ns=131546994738120
+LENS_SUBMIT commit=9 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=131546994738120 generation=1
+LENS_PRESENTED commit=9 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(131546994738120) presented_ns=131547011404786 generation=1
+LENS_SUBMIT commit=10 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=131547011404786 generation=1
+LENS_PRESENTED commit=10 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(131547011404786) presented_ns=131547111404782 generation=1
+LENS_SUBMIT commit=11 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=131547111404782 generation=1
+LENS_PRESENTED commit=11 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(131547111404782) presented_ns=131547228071444 generation=1
+LENS_SUBMIT commit=12 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=131547244738110 generation=1
+LENS_PRESENTED commit=12 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(131547244738110) presented_ns=131547328071440 generation=1
+LENS_SUBMIT commit=13 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=131547328071440 generation=1
+LENS_PRESENTED commit=13 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(131547328071440) presented_ns=131547428071436 generation=1
+LENS_SUBMIT commit=14 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=131547511404766 generation=1
+LENS_PRESENTED commit=14 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(131547511404766) presented_ns=131547528071432 generation=1
+LENS_SUBMIT commit=15 rect=(620,147,160,160) source=(606,227) color=#FFFFFF pts_ns=131547528071432 generation=1
+LENS_PRESENTED commit=15 color=#FFFFFF source=Some(PixelPoint { x: 606, y: 227 }) video_pts=Some(131547528071432) presented_ns=131547644738094 generation=1
+SELECTED_RELEASE button=272 action=select color=#FFFFFF
+END reason=release_or_error selected=true history=7
+CLEANUP shields=2 lens_destroyed=true pointers_released=true keyboard_objects=0
+WAYLAND_CLEANUP flush=Ok(()) result=None
+CAPTURE_CLEANUP worker=Ok(Ok(())) session_close=Ok(())

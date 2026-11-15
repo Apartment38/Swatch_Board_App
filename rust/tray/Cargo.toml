@@ -1,0 +1,19 @@
+[package]
+name = "swatch-board-tray"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+ksni.workspace = true
+swatch-board-ipc = { path = "../ipc" }
+swatch-board-color = { path = "../color" }
+swatch-board-storage = { path = "../storage" }
+swatch-board-clipboard = { path = "../clipboard" }
+swatch-board-config-core = { path = "../config-core" }
+ashpd.workspace = true
+futures-util = "=0.3.34"
+tokio = { workspace = true, features = ["process", "io-util", "signal"] }
+serde = "=1.0.229"
+zbus.workspace = true

@@ -1,0 +1,17 @@
+{
+  "id": "zed",
+  "name": "Zed",
+  "version": "1.0.0",
+  "api_version": 1,
+  "target": "zed",
+  "target_versions": [
+    "0.2"
+  ],
+  "outputs": [
+    {
+      "path": "swatch-board.json",
+      "template": "templates/theme.j2",
+      "format": "json"
+    }
+  ]
+}

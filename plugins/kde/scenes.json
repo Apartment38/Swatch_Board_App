@@ -1,0 +1,264 @@
+[
+  {
+    "id": "window",
+    "title": "Window",
+    "width": 800,
+    "height": 480,
+    "nodes": [
+      {
+        "id": "back",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          800,
+          480
+        ],
+        "role": "window_background"
+      },
+      {
+        "id": "title",
+        "kind": "text",
+        "rect": [
+          20,
+          15,
+          550,
+          30
+        ],
+        "role": "window_foreground",
+        "text": "KDE color scheme preview"
+      },
+      {
+        "id": "menu",
+        "kind": "tab",
+        "rect": [
+          650,
+          10,
+          120,
+          36
+        ],
+        "role": "button_background",
+        "text": "Menu",
+        "text_role": "button_foreground",
+        "target": "menu"
+      },
+      {
+        "id": "view",
+        "kind": "rect",
+        "rect": [
+          25,
+          65,
+          500,
+          290
+        ],
+        "role": "view_background",
+        "border_role": "inactive_foreground"
+      },
+      {
+        "id": "item",
+        "kind": "list",
+        "rect": [
+          45,
+          90,
+          440,
+          38
+        ],
+        "role": "selection_background",
+        "text": "Selected item",
+        "text_role": "selection_foreground"
+      },
+      {
+        "id": "normal",
+        "kind": "text",
+        "rect": [
+          45,
+          150,
+          440,
+          30
+        ],
+        "role": "view_foreground",
+        "text": "Normal view text"
+      },
+      {
+        "id": "disabled",
+        "kind": "text",
+        "rect": [
+          45,
+          190,
+          440,
+          30
+        ],
+        "role": "disabled_foreground",
+        "text": "Disabled control",
+        "enabled": false
+      },
+      {
+        "id": "button",
+        "kind": "tab",
+        "rect": [
+          570,
+          100,
+          180,
+          42
+        ],
+        "role": "button_background",
+        "text": "Open dialog",
+        "text_role": "button_foreground",
+        "target": "dialog"
+      },
+      {
+        "id": "tooltip",
+        "kind": "rect",
+        "rect": [
+          550,
+          200,
+          210,
+          55
+        ],
+        "role": "tooltip_background",
+        "text": "Tooltip text",
+        "text_role": "tooltip_foreground"
+      }
+    ]
+  },
+  {
+    "id": "menu",
+    "title": "Application menu",
+    "width": 800,
+    "height": 480,
+    "nodes": [
+      {
+        "id": "back",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          800,
+          480
+        ],
+        "role": "window_background"
+      },
+      {
+        "id": "panel",
+        "kind": "rect",
+        "rect": [
+          470,
+          45,
+          290,
+          250
+        ],
+        "role": "view_background",
+        "border_role": "inactive_foreground"
+      },
+      {
+        "id": "item",
+        "kind": "tab",
+        "rect": [
+          490,
+          70,
+          245,
+          40
+        ],
+        "role": "selection_background",
+        "text": "Open dialog",
+        "text_role": "selection_foreground",
+        "target": "dialog"
+      },
+      {
+        "id": "close",
+        "kind": "tab",
+        "rect": [
+          490,
+          135,
+          245,
+          40
+        ],
+        "role": "button_background",
+        "text": "Close menu",
+        "text_role": "button_foreground",
+        "target": "window"
+      }
+    ]
+  },
+  {
+    "id": "dialog",
+    "title": "Dialog",
+    "width": 800,
+    "height": 480,
+    "nodes": [
+      {
+        "id": "back",
+        "kind": "window",
+        "rect": [
+          0,
+          0,
+          800,
+          480
+        ],
+        "role": "inactive_background"
+      },
+      {
+        "id": "inactive",
+        "kind": "text",
+        "rect": [
+          30,
+          30,
+          400,
+          30
+        ],
+        "role": "inactive_foreground",
+        "text": "Inactive window behind dialog"
+      },
+      {
+        "id": "dialog",
+        "kind": "dialog",
+        "rect": [
+          180,
+          90,
+          440,
+          290
+        ],
+        "role": "window_background",
+        "border_role": "inactive_foreground"
+      },
+      {
+        "id": "title",
+        "kind": "text",
+        "rect": [
+          210,
+          120,
+          380,
+          30
+        ],
+        "role": "window_foreground",
+        "text": "Example dialog"
+      },
+      {
+        "id": "message",
+        "kind": "text",
+        "rect": [
+          210,
+          175,
+          380,
+          30
+        ],
+        "role": "window_foreground",
+        "text": "Colors are editable by role."
+      },
+      {
+        "id": "ok",
+        "kind": "tab",
+        "rect": [
+          430,
+          290,
+          140,
+          40
+        ],
+        "role": "button_background",
+        "text": "OK",
+        "text_role": "button_foreground",
+        "target": "window"
+      }
+    ]
+  }
+]

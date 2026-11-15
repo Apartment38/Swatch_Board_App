@@ -1,0 +1,55 @@
+{
+  "case": "native-matrix-normal",
+  "exit": 0,
+  "stdout": "#FFFFFF",
+  "counts_before": [
+    {
+      "presses": 5,
+      "releases": 5,
+      "keyboard_enters": 5,
+      "keyboard_leaves": 4
+    },
+    {
+      "presses": 0,
+      "releases": 0,
+      "keyboard_enters": 1,
+      "keyboard_leaves": 1
+    }
+  ],
+  "counts_after": [
+    {
+      "presses": 5,
+      "releases": 5,
+      "keyboard_enters": 5,
+      "keyboard_leaves": 4
+    },
+    {
+      "presses": 0,
+      "releases": 0,
+      "keyboard_enters": 1,
+      "keyboard_leaves": 1
+    }
+  ],
+  "transitions": [
+    {
+      "cutoff_ns": 133983129775220,
+      "video_pts_ns": 133983377973998,
+      "stream": 56
+    },
+    {
+      "cutoff_ns": 133984179578456,
+      "video_pts_ns": 133984311307294,
+      "stream": 48
+    }
+  ],
+  "secondary_screenshot_size": [
+    2048,
+    768
+  ],
+  "primary_screenshot_size": [
+    2048,
+    768
+  ],
+  "sessions_closed": true,
+  "gate": "partial_not_phase1a"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "physical-fixture",
+  "name": "Physical acceptance fixture",
+  "version": "1.0",
+  "api_version": 1,
+  "target": "Acceptance fixture",
+  "target_versions": [
+    "1"
+  ],
+  "outputs": [
+    {
+      "path": "acceptance-theme.txt",
+      "template": "templates/theme.j2",
+      "format": "text"
+    }
+  ]
+}
