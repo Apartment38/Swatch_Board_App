@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod layout_tests;
 mod mixer;
 mod palette;
 mod theme;
@@ -264,6 +266,17 @@ impl eframe::App for Board {
                 Event::Activate => {}
             }
         }
+        self.show_ui(ctx);
+    }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, "tab", &self.tab);
+    }
+}
+
+impl Board {
+    // Shared by the native App and integrated client-geometry regressions.
+    fn show_ui(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Swatch Board");
@@ -306,6 +319,8 @@ impl eframe::App for Board {
             .min_height(130.0)
             .max_height(220.0)
             .show(ctx, |ui| {
+                // Honor the user's panel size even when its contents are short.
+                ui.set_min_height(ui.available_height());
                 self.mixer.palette_ui(ui);
                 self.palette.sync_from_mixer(&self.mixer);
                 self.palette.pinned_ui(ui, &mut self.mixer);
@@ -359,10 +374,6 @@ impl eframe::App for Board {
                 }
             }
         });
-    }
-
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, "tab", &self.tab);
     }
 }
 

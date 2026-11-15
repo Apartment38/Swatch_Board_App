@@ -251,8 +251,10 @@ impl Mixer {
         if let Some(error) = &self.error {
             ui.colored_label(ui.visuals().error_fg_color, error);
         }
-        self.channel_editor(ui);
         egui::ScrollArea::vertical().id_salt("mixer_details").show(ui, |ui| {
+            // The channel editor must scroll too: above an expanded palette it
+            // can otherwise consume the entire client and strand the fields.
+            self.channel_editor(ui);
             let current = self.state.current;
             let target = ui.dnd_drop_zone::<Color, _>(egui::Frame::group(ui.style()), |ui| {
                 swatch(ui, current, egui::vec2(ui.available_width().max(80.0), 90.0));
