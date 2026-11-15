@@ -22,6 +22,7 @@ use wayland_client::{
     protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface},
 };
 mod handlers;
+mod palette;
 
 type Result<T, E = Box<dyn Error>> = std::result::Result<T, E>;
 type Entry = (String, String, String, String);
@@ -71,6 +72,7 @@ fn run() -> Result<()> {
     let cursor_theme = wayland_cursor::CursorTheme::load(&conn, shm.wl_shm().clone(), 24)?;
     let cursor_shapes = CursorShapeManager::bind(&globals, &qh).ok();
     let mut app = App {
+        palette: palette::Palette::load(),
         registry: RegistryState::new(&globals),
         outputs: OutputState::new(&globals, &qh),
         seats: SeatState::new(&globals, &qh),
@@ -164,6 +166,7 @@ struct Shield {
     configured: bool,
 }
 struct App {
+    palette: palette::Palette,
     registry: RegistryState,
     outputs: OutputState,
     seats: SeatState,
@@ -303,7 +306,7 @@ impl App {
         };
         canvas.fill(0);
         if self.started && self.selected_output == Some(i) {
-            popup_frame(canvas, (width, height), x, y, w, h);
+            popup_frame(canvas, (width, height), x, y, w, h, &self.palette);
             text(
                 canvas,
                 width,
@@ -311,7 +314,7 @@ impl App {
                 x + 8,
                 y + 8,
                 "Recent colors",
-                0xffffffff,
+                self.palette.window_text,
             );
             if self.entries.is_empty() {
                 text(
@@ -321,7 +324,7 @@ impl App {
                     x + 8,
                     y + 32,
                     "Pick a color to start your history",
-                    0xffdddddd,
+                    self.palette.window_text,
                 );
             }
             for n in 0..self.opts.columns * self.opts.rows {
@@ -331,9 +334,12 @@ impl App {
                 };
                 let xx = x + 8 + (n % self.opts.columns) as i32 * cw;
                 let yy = y + 28 + (n / self.opts.columns) as i32 * ch;
-                if index == self.selected {
-                    rect(canvas, (width, height), xx, yy, cw - 4, ch - 4, 0xff296b91);
-                }
+                let (background, foreground) = if index == self.selected {
+                    (self.palette.selection, self.palette.selection_text)
+                } else {
+                    (self.palette.view, self.palette.view_text)
+                };
+                rect(canvas, (width, height), xx, yy, cw - 4, ch - 4, background);
                 let color = u32::from_str_radix(
                     entry.1.trim_start_matches('#').get(..6).unwrap_or("000000"),
                     16,
@@ -355,7 +361,7 @@ impl App {
                     xx + 3,
                     yy + ch - 19,
                     &entry.1,
-                    0xffffffff,
+                    foreground,
                 );
             }
             let status = if self.status.is_empty() {
@@ -363,7 +369,15 @@ impl App {
             } else {
                 &self.status
             };
-            text(canvas, width, height, x + 8, y + h - 24, status, 0xffffffff);
+            text(
+                canvas,
+                width,
+                height,
+                x + 8,
+                y + h - 24,
+                status,
+                self.palette.window_text,
+            );
         }
         let surface = self.shields[i].layer.wl_surface();
         if buffer.attach_to(surface).is_err() {
@@ -470,7 +484,15 @@ impl App {
     }
 }
 
-fn popup_frame(c: &mut [u8], size: (i32, i32), x: i32, y: i32, w: i32, h: i32) {
+fn popup_frame(
+    c: &mut [u8],
+    size: (i32, i32),
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    palette: &palette::Palette,
+) {
     let (width, height) = size;
     // Layer surfaces have no compositor decoration: paint a soft, premultiplied
     // shadow into the transparent shield to lift the popup above the desktop.
@@ -483,8 +505,8 @@ fn popup_frame(c: &mut [u8], size: (i32, i32), x: i32, y: i32, w: i32, h: i32) {
             c[p..p + 4].copy_from_slice(&(alpha << 24).to_le_bytes());
         }
     }
-    rect(c, size, x, y, w, h, 0xff41464c);
-    rect(c, size, x + 1, y + 1, w - 2, h - 2, 0xff20242a);
+    rect(c, size, x, y, w, h, palette.border);
+    rect(c, size, x + 1, y + 1, w - 2, h - 2, palette.window);
 }
 
 fn rect(c: &mut [u8], (width, height): (i32, i32), x: i32, y: i32, w: i32, h: i32, color: u32) {
