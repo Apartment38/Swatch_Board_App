@@ -46,12 +46,14 @@ impl Tray for Item {
         vec![
             StandardItem {
                 label: "Pick Color".into(),
+                icon_name: "color-picker".into(),
                 activate: Box::new(|item: &mut Self| item.pick()),
                 ..Default::default()
             }
             .into(),
             StandardItem {
                 label: "Show Palette".into(),
+                icon_name: "color-management".into(),
                 activate: Box::new(|item: &mut Self| {
                     let (reply, _) = oneshot::channel();
                     let _ = item.requests.send(Request::ShowHistory(reply));
@@ -61,14 +63,17 @@ impl Tray for Item {
             .into(),
             StandardItem {
                 label: "Open Board".into(),
+                icon_name: "view-grid".into(),
                 activate: Box::new(|item: &mut Self| {
                     let _ = item.requests.send(Request::OpenBoard);
                 }),
                 ..Default::default()
             }
             .into(),
+            ksni::MenuItem::Separator,
             StandardItem {
-                label: "Configure".into(),
+                label: "Configure…".into(),
+                icon_name: "configure".into(),
                 activate: Box::new(|item: &mut Self| {
                     let (reply, _) = oneshot::channel();
                     let _ = item.requests.send(Request::Configure(reply));
@@ -78,6 +83,7 @@ impl Tray for Item {
             .into(),
             StandardItem {
                 label: "Quit".into(),
+                icon_name: "application-exit".into(),
                 activate: Box::new(|item: &mut Self| {
                     let _ = item.requests.send(Request::Quit);
                 }),
