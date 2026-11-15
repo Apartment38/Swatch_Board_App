@@ -11,8 +11,16 @@ use std::time::Duration;
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use rusqlite::{Connection, ErrorCode, OptionalExtension, TransactionBehavior, params};
-pub use swatch_board_picker_core::Rgba8;
 use uuid::Uuid;
+
+/// Stored 8-bit sRGB channels, independent of the compositor's picker protocol.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Rgba8 {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+    pub a: u8,
+}
 
 mod palettes;
 pub use palettes::{GenerationRecord, PaletteRepository, SavedPalette};

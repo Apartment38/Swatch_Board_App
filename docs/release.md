@@ -12,16 +12,16 @@ containing the release sources before publishing the recipe, then inspect the
 resulting `.SRCINFO` and source revision. Do not use a moving branch or tag as
 the source pin.
 
-The recipe's native build requirements are Rust/Cargo, Git, Clang/libclang, pkgconf,
-PipeWire, Wayland and libxkbcommon development metadata. Runtime dependencies
-include glibc, GCC runtime, PipeWire, libglvnd, and hicolor-icon-theme. The latter
-is required for the installed icon hierarchy. `options=('!lto')` is deliberate:
-Arch's GCC LTO C objects for bundled SQLite cannot be consumed by Rust's LLVM
-linker. This was reproduced in the isolated build and fixed before packaging.
-KDE's XDG portal is an optional runtime integration, and `kscreen` is only used
-by the documented output-selection fallback.
+The recipe's native build requirements are Rust/Cargo, Git, pkgconf, Wayland
+and libxkbcommon development metadata. Runtime dependencies include glibc,
+GCC runtime, KWin, libglvnd, and hicolor-icon-theme. The latter is required for
+the installed icon hierarchy. `options=('!lto')` is deliberate: Arch's GCC LTO
+C objects for bundled SQLite cannot be consumed by Rust's LLVM linker.
+KDE's XDG portal provides the tray's optional GlobalShortcuts integration;
+`kscreen` is only used by the documented output-selection fallback.
+The picker uses KWin directly and does not require the ScreenCast portal.
 
-A fresh Arch Docker container built the repaired payload, ran **180 tests**
+Historically, a fresh Arch Docker container built the repaired payload, ran **180 tests**
 (one intentionally ignored) and strict Clippy, produced `0.1.0-2`, installed it
 **inside the container**, and passed installed picker, all four plugin golden,
 complete plugin/schema/license byte-inventory and metadata checks. The physical
@@ -33,7 +33,7 @@ A local Git bundle supplied the unpushed source revision via a makepkg Git URL
 rewrite; this is not a test of public source availability. Push only when
 explicitly authorised before remote package consumers need the source.
 
-Current evidence: `docs/evidence/phase6-packaging/refresh-checks.json` and
+Historical evidence: `docs/evidence/phase6-packaging/refresh-checks.json` and
 `physical-keyboard.json`. `checks.json` describes the earlier `0.1.0-1` baseline,
 which does not contain the Mixer feedback repair and is superseded as a package
 candidate. The unsigned local artifact is under
@@ -50,7 +50,7 @@ namcap PKGBUILD swatch-board-*.pkg.tar.zst
 ```
 
 Review dependency licenses before every release. `THIRD_PARTY_NOTICES.txt` is a
-conservative collection for all 431 registry packages in the current lockfile,
+conservative collection for all 406 registry packages in the current lockfile,
 including build-time and non-Linux dependencies. It contains matching license,
 copyright and notice files from checksum-verified crate archives, the egui
 bundled font text files, and where available license files retrieved from the
@@ -132,8 +132,9 @@ XDG desktop entry; no system service or second autostart mechanism is installed.
 
 ## Compatibility targets and release gates
 
-The supported physical target is KDE Plasma 6 on Wayland with a working
-PipeWire ScreenCast portal and GlobalShortcuts portal. Fedora and openSUSE are
+The supported physical target is KDE Plasma 6 on Wayland with KWin ColorPicker.
+The tray's global shortcuts require a working GlobalShortcuts portal. Native
+acceptance of the replacement picker is pending. Fedora and openSUSE are
 compatibility targets to evaluate after Arch; their package names, portal
 versions, dependencies, and clean-build results have not been validated.
 Record distro release, kernel, Rust version, Plasma/KWin version, portal

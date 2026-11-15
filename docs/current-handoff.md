@@ -1,5 +1,25 @@
 # Swatch Board current handoff
 
+## KWin picker cutover
+
+The custom ScreenCast/PipeWire magnifier is replaced by KWin's native
+`org.kde.KWin` ColorPicker D-Bus interface. KWin manages selection and
+cancellation; the picker needs neither a screen-capture portal nor a desktop
+entry. The tray still uses the GlobalShortcuts portal. Legacy magnifier settings
+are migrated rather than retained as runtime options. Native desktop acceptance
+of this replacement is pending; the picker acceptance and capture evidence below
+describe the previous implementation and do not qualify the replacement.
+
+Verification: workspace debug build, 30 targeted picker/config/tray/storage tests,
+11 packaging checks, targeted all-targets strict Clippy and workspace rustfmt
+check passed. Private peer-D-Bus tests cover QColor's `(u)` wire representation,
+channel decoding, cancellation and compositor errors; they do not invoke the live
+desktop. The live KWin interface was introspected and exposes `pick → (u)`.
+Removed the obsolete capture core, native overlay probes and Wayland fixtures;
+stored RGBA channels now belong to storage. The lockfile drops 25 registry
+packages, and their notice sections were removed without changing retained text.
+
+
 ## UX gauntlet — stopped at user boundary
 
 The final authorized revision and native re-review are complete; no further iteration is authorized. This is **not UX acceptance or release qualification**. All six gauntlet cards are done (task completion, not product acceptance).

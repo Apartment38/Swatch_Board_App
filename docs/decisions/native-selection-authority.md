@@ -1,5 +1,8 @@
 # Decision: investigate Rust-owned selection with displayed-sample authority
 
+> **Historical decision:** The investigated custom picker has since been
+> replaced by KWin ColorPicker. See the [current handoff](../current-handoff.md).
+
 ## Status
 
 **User-approved investigation; not a Phase 1A pass.**

@@ -2,25 +2,23 @@
 
 ## Picker and portals
 
-- **Picker is rejected by ScreenCast portal:** confirm the installed
-  `org.apartment38.SwatchBoard.desktop` entry has an absolute `Exec` path to
-  `swatch-board-picker` and is visible in an XDG applications directory. The
-  portal associates the requester with this desktop entry. Reinstall the
-  package after moving the prefix and retry from the tray.
-- **No capture or shortcut prompt appears:** check that the KDE XDG portal
-  backend is running and that the request is being made from a real graphical
-  user session with its session D-Bus and Wayland socket. Human authorization
-  dialogs are manual. Do not try to work around denied permission by restarting
-  KWin or changing desktop grants from a script.
+- **Picker fails or does not appear:** run from a KDE Plasma Wayland session
+  with access to its session D-Bus and a running KWin ColorPicker service.
+  KWin handles the selection interface and cancellation; the picker does not
+  use the screen-capture portal.
+- **No shortcut prompt appears:** check that the KDE XDG portal backend is
+  running and that the tray has access to the graphical session's D-Bus.
+  Authorization dialogs are manual. Do not restart KWin or change desktop
+  grants from a script to work around denial.
 - **Global shortcuts show unavailable or revoked:** open KDE System Settings'
   Shortcuts page, approve/assign the existing Swatch Board actions, then use
   Settings status and retry. Saved preferences are suggestions until KDE has
   assigned both actions. Conflicts are rejected; use an unused intermediate
   shortcut to swap two assignments. The assignment sequence is not atomic, so
   inspect status after an error.
-- **Picker output selection is ambiguous:** it fails closed. If pointer output
-  identity is absent, the documented fallback queries `kscreen-doctor`; install
-  KDE's `kscreen` package or use the picker on a known active output.
+- **History popup output selection is ambiguous:** if pointer output identity
+  is absent, the documented fallback queries `kscreen-doctor`; install KDE's
+  `kscreen` package or use the popup on a known active output.
 
 ## Tray, clipboard, and history
 

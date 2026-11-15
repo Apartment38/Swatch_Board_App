@@ -163,10 +163,6 @@ impl eframe::App for Settings {
                         }
                     });
                     ui.separator();
-                    ui.heading("Magnifier");
-                    number(ui, "Radius (pixels)", &mut self.config.magnifier_radius, 0..=31);
-                    number(ui, "Zoom", &mut self.config.magnifier_zoom, 4..=32);
-                    ui.separator();
                     ui.heading("Shortcuts");
                     ui.horizontal(|ui| { ui.label("Pick color"); ui.text_edit_singleline(&mut self.config.pick_shortcut); });
                     ui.horizontal(|ui| { ui.label("Show history"); ui.text_edit_singleline(&mut self.config.history_shortcut); });

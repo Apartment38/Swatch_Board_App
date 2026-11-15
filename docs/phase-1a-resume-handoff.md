@@ -1,5 +1,8 @@
 # Swatch Board — resumed-work handoff
 
+> **Historical:** The custom picker described here has since been replaced by
+> KWin ColorPicker. See the [current handoff](current-handoff.md).
+
 > **Completed:** Work resumed after checkpoint `f2d436e`. Mixed-scale routing,
 > transformed capture mapping, animated presented authority, held-button failure,
 > readout/marker, physical 1.75×/rotated/lock acceptance, and the private failure

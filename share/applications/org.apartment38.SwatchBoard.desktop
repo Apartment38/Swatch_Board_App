@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Swatch Board
-Comment=Live Wayland magnifying color picker
+Comment=Pick a color using KWin
 Exec=swatch-board-picker
 Icon=org.apartment38.SwatchBoard
 Terminal=false

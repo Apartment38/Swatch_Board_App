@@ -2,12 +2,12 @@
 
 Build beautiful palettes with swatches.
 
-Swatch Board is a Rust-only KDE Plasma Wayland color utility. The picker,
-tray, history, settings, Board shell, Color Mixer, and Palette Editor have passed
-target-desktop acceptance. The Theme Generator's runtime-authored external-plugin
-workflow has passed native KDE Wayland acceptance with user-operated interactions
-and database/export verification. This does not establish physical testing of
-every bundled target plugin. See the [current handoff](docs/current-handoff.md).
+Swatch Board is a Rust-only KDE Plasma Wayland color utility. The tray, history,
+settings, Board shell, Color Mixer, and Palette Editor have passed target-desktop
+acceptance. The replacement native KWin picker still needs desktop acceptance.
+The Theme Generator's runtime-authored external-plugin workflow has passed native
+KDE Wayland acceptance; this does not establish physical testing of every bundled
+target plugin. See the [current handoff](docs/current-handoff.md).
 
 ## Build and test
 
@@ -19,8 +19,7 @@ cargo clippy --offline --workspace --all-targets --locked -- -D warnings
 ```
 
 Offline commands require the pinned dependencies to be cached already. A first
-build on a fresh machine needs network access and the native PipeWire/SPA and
-Wayland development packages, plus the libclang tooling used by their bindings.
+build on a fresh machine needs network access and Wayland development packages.
 
 ## Run the tray
 
@@ -31,11 +30,6 @@ cargo build --locked --workspace
 ./target/debug/swatch-board-tray
 ```
 
-The picker also requires `share/applications/org.apartment38.SwatchBoard.desktop`
-to be installed in an XDG applications directory. For an uninstalled development
-build, copy that entry to `~/.local/share/applications/` and change its `Exec`
-to the absolute path of the built `swatch-board-picker`; the portal rejects an
-entry whose executable it cannot find. Remove the development entry when done.
 
 Left-click the tray icon or select **Pick Color**. Successful captures are
 saved to `${XDG_DATA_HOME:-$HOME/.local/share}/swatch-board/library.sqlite3`,
@@ -58,13 +52,11 @@ To run the picker directly from a KDE Plasma Wayland desktop session:
 cargo run --offline --locked -p swatch-board-picker
 ```
 
-The picker requests screen-capture authorization through KDE's portal. Left
-release confirms the exact center sample from a genuinely presented magnifier
-commit; right release or Escape cancels. Diagnostics go to stderr and the
-selected `#RRGGBB` value to stdout. When moving between outputs, the picker waits
-for fresh target video and for the reported presentation time before using a
-sample; timeouts and output loss fail closed. When run directly the picker does
-not update history or clipboard; use the tray for those actions.
+The picker invokes KWin's native ColorPicker over the session bus. KWin manages
+the selection interface, keyboard input and cancellation; no screen-capture
+portal or picker desktop entry is required. The selected `#RRGGBB` value goes to
+stdout. When run directly the picker does not update history or clipboard; use
+the tray for those actions.
 
 Inspect the CLI without opening a capture session:
 
@@ -73,9 +65,8 @@ Inspect the CLI without opening a capture session:
 ./target/debug/swatch-board-picker --version
 ```
 
-The executable requires access to the desktop's session D-Bus and Wayland socket.
-If launched outside the desktop environment, ensure `WAYLAND_DISPLAY` points to
-the actual compositor socket; do not assume a particular socket name.
+The picker requires access to the KDE session D-Bus and KWin ColorPicker service.
+The other desktop components also require the Wayland session.
 
 ## History and clipboard settings
 
@@ -88,8 +79,6 @@ history_columns = 4
 history_rows = 3
 auto_copy = true
 clipboard_format = "hex"
-magnifier_radius = 7
-magnifier_zoom = 10
 pick_shortcut = "Meta+Shift+C"
 history_shortcut = "Meta+Shift+H"
 hide_board_while_picking = false
@@ -107,9 +96,8 @@ control; the tray must remain running unless a clipboard manager retains the
 selection. Invalid settings or incompatible databases produce an error rather
 than silently discarding data.
 
-Configure validates settings and applies changes to the running tray. Magnifier
-radius is 0–31 and zoom is 4–32. Global shortcuts require desktop portal
-authorization. On KDE, Save requests assignment of the saved shortcuts to the
+Configure validates settings and applies changes to the running tray. Global
+shortcuts require desktop portal authorization. On KDE, Save requests assignment of the saved shortcuts to the
 existing portal actions; both actions must already be assigned. Unassigned or
 revoked shortcuts must first be enabled in KDE System Settings. Conflicting
 shortcuts are rejected; use a free intermediate binding to swap two shortcuts.
@@ -221,8 +209,8 @@ does not close the Board. A second launch activates the existing Board instance.
 ## Project references
 
 - [Implementation plan](swatch-board-agent-implementation-plan.md)
-- [Phase 1A status](docs/phase-1a-status.md)
-- [Live validation and blockers](docs/phase-1a-live-validation.md)
+- [Phase 1A status (historical)](docs/phase-1a-status.md)
+- [Live validation and blockers (historical)](docs/phase-1a-live-validation.md)
 - [Current developer handoff](docs/current-handoff.md)
 - [Known-color fixture](docs/phase-1a-color-fixture.html)
 - [Historical conversation export](colorboard-conversation-export.md) — preserved

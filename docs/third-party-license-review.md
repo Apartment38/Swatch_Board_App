@@ -1,14 +1,17 @@
 # Third-party licensing review
 
-This review applies to the default workspace features and the lockfile with
-SHA-256 `210d1cc0deea8a0c78d7c74b05d69ba358e34b7ea81e034c9c5e5d0268b0e035`.
-It is an aid to reviewing release candidates, not a blanket approval of every
-future build or its native dependencies.
+The detailed review below applies to the pre-KWin-picker lockfile with SHA-256
+`210d1cc0deea8a0c78d7c74b05d69ba358e34b7ea81e034c9c5e5d0268b0e035`.
+The KWin cutover removed 25 registry packages and preserved the remaining 406
+notice sections unchanged; it added no registry packages. The new lockfile SHA-256
+is `6a0fb3f9871021866d56f3cab308e4acdd9dcd84c0384504e508c5e86e97e175`.
+The dependency trees and binary linkage observations below are historical, not
+fresh qualification of the replacement picker or a release approval.
 
 ## Rust packages and embedded assets
 
-The committed notice collection conservatively covers all 431 registry packages
-in the lockfile, including optional, test, build and non-Linux packages. Crate
+At that checkpoint the notice collection conservatively covered all 431 registry
+packages, including optional, test, build and non-Linux packages. Crate
 archives were checked against their lockfile SHA-256 checksums. Where archives
 omitted their own license files, the collection includes files obtained from
 the source commit identified in the crate where available. A filename search
