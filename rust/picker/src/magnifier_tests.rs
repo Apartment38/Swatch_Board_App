@@ -11,6 +11,7 @@ struct State {
     supported: bool,
     fail_load: bool,
     fail_toggle: bool,
+    fail_zoom_in: bool,
     defer_reset: bool,
 }
 
@@ -24,6 +25,7 @@ impl Default for State {
             supported: true,
             fail_load: false,
             fail_toggle: false,
+            fail_zoom_in: false,
             defer_reset: false,
         }
     }
@@ -99,12 +101,19 @@ struct Shortcuts(Arc<Mutex<State>>);
 impl Shortcuts {
     #[zbus(name = "invokeShortcut")]
     fn invoke(&self, name: &str) -> zbus::fdo::Result<()> {
-        assert_eq!(name, "view_actual_size");
         let mut state = self.0.lock().unwrap();
         assert!(state.magnifier_loaded && !state.zoom_loaded);
         if state.fail_toggle {
             return Err(zbus::fdo::Error::Failed("shortcut unavailable".into()));
         }
+        if name == "view_zoom_in" {
+            if state.fail_zoom_in {
+                return Err(zbus::fdo::Error::Failed("zoom shortcut unavailable".into()));
+            }
+            state.magnifier *= 1.2;
+            return Ok(());
+        }
+        assert_eq!(name, "view_actual_size");
         if state.magnifier <= 1.0 {
             state.magnifier = 2.0;
         } else if state.defer_reset {
@@ -146,7 +155,7 @@ async fn cursor_loupe_restores_zoom_even_when_pick_finishes_before_first_frame()
     {
         let state = state.lock().unwrap();
         assert!(state.magnifier_loaded && !state.zoom_loaded);
-        assert_eq!(state.magnifier, 2.0);
+        assert!(state.magnifier >= 8.0);
     }
     magnifier.restore().await.unwrap();
     assert_eq!(*state.lock().unwrap(), State::default());
@@ -182,7 +191,7 @@ async fn preloaded_idle_magnifier_is_not_unloaded_on_close() {
     };
     let (_server, client, state) = peer(original.clone()).await;
     let mut magnifier = Magnifier::start(&client).await.unwrap();
-    assert_eq!(state.lock().unwrap().magnifier, 2.0);
+    assert!(state.lock().unwrap().magnifier >= 8.0);
     magnifier.restore().await.unwrap();
     assert_eq!(*state.lock().unwrap(), original);
 }
@@ -200,6 +209,10 @@ async fn partial_setup_failures_restore_original_effect_before_returning_error()
         },
         State {
             fail_toggle: true,
+            ..State::default()
+        },
+        State {
+            fail_zoom_in: true,
             ..State::default()
         },
     ] {

@@ -34,6 +34,14 @@ completion confirmed Magnifier unloaded and the previous Zoom effect loaded at
 `targetZoom: 1`. This verifies the native effect lifecycle, not a full color-pick
 or multioutput acceptance round. The throwaway example was removed.
 
+Zoom increase: picker-owned magnification now reaches at least 8× using KDE's
+Zoom In steps (8.599633919999999× with the tested default 1.2 factor). Existing
+active accessibility magnification remains untouched. The user chose to retain
+KWin's native cursor rather than add a compositor extension for a pixel-square
+crosshair. Eleven standalone picker tests, targeted strict Clippy, formatting
+and the picker build passed. The live higher-zoom appearance is captured in
+ignored `target/native-magnifier-8x-smoke.png`.
+
 
 ## UX gauntlet — stopped at user boundary
 

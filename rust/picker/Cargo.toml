@@ -10,4 +10,4 @@ tokio = { workspace = true, features = ["signal"] }
 zbus.workspace = true
 
 [dev-dependencies]
-zbus = { workspace = true, features = ["p2p"] }
+zbus = { workspace = true, features = ["p2p", "tokio"] }

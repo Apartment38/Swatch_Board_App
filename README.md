@@ -53,8 +53,9 @@ cargo run --offline --locked -p swatch-board-picker
 ```
 
 The picker invokes KWin's native ColorPicker over the session bus and uses KDE's
-cursor-centered Magnifier while picking. KDE controls its appearance; there are
-no picker radius or zoom options. No ScreenCast prompt, screen-capture portal or
+cursor-centered Magnifier at a minimum of 8× while picking, rounded up using KDE's
+zoom steps. KDE controls its appearance and native cursor; there are no picker
+radius or zoom options. No ScreenCast prompt, screen-capture portal or
 picker desktop entry is required. The selected `#RRGGBB` value goes to stdout.
 When run directly the picker does not update history or clipboard; use the tray
 for those actions.

@@ -107,6 +107,7 @@ impl<'a> Magnifier<'a> {
                 }
                 tokio::time::sleep(Duration::from_millis(20)).await;
             }
+            self.increase_zoom().await?;
         }
         Ok(())
     }
@@ -115,6 +116,36 @@ impl<'a> Magnifier<'a> {
         self.shortcuts
             .call("invokeShortcut", &("view_actual_size",))
             .await
+    }
+
+    async fn increase_zoom(&self) -> zbus::Result<()> {
+        const MINIMUM_ZOOM: f64 = 8.0;
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut zoom = self.target("magnifier").await?;
+        while zoom < MINIMUM_ZOOM {
+            self.shortcuts
+                .call::<_, _, ()>("invokeShortcut", &("view_zoom_in",))
+                .await?;
+            loop {
+                let next = self.target("magnifier").await?;
+                if next > zoom {
+                    zoom = next;
+                    break;
+                }
+                if next < zoom || Instant::now() >= deadline {
+                    return Err(Error::Failure(
+                        "KDE's Zoom In shortcut could not increase magnification to 8×".into(),
+                    ));
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+            if zoom < MINIMUM_ZOOM && Instant::now() >= deadline {
+                return Err(Error::Failure(
+                    "KDE's Zoom In shortcut could not increase magnification to 8×".into(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     pub async fn restore(&mut self) -> zbus::Result<()> {
