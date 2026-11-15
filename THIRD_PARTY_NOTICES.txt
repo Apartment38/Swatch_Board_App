@@ -71923,3 +71923,25 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+==============================================================================
+Bundled SQLite 3.46.0 (libsqlite3-sys 0.30.1, sqlite3/sqlite3.c)
+The bundled SQLite amalgamation contains the following notice in its source:
+
+The author disclaims copyright to this source code. In place of
+ a legal notice, here is a blessing:
+
+    May you do good and not evil.
+    May you find forgiveness for yourself and forgive others.
+    May you share freely, never taking more than you give.
+
+==============================================================================
+Embedded font copyright metadata (epaint_default_fonts 0.31.1)
+The following copyright strings are from the bundled font name tables:
+
+NotoEmoji-Regular.ttf: Copyright 2013 Google Inc. All Rights Reserved.
+Ubuntu-Light.ttf: Copyright 2011 Canonical Ltd.  Licensed under the Ubuntu Font Licence 1.0
+Hack-Regular.ttf: Copyright (c) 2018 Source Foundry Authors / Copyright (c) 2003 by Bitstream, Inc. All Rights Reserved.
+
+The epaint_default_fonts section above contains the corresponding license texts,
+including the emoji-icon-font notice supplied with that font.

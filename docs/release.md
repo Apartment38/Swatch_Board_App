@@ -58,11 +58,11 @@ exact upstream Git commit recorded in the crate. The installer includes this
 collection alongside the project license. Its presence is not a completed
 license audit: filename-based collection can miss other notices or obligations.
 The collection explicitly marks eight packages for which no notice file was
-found; `hexf-parse` is in the prior Linux inventory and declares CC0-1.0, while
-the remaining marked packages concern Apple, Windows or UEFI targets. Confirm
-actual shipped dependencies, inspect missing upstream material and all bundled
-native libraries and fonts, and review applicable license obligations before
-distribution. Recollect and review the notices whenever the lockfile changes.
+found. The default x86_64 and aarch64 Linux production and build dependency
+trees do not select any of them; `hexf-parse` is an optional dependency in the
+broader metadata inventory and declares CC0-1.0. See
+`docs/third-party-license-review.md` for the scope and evidence. Recollect and
+review the notices whenever the lockfile, target or features change.
 The Arch recipe still pins an older source commit, so its pin must be updated to
 a commit containing the notice collection before a package can include it.
 
@@ -71,10 +71,17 @@ and checksums, but does not constitute an SPDX/license-notice audit. The recorde
 `dependency-license-inventory.json` enumerates metadata declarations and candidate
 notice-file gaps only; some upstream crate archives omit their own notice files.
 The installed project MIT license is not proof that all bundled code/font
-redistribution obligations are satisfied. Obtain and review the exact-version
-remaining third-party notices before public distribution. **This local artifact is not
-approved for public release.** Neither a legal/notice audit nor an independent
-reproducibility comparison has been completed.
+redistribution obligations are satisfied. **The existing artifact is not
+approved for public release.** Each distribution candidate must have its own
+native-library, toolchain and license review; AppImage and Flatpak artifacts have
+not yet been built or reviewed. An independent reproducibility comparison has
+also not been completed.
+
+The installer includes the Rust standard library copyright inventory and license
+texts from the active toolchain's `share/doc/rust` directory. If the build
+toolchain is no longer active, set `RUST_LICENSE_DIR` to the preserved directory
+from the exact toolchain that built the binaries. Installation fails if that
+documentation is missing. Do not substitute a different toolchain's notices.
 
 ## Local release verification
 

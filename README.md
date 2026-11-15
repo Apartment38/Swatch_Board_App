@@ -121,6 +121,10 @@ The Board applies the hide preference to picks started from its own window.
 
 For a staged installation, build release binaries and use
 `PREFIX=/usr DESTDIR=/tmp/swatch-board-stage bash packaging/install.sh`.
+The installer includes notices from the active Rust toolchain; when installing
+previously built binaries, set `RUST_LICENSE_DIR` to the `share/doc/rust`
+directory from the toolchain that built them. See `docs/release.md` for the
+distribution review requirements.
 
 ## Run the Board
 

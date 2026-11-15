@@ -24,12 +24,17 @@ class InstallerTests(unittest.TestCase):
             path.write_text("#!/bin/sh\nexit 99\n")
             path.chmod(0o755)
         self.stage = self.root / "stage"
+        self.rust_notices = self.root / "rust-notices"
+        (self.rust_notices / "licenses").mkdir(parents=True)
+        (self.rust_notices / "COPYRIGHT-library.html").write_text("standard library copyright")
+        (self.rust_notices / "licenses/MIT.txt").write_text("test license")
+        (self.rust_notices / "licenses/Apache-2.0.txt").write_text("test Apache license")
 
     def install(self):
         return subprocess.run(
             ["bash", str(ROOT / "packaging/install.sh")],
             env={**os.environ, "PREFIX": "/usr/local", "DESTDIR": str(self.stage),
-                 "BINDIR": str(self.bindir)},
+                 "BINDIR": str(self.bindir), "RUST_LICENSE_DIR": str(self.rust_notices)},
             capture_output=True, text=True, check=False,
         )
 
@@ -49,6 +54,23 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue((prefix / "share/swatch-board/plugins/example-terminal/manifest.json").is_file())
         notices = prefix / "share/licenses/swatch-board/THIRD_PARTY_NOTICES.txt"
         self.assertEqual(notices.read_bytes(), (ROOT / "THIRD_PARTY_NOTICES.txt").read_bytes())
+        installed_rust = prefix / "share/licenses/swatch-board/rust-standard-library"
+        self.assertEqual((installed_rust / "COPYRIGHT-library.html").read_text(), "standard library copyright")
+        self.assertEqual((installed_rust / "licenses/MIT.txt").read_text(), "test license")
+
+    def test_missing_rust_notices_fails_before_writing_stage(self):
+        (self.rust_notices / "COPYRIGHT-library.html").unlink()
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Missing Rust standard library notices", result.stderr)
+        self.assertFalse(self.stage.exists())
+
+    def test_missing_rust_license_text_fails_before_writing_stage(self):
+        (self.rust_notices / "licenses/Apache-2.0.txt").unlink()
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Missing Rust standard library notices", result.stderr)
+        self.assertFalse(self.stage.exists())
 
     def test_missing_worker_fails_before_writing_stage(self):
         (self.bindir / "swatch-board-theme-worker").unlink()

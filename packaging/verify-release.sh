@@ -21,7 +21,8 @@ for name in swatch-board-picker swatch-board-tray swatch-board-history \
 done
 "$bin/swatch-board-picker" --version | grep -Fx "Swatch Board Picker 0.1.0"
 "$bin/swatch-board-picker" --help >/dev/null
-python3 - "$stage" "$root" <<'PY'
+rust_license_dir=${RUST_LICENSE_DIR:-"$(rustc --print sysroot)/share/doc/rust"}
+python3 - "$stage" "$root" "$rust_license_dir" <<'PY'
 import json
 from pathlib import Path
 import subprocess
@@ -29,6 +30,7 @@ import sys
 
 prefix = Path(sys.argv[1]) / "usr"
 source = Path(sys.argv[2])
+rust_source = Path(sys.argv[3])
 # Check all shipped plugin/schema bytes, not merely their directory names.
 for category in ("plugins", "schemas"):
     original = source / category
@@ -44,6 +46,12 @@ if (prefix / "share/licenses/swatch-board/LICENSE").read_bytes() != (source / "L
     raise RuntimeError("installed license differs")
 if (prefix / "share/licenses/swatch-board/THIRD_PARTY_NOTICES.txt").read_bytes() != (source / "THIRD_PARTY_NOTICES.txt").read_bytes():
     raise RuntimeError("installed third-party notices differ")
+rust_installed = prefix / "share/licenses/swatch-board/rust-standard-library"
+for relative in [Path("COPYRIGHT-library.html"), *(
+    p.relative_to(rust_source) for p in (rust_source / "licenses").rglob("*") if p.is_file()
+)]:
+    if (rust_installed / relative).read_bytes() != (rust_source / relative).read_bytes():
+        raise RuntimeError(f"installed Rust notice differs: {relative}")
 for name in ("ghostty", "zed", "kde", "example-terminal"):
     plugin = prefix / "share/swatch-board/plugins" / name
     manifest = json.loads((plugin / "manifest.json").read_text())

@@ -5,7 +5,8 @@ set -euo pipefail
 if [[ ${1:-} == --help ]]; then
     printf '%s\n' 'Usage: PREFIX=/usr/local DESTDIR=/tmp/stage BINDIR=target/release bash packaging/install.sh' \
         'PREFIX is the absolute installation prefix; DESTDIR is an optional absolute staging root.' \
-        'BINDIR is the directory containing the six already-built executables (default: target/release).'
+        'BINDIR is the directory containing the six already-built executables (default: target/release).' \
+        'RUST_LICENSE_DIR is the build toolchain share/doc/rust directory; defaults to the active rustc sysroot.'
     exit 0
 fi
 if (( $# != 0 )); then
@@ -40,6 +41,18 @@ for binary in swatch-board-picker swatch-board-tray swatch-board-history swatch-
     }
 done
 
+# Rust's standard library is linked into the executables and has notices outside
+# Cargo.lock. Use the documentation from the *same* toolchain used to build.
+rust_license_dir=${RUST_LICENSE_DIR:-}
+if [[ -z $rust_license_dir ]]; then
+    command -v rustc >/dev/null || { printf '%s\n' 'Set RUST_LICENSE_DIR to the build toolchain share/doc/rust directory.' >&2; exit 1; }
+    rust_license_dir="$(rustc --print sysroot)/share/doc/rust"
+fi
+[[ -s $rust_license_dir/COPYRIGHT-library.html && -s $rust_license_dir/licenses/MIT.txt && -s $rust_license_dir/licenses/Apache-2.0.txt ]] || {
+    printf 'Missing Rust standard library notices in %s\n' "$rust_license_dir" >&2
+    exit 1
+}
+
 install -d "$destdir$prefix/bin" "$destdir$prefix/share/applications" \
     "$destdir$prefix/share/icons/hicolor/scalable/apps" "$destdir$prefix/share/metainfo" \
     "$destdir$prefix/share/licenses/swatch-board"
@@ -52,6 +65,10 @@ install -m 644 "$root/share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.
     "$destdir$prefix/share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml"
 install -m 644 "$root/LICENSE" "$destdir$prefix/share/licenses/swatch-board/LICENSE"
 install -m 644 "$root/THIRD_PARTY_NOTICES.txt" "$destdir$prefix/share/licenses/swatch-board/THIRD_PARTY_NOTICES.txt"
+install -d "$destdir$prefix/share/licenses/swatch-board/rust-standard-library"
+install -m 644 "$rust_license_dir/COPYRIGHT-library.html" "$destdir$prefix/share/licenses/swatch-board/rust-standard-library/COPYRIGHT-library.html"
+cp -R "$rust_license_dir/licenses" "$destdir$prefix/share/licenses/swatch-board/rust-standard-library/"
+chmod -R a+rX "$destdir$prefix/share/licenses/swatch-board/rust-standard-library"
 install -d "$destdir$prefix/share/swatch-board/plugins" "$destdir$prefix/share/swatch-board/schemas"
 cp -R "$root/plugins/." "$destdir$prefix/share/swatch-board/plugins/"
 cp -R "$root/schemas/." "$destdir$prefix/share/swatch-board/schemas/"
