@@ -15,16 +15,18 @@ class ArchRecipeTests(unittest.TestCase):
             capture_output=True, text=True, check=True,
         )
         dependencies = set(result.stdout.splitlines())
-        self.assertTrue({"git", "clang", "cargo", "pkgconf", "wayland", "libxkbcommon"}
+        self.assertTrue({"git", "cargo", "pkgconf", "wayland", "libxkbcommon"}
                         <= dependencies, dependencies)
 
-    def test_icon_theme_runtime_dependency_is_declared(self):
+    def test_desktop_runtime_dependencies_are_declared(self):
         result = subprocess.run(
             ["bash", "-c", 'source "$1"; printf "%s\\n" "${depends[@]}"',
              "bash", str(ROOT / "packaging/arch/PKGBUILD")],
             capture_output=True, text=True, check=True,
         )
-        self.assertIn("hicolor-icon-theme", result.stdout.splitlines())
+        dependencies = set(result.stdout.splitlines())
+        self.assertTrue({"hicolor-icon-theme", "kwin"} <= dependencies, dependencies)
+        self.assertNotIn("pipewire", dependencies)
 
     def test_cross_language_objects_do_not_use_gcc_lto(self):
         result = subprocess.run(

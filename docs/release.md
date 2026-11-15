@@ -63,8 +63,10 @@ trees do not select any of them; `hexf-parse` is an optional dependency in the
 broader metadata inventory and declares CC0-1.0. See
 `docs/third-party-license-review.md` for the scope and evidence. Recollect and
 review the notices whenever the lockfile, target or features change.
-The Arch recipe still pins an older source commit, so its pin must be updated to
-a commit containing the notice collection before a package can include it.
+The Arch `0.1.0-3` recipe pins the local native-picker source checkpoint
+`c1bd7bfd396e8199acd727a043ef6287949ee11c`, including the notice collection.
+That source has not been pushed, and this package revision has not been built or
+release-qualified.
 
 `Cargo.lock` pins versions
 and checksums, but does not constitute an SPDX/license-notice audit. The recorded
