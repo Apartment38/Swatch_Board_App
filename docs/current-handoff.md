@@ -1,5 +1,17 @@
 # Swatch Board current handoff
 
+## UX gauntlet — stopped at user boundary
+
+The final authorized revision and native re-review are complete; no further iteration is authorized. This is **not UX acceptance or release qualification**. All six gauntlet cards are done (task completion, not product acceptance).
+
+- Final critic: `docs/evidence/ux-gauntlet/critic-layout-revision/verdict.md`. Independently built/native execution, not blind. Pointer Add/Lock/locked Delete and one tab transition have narrow native evidence. Small-output lower details remain cut off; titlebar/output versus actual visible client geometry and scroll reachability are unresolved, not a confirmed exact-client scrolling defect.
+- Native keyboard, font14 expanded multi-swatch reachability, HEX Apply/Undo/Redo/error recovery, locked edit/history refusal, AT-SPI names/roles, native theme/scaling integration remain untested.
+- Builder report: `docs/evidence/ux-gauntlet/layout-revision/report.md`; reports build/strict Clippy/fmt pass and 201 tests passed, 0 failed, 1 ignored after staging the built theme worker beside test executables. Not a theme.rs repair or native acceptance. Integrated headless regressions cover expanded height and mixer Apply scroll reachability.
+- Lead verified board has no active gauntlet cards; final `/proc` scan of both critic-owned private runtime roots was empty. Forced teardown is not normal-close evidence.
+- At final inspection HEAD was `03cf60e` (`First Gauntlet Run`), with staged evidence and `rust/board/src/layout_tests.rs`. This differs from the workers' recorded `195cb9f` provenance; lead did not create, amend, revert or push that checkpoint. Preserve the existing index/worktree. No additional checkpoint made at closeout.
+- Progress: `docs/ux-gauntlet-progress.html`. Remaining defects and release/license/reproducibility gates stay open.
+
+
 ## Repository state
 
 - Project: `/home/erick/Projects/Swatch_Board_App`

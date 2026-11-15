@@ -1,0 +1,7 @@
+[03:17:58.986481]  -> xdg_toplevel#36.set_min_size(540, 360)
+[03:17:58.998788] xdg_toplevel#36.configure_bounds(540, 324)
+[03:17:58.998793] xdg_toplevel#36.configure(0, 0, array[0])
+[03:17:58.999079]  -> xdg_surface#35.set_window_geometry(0, 0, 540, 324)
+[03:17:58.999209]  -> xdg_surface#35.set_window_geometry(0, 0, 540, 360)
+[03:17:58.999235]  -> xdg_toplevel#36.set_min_size(540, 360)
+[03:17:59.131550] xdg_toplevel#36.configure(540, 360, array[4])

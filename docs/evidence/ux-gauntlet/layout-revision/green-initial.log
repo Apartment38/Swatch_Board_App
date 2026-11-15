@@ -1,0 +1,14 @@
+   Compiling swatch-board v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/board)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.41s
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board/bb0b50b96af84716/out/swatch_board-bb0b50b96af84716)
+
+running 3 tests
+test layout_tests::integrated_minimum_client_font14_mixer_apply_reachable_above_expanded_palette ... 540x360 client, font14, history open: Apply reached=true; bounds=None
+ok
+test layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal ... all swatch details reached: {0, 1, 2, 3, 4, 5, 6, 7}
+ok
+test layout_tests::integrated_palette_preserves_expanded_height ... requested palette height=220; actual=[[0.0 140.0] - [540.0 360.0]]
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 37 filtered out; finished in 1.00s
+

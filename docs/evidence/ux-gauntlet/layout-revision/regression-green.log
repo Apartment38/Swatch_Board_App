@@ -1,0 +1,43 @@
+$ cargo test --offline --locked -p swatch-board --bin swatch-board layout_tests:: -- --nocapture --test-threads=1
+   Compiling swatch-board v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/board)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.92s
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board/bb0b50b96af84716/out/swatch_board-bb0b50b96af84716)
+
+running 3 tests
+test layout_tests::integrated_minimum_client_font14_mixer_apply_reachable_above_expanded_palette ... 
+running 1 test
+test layout_tests::integrated_minimum_client_font14_mixer_apply_reachable_above_expanded_palette ... 540x360 client, font14, history open: Apply reached=true; bounds=None
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out; finished in 0.85s
+
+
+ok
+test layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal ... 
+running 1 test
+test layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal ... client=[540.0 360.0]; requested panel height=130; all swatch details reached: {0, 1, 2, 3, 4, 5, 6, 7}; refusal=Some(([[8.0 226.8] - [492.2 260.8]], [[0.0 203.8] - [540.0 360.0]]))
+client=[540.0 360.0]; requested panel height=145; all swatch details reached: {0, 1, 2, 3, 4, 5, 6, 7}; refusal=Some(([[8.0 226.8] - [492.2 260.8]], [[0.0 203.8] - [540.0 360.0]]))
+client=[540.0 360.0]; requested panel height=220; all swatch details reached: {0, 1, 2, 3, 4, 5, 6, 7}; refusal=Some(([[8.0 163.0] - [492.2 197.0]], [[0.0 140.0] - [540.0 360.0]]))
+client=[960.0 640.0]; requested panel height=130; all swatch details reached: {0, 1, 2, 3, 4, 5, 6, 7}; refusal=Some(([[8.0 522.8] - [701.5 540.8]], [[0.0 499.8] - [960.0 640.0]]))
+client=[960.0 640.0]; requested panel height=145; all swatch details reached: {0, 1, 2, 3, 4, 5, 6, 7}; refusal=Some(([[8.0 518.0] - [701.5 536.0]], [[0.0 495.0] - [960.0 640.0]]))
+client=[960.0 640.0]; requested panel height=220; all swatch details reached: {0, 1, 2, 3, 4, 5, 6, 7}; refusal=Some(([[8.0 443.0] - [701.5 461.0]], [[0.0 420.0] - [960.0 640.0]]))
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out; finished in 2.66s
+
+
+ok
+test layout_tests::integrated_palette_preserves_expanded_height ... 
+running 1 test
+test layout_tests::integrated_palette_preserves_expanded_height ... requested palette height=220; actual=[[0.0 140.0] - [540.0 360.0]]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out; finished in 0.06s
+
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 37 filtered out; finished in 3.59s
+
+
+EXIT=0

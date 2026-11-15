@@ -1,0 +1,5 @@
+$ cargo build --offline --locked --workspace --all-targets
+   Compiling swatch-board v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/board)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.98s
+
+EXIT=0

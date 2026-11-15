@@ -1,0 +1,14 @@
+   Compiling tempfile v3.27.0
+   Compiling swatch-board-tray v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/tray)
+   Compiling swatch-board-storage v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/storage)
+   Compiling swatch-board-config v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/config)
+   Compiling swatch-board v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/board)
+   Compiling swatch-board-clipboard v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/clipboard)
+   Compiling swatch-board-theme-core v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/theme-core)
+   Compiling swatch-board-history v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/history)
+   Compiling swatch-board-picker v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/picker)
+   Compiling swatch-board-config-core v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/config-core)
+   Compiling swatch-board-color v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/color)
+   Compiling swatch-board-picker-core v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/picker-core)
+   Compiling swatch-board-ipc v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/ipc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 11s

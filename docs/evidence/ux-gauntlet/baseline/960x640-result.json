@@ -1,0 +1,23 @@
+{
+  "output_requested": [
+    960,
+    640
+  ],
+  "private_virtual_backend": true,
+  "board_pid": 107881,
+  "actions": [
+    {
+      "action": "Add current color",
+      "x": 190,
+      "y": 557,
+      "clicks": 1
+    },
+    {
+      "action": "Palette Editor tab",
+      "x": 120,
+      "y": 70,
+      "clicks": 1
+    }
+  ],
+  "note": "output dimensions not verified as Board client dimensions; clicks are attempted, effect requires screenshot verification"
+}

@@ -1,0 +1,15 @@
+   Compiling swatch-board v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/board)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.73s
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board/bb0b50b96af84716/out/swatch_board-bb0b50b96af84716)
+
+running 2 tests
+test layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal ... client=[540.0 360.0]; initial name=Some(([[12.0 339.9] - [69.1 355.9]], [[11.0 338.9] - [117.0 357.0]])); refusal=Some(([[8.0 226.8] - [492.2 260.8]], [[0.0 203.8] - [540.0 360.0]]))
+after vertical wheel name=Some(([[12.0 339.9] - [69.1 355.9]], [[11.0 338.9] - [117.0 357.0]]))
+ok
+test layout_tests::integrated_palette_resize_characterization ... default 540x360: name=Some(([[12.0 339.9] - [69.1 355.9]], [[11.0 338.9] - [117.0 357.0]]))
+after panel resize: name=Some(([[12.0 339.9] - [69.1 355.9]], [[11.0 338.9] - [117.0 357.0]])); visible=true
+after client resize 960x640: name=Some(([[12.0 619.9] - [69.1 635.9]], [[11.0 618.9] - [117.0 637.0]])); visible=true
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 37 filtered out; finished in 0.45s
+
