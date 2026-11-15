@@ -270,19 +270,14 @@ impl App {
     }
     fn geometry(&self, i: usize) -> (i32, i32, i32, i32, i32, i32) {
         let s = &self.shields[i];
-        let cw = (s.width as i32 / self.opts.columns as i32).clamp(40, 132);
-        let ch = (s.height as i32 / (self.opts.rows as i32 + 1)).clamp(40, 100);
-        let w = (cw * self.opts.columns as i32 + 16).min(s.width as i32);
-        let h = (ch * self.opts.rows as i32 + 64).min(s.height as i32);
-        (
-            ((s.width as i32 - w) / 2).max(0),
-            ((s.height as i32 - h) / 2).max(0),
-            w,
-            h,
-            cw,
-            ch,
+        popup_geometry(
+            s.width as i32,
+            s.height as i32,
+            self.opts.columns,
+            self.opts.rows,
         )
     }
+
     fn redraw_all(&mut self) {
         for i in 0..self.shields.len() {
             self.draw(i);
@@ -328,6 +323,9 @@ impl App {
                 );
             }
             for n in 0..self.opts.columns * self.opts.rows {
+                if cw < 12 {
+                    break;
+                }
                 let index = self.offset + n;
                 let Some(entry) = self.entries.get(index) else {
                     break;
@@ -363,21 +361,41 @@ impl App {
                     xx + 3,
                     yy + 3,
                     cw - 10,
-                    (ch - 25).max(6),
+                    ch - 10,
+                    self.palette.border,
+                );
+                rect(
+                    canvas,
+                    (width, height),
+                    xx + 4,
+                    yy + 4,
+                    cw - 12,
+                    ch - 12,
                     0xff000000 | color,
                 );
-                text(
+                // Keep the code inside a padded strip, centered with the same
+                // font metrics used to render it. The complete tile is square.
+                let band_height = 25.min(ch - 12);
+                let band_y = yy + ch - 8 - band_height;
+                rect(
                     canvas,
-                    width,
-                    height,
-                    xx + 3,
-                    yy + ch - 19,
+                    (width, height),
+                    xx + 4,
+                    band_y,
+                    cw - 12,
+                    band_height,
+                    background,
+                );
+                centered_text(
+                    canvas,
+                    (width, height),
+                    (xx + 7, band_y + 4, cw - 18, band_height - 8),
                     &entry.1,
                     foreground,
                 );
             }
             let status = if self.status.is_empty() {
-                "Click a color to copy  ·  Enter: copy  ·  Esc: close"
+                "Click or Enter to copy · Esc to close"
             } else {
                 &self.status
             };
@@ -433,14 +451,10 @@ impl App {
         if px < x || py < y || px >= x + w || py >= y + h {
             return None;
         }
-        let (dx, dy) = (px - x - 8, py - y - 28);
-        if dx < 0 || dy < 0 {
+        let Some((col, row)) = grid_hit(x, y, cw, ch, self.opts.columns, self.opts.rows, px, py)
+        else {
             return Some(usize::MAX);
-        }
-        let (col, row) = (dx / cw, dy / ch);
-        if col >= self.opts.columns as i32 || row >= self.opts.rows as i32 {
-            return Some(usize::MAX);
-        }
+        };
         let n = self.offset + row as usize * self.opts.columns + col as usize;
         Some(if n < self.entries.len() {
             n
@@ -496,6 +510,41 @@ impl App {
     }
 }
 
+// Reserve title/footer space before fitting the square grid to either axis.
+fn popup_geometry(
+    width: i32,
+    height: i32,
+    columns: usize,
+    rows: usize,
+) -> (i32, i32, i32, i32, i32, i32) {
+    let cell = ((width - 16).max(0) / columns as i32)
+        .min((height - 64).max(0) / rows as i32)
+        .min(108);
+    let w = (cell * columns as i32 + 16).min(width);
+    let h = (cell * rows as i32 + 64).min(height);
+    ((width - w) / 2, (height - h) / 2, w, h, cell, cell)
+}
+fn grid_hit(
+    x: i32,
+    y: i32,
+    cw: i32,
+    ch: i32,
+    columns: usize,
+    rows: usize,
+    px: i32,
+    py: i32,
+) -> Option<(i32, i32)> {
+    let (dx, dy) = (px - x - 8, py - y - 28);
+    if dx < 0 || dy < 0 || cw < 12 {
+        return None;
+    }
+    let (col, row) = (dx / cw, dy / ch);
+    if col >= columns as i32 || row >= rows as i32 || dx % cw >= cw - 4 || dy % ch >= ch - 4 {
+        return None;
+    }
+    Some((col, row))
+}
+
 fn popup_frame(
     c: &mut [u8],
     size: (i32, i32),
@@ -529,10 +578,9 @@ fn rect(c: &mut [u8], (width, height): (i32, i32), x: i32, y: i32, w: i32, h: i3
         }
     }
 }
-fn text(c: &mut [u8], w: i32, h: i32, x: i32, y: i32, s: &str, color: u32) {
-    use ab_glyph::{Font, ScaleFont};
+fn system_font() -> Option<&'static ab_glyph::FontArc> {
     static FONT: std::sync::OnceLock<Option<ab_glyph::FontArc>> = std::sync::OnceLock::new();
-    let font = FONT.get_or_init(|| {
+    FONT.get_or_init(|| {
         // Fontconfig resolves installed system fonts, including user overrides.
         let output = std::process::Command::new("fc-match")
             .args(["-s", "-f", "%{file}\n", "sans-serif"])
@@ -541,17 +589,65 @@ fn text(c: &mut [u8], w: i32, h: i32, x: i32, y: i32, s: &str, color: u32) {
         String::from_utf8_lossy(&output.stdout)
             .lines()
             .find_map(|path| ab_glyph::FontArc::try_from_vec(std::fs::read(path).ok()?).ok())
-    });
-    let Some(font) = font else {
-        bitmap_text(c, w, h, x, y, s, color);
+    })
+    .as_ref()
+}
+fn centered_text(c: &mut [u8], size: (i32, i32), area: (i32, i32, i32, i32), s: &str, color: u32) {
+    use ab_glyph::{Font, ScaleFont};
+    let (x, y, width, height) = area;
+    if width <= 0 || height <= 0 {
+        return;
+    }
+    let Some(font) = system_font() else {
+        let text_width = s.chars().count() as i32 * 6;
+        if text_width <= width && height >= 7 {
+            bitmap_text(
+                c,
+                size.0,
+                size.1,
+                x + (width - text_width) / 2,
+                y + (height - 7) / 2,
+                s,
+                color,
+            );
+        }
         return;
     };
     let scaled = font.as_scaled(17.0);
+    let advance: f32 = s
+        .chars()
+        .map(|ch| scaled.h_advance(scaled.glyph_id(ch)))
+        .sum();
+    let scale = 17.0_f32
+        .min(height as f32)
+        .min(17.0 * width as f32 / advance.max(1.0));
+    let text_width = advance * scale / 17.0;
+    text_at_scale(
+        c,
+        size.0,
+        size.1,
+        x + ((width as f32 - text_width) / 2.0).round() as i32,
+        y + ((height as f32 - scale) / 2.0).round() as i32,
+        s,
+        color,
+        scale,
+    );
+}
+fn text(c: &mut [u8], w: i32, h: i32, x: i32, y: i32, s: &str, color: u32) {
+    text_at_scale(c, w, h, x, y, s, color, 17.0);
+}
+fn text_at_scale(c: &mut [u8], w: i32, h: i32, x: i32, y: i32, s: &str, color: u32, scale: f32) {
+    use ab_glyph::{Font, ScaleFont};
+    let Some(font) = system_font() else {
+        bitmap_text(c, w, h, x, y, s, color);
+        return;
+    };
+    let scaled = font.as_scaled(scale);
     let mut cursor = x as f32;
     for ch in s.chars() {
         let id = scaled.glyph_id(ch);
         let glyph =
-            id.with_scale_and_position(17.0, ab_glyph::point(cursor, y as f32 + scaled.ascent()));
+            id.with_scale_and_position(scale, ab_glyph::point(cursor, y as f32 + scaled.ascent()));
         if let Some(outlined) = font.outline_glyph(glyph) {
             let bounds = outlined.px_bounds();
             outlined.draw(|gx, gy, coverage| {
@@ -637,7 +733,43 @@ fn glyph(c: char) -> [u8; 7] {
 
 #[cfg(test)]
 mod tests {
-    use super::primary_output;
+    use super::{grid_hit, popup_geometry, primary_output};
+
+    #[test]
+    fn square_grid_fits_each_screen_axis_and_configured_dimensions() {
+        for (width, height) in [(1920, 1080), (640, 480), (320, 240), (128, 96)] {
+            for columns in 1..=12 {
+                for rows in 1..=12 {
+                    let (x, y, w, h, cw, ch) = popup_geometry(width, height, columns, rows);
+                    assert_eq!(cw, ch);
+                    assert!(x >= 0 && y >= 0 && x + w <= width && y + h <= height);
+                    assert!(8 + cw * columns as i32 <= w);
+                    assert!(28 + ch * rows as i32 <= h - 24);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn hit_regions_match_tiles_and_exclude_gutters_and_footer() {
+        let (x, y, _, _, cw, ch) = popup_geometry(640, 480, 4, 3);
+        assert_eq!(grid_hit(x, y, cw, ch, 4, 3, x + 8, y + 28), Some((0, 0)));
+        assert_eq!(
+            grid_hit(
+                x,
+                y,
+                cw,
+                ch,
+                4,
+                3,
+                x + 8 + 3 * cw + 10,
+                y + 28 + 2 * ch + 10
+            ),
+            Some((3, 2))
+        );
+        assert_eq!(grid_hit(x, y, cw, ch, 4, 3, x + 8 + cw - 1, y + 38), None);
+        assert_eq!(grid_hit(x, y, cw, ch, 4, 3, x + 18, y + 28 + 3 * ch), None);
+    }
 
     #[test]
     fn primary_output_uses_enabled_priority_one_and_rejects_ambiguity() {
