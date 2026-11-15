@@ -3089,6 +3089,7 @@ dependencies = [
 name = "swatch-board-history"
 version = "0.1.0"
 dependencies = [
+ "ab_glyph",
  "serde_json",
  "smithay-client-toolkit 0.21.1",
  "swatch-board-ipc",
