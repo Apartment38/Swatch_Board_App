@@ -2,9 +2,9 @@
 
 ## Arch Linux first
 
-`packaging/arch/PKGBUILD` is the initial distro recipe. Its current source pin
-predates the KWin effect cutover and must be updated at the next source
-checkpoint. The recipe fetches Rust dependencies according to `Cargo.lock`;
+`packaging/arch/PKGBUILD` is the initial distro recipe. The `0.1.0-4` recipe pins
+the local custom-effect source checkpoint `bd3b66726bf78047cf0491ae1d62f16386f36c93`.
+The recipe fetches Rust dependencies according to `Cargo.lock`;
 the build system supplies the compiler and platform libraries. This is a locked
 source build, not a claim of bit-for-bit reproducibility.
 The Git source uses `SKIP` because makepkg verifies the fixed commit instead of
@@ -65,9 +65,9 @@ trees do not select any of them; `hexf-parse` is an optional dependency in the
 broader metadata inventory and declares CC0-1.0. See
 `docs/third-party-license-review.md` for the scope and evidence. Recollect and
 review the notices whenever the lockfile, target or features change.
-The `0.1.0-3` source pin `c1bd7bfd396e8199acd727a043ef6287949ee11c`
-does not contain the new effect. The new recipe and package are not
-release-qualified; update the pin and `.SRCINFO` only at a source checkpoint.
+The `0.1.0-4` source checkpoint includes the custom effect and its GPL license.
+The source has not been pushed and this package revision has not been built or
+release-qualified.
 
 `Cargo.lock` pins versions
 and checksums, but does not constitute an SPDX/license-notice audit. The recorded

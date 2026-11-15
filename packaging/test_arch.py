@@ -15,8 +15,8 @@ class ArchRecipeTests(unittest.TestCase):
             capture_output=True, text=True, check=True,
         )
         dependencies = set(result.stdout.splitlines())
-        self.assertTrue({"git", "cargo", "pkgconf", "wayland", "libxkbcommon"}
-                        <= dependencies, dependencies)
+        self.assertTrue({"git", "cargo", "cmake", "extra-cmake-modules", "pkgconf",
+                         "wayland", "libxkbcommon", "vulkan-headers"} <= dependencies, dependencies)
 
     def test_desktop_runtime_dependencies_are_declared(self):
         result = subprocess.run(
@@ -43,7 +43,7 @@ class ArchRecipeTests(unittest.TestCase):
                                 capture_output=True, text=True, check=True)
         self.assertEqual(result.stdout, (directory / ".SRCINFO").read_text())
 
-    def test_pinned_source_contains_release_payload(self):
+    def test_pinned_source_contains_native_effect_payload(self):
         result = subprocess.run(
             ["bash", "-c", 'source "$1"; printf "%s" "$_commit"',
              "bash", str(ROOT / "packaging/arch/PKGBUILD")],
@@ -51,8 +51,8 @@ class ArchRecipeTests(unittest.TestCase):
         )
         commit = result.stdout
         self.assertRegex(commit, r"^[0-9a-f]{40}$")
-        for path in ("share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml",
-                     "plugins/example-terminal/manifest.json", "packaging/verify-release.sh"):
+        for path in ("kwin/CMakeLists.txt", "kwin/picker.cpp",
+                     "kwin/swatchboardpicker.json", "kwin/LICENSE", "packaging/install.sh"):
             subprocess.run(["git", "cat-file", "-e", f"{commit}:{path}"], cwd=ROOT, check=True)
 
 
