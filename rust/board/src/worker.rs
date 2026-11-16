@@ -30,6 +30,7 @@ pub enum Event {
     PickFinished(Result<(), String>),
     Error(String),
     Activate,
+    ActivatePalette,
 }
 
 #[derive(Clone)]
@@ -50,6 +51,10 @@ impl BoardControl {
     fn activate(&self) {
         self.0.send(Event::Activate);
     }
+
+    fn activate_palette(&self) {
+        self.0.send(Event::ActivatePalette);
+    }
 }
 
 // The reply and completion signal can arrive in either order.
@@ -62,7 +67,7 @@ enum PickState {
     Active,
 }
 
-pub fn start() -> Result<(Sender<Command>, Receiver<Event>), String> {
+pub fn start(show_palette: bool) -> Result<(Sender<Command>, Receiver<Event>), String> {
     let (commands, command_rx) = mpsc::channel();
     let (event_tx, events) = mpsc::channel();
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
@@ -79,7 +84,12 @@ pub fn start() -> Result<(Sender<Command>, Receiver<Event>), String> {
                     return;
                 }
             };
-            runtime.block_on(run(command_rx, Events { sender: event_tx }, ready_tx));
+            runtime.block_on(run(
+                command_rx,
+                Events { sender: event_tx },
+                ready_tx,
+                show_palette,
+            ));
         })
         .map_err(|error| format!("Cannot start Board worker: {error}"))?;
     ready_rx
@@ -131,6 +141,7 @@ async fn run(
     commands: Receiver<Command>,
     events: Events,
     ready: mpsc::SyncSender<Result<(), String>>,
+    show_palette: bool,
 ) {
     let connection = match Connection::session().await {
         Ok(connection) => connection,
@@ -159,7 +170,16 @@ async fn run(
             let result = async {
                 let proxy =
                     zbus::Proxy::new(&connection, BOARD_SERVICE, BOARD_PATH, BOARD_SERVICE).await?;
-                proxy.call::<_, _, ()>("Activate", &()).await
+                proxy
+                    .call::<_, _, ()>(
+                        if show_palette {
+                            "ActivatePalette"
+                        } else {
+                            "Activate"
+                        },
+                        &(),
+                    )
+                    .await
             }
             .await;
             let _ = ready.send(match result {

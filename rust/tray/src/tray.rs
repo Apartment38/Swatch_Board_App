@@ -55,8 +55,7 @@ impl Tray for Item {
                 label: "Show Palette".into(),
                 icon_name: "color-management".into(),
                 activate: Box::new(|item: &mut Self| {
-                    let (reply, _) = oneshot::channel();
-                    let _ = item.requests.send(Request::ShowHistory(reply));
+                    let _ = item.requests.send(Request::OpenPalette);
                 }),
                 ..Default::default()
             }

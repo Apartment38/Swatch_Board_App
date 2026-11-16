@@ -14,6 +14,7 @@ fn output(program: &str, args: &[&str]) -> String {
 }
 fn main() {
     println!("cargo:rerun-if-changed=src/frontend.cpp");
+    println!("cargo:rerun-if-changed=src/generator_wheel.h");
     for key in [
         "CXX",
         "AR",

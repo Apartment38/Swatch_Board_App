@@ -1,5 +1,29 @@
 # Swatch Board current handoff
 
+## UI improvements in progress — 2026-11-16
+
+Work began from freshly fetched `origin/main` (0f20cd7). The mixer has a pinned
+current color, a collapsible history sidebar, and a compact clickable,
+reorderable palette with context-menu editing. Navigation and common editing
+actions have icons and a persisted label preference. Theme role drops replace
+the field, the duplicate palette and manual render button are gone, and the
+scene stays visible while controls scroll. Preview files follow current resolved
+values and export renders those values; repeated snapshots cache the render.
+The generator has an interactive HSV base-color wheel. The tray's Show Palette
+action launches or activates the Board on its Palette page.
+
+The work list and remaining scope are in [ui-improvements-todo.md](ui-improvements-todo.md).
+In particular, the reported Settings footer error has not been identified; its
+exact message and desktop context are needed. The wheel does not yet provide
+Adobe-style draggable harmony handles, and the responsive cleanup is incomplete.
+The new interactions have not been accepted on a physical Plasma desktop.
+
+Verification: offline locked workspace build and workspace tests passed (one
+existing ignored test); Board and Settings Qt control smoke passed with the
+offscreen platform in isolated XDG directories. These are not Wayland, physical
+input, screen-reader, or tray integration acceptance. Qt development headers
+were extracted into `/tmp` for the build, without installing system packages.
+
 ## Native Qt frontend cutover
 
 Board, Settings, and the history popup now use Qt 6 Widgets through the shared

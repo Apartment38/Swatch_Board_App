@@ -2,6 +2,7 @@
 #include <QtGui>
 #include <QtWidgets>
 #include <functional>
+#include "generator_wheel.h"
 
 extern "C" void swatch_qt_free(char *);
 using Callback = char *(*)(void *, const char *);
@@ -127,6 +128,27 @@ protected:
     }
     dropped(index, e->mimeData()->text());
     e->acceptProposedAction();
+  }
+};
+// A dropped swatch replaces the complete color value rather than being inserted
+// at the cursor position as QLineEdit's default drop handling does.
+class ColorLineEdit : public QLineEdit {
+public:
+  ColorLineEdit(const QString &value, QWidget *parent) : QLineEdit(value, parent) {
+    setAccessibleName("Role color");
+    setAcceptDrops(true);
+  }
+protected:
+  void dragEnterEvent(QDragEnterEvent *e) override {
+    if (e->mimeData()->hasText() && color(e->mimeData()->text()).isValid())
+      e->acceptProposedAction();
+  }
+  void dropEvent(QDropEvent *e) override {
+    if (e->mimeData()->hasText() && color(e->mimeData()->text()).isValid()) {
+      setText(e->mimeData()->text());
+      emit editingFinished();
+      e->acceptProposedAction();
+    }
   }
 };
 class PaletteDrop : public QLabel {
@@ -341,13 +363,14 @@ class Frontend : public QWidget {
   QSettings settings;
   QTabWidget *tabs = nullptr;
   QLabel *status = nullptr, *connectionStatus = nullptr;
-  QPushButton *pickButton = nullptr;
+  QAction *pickAction = nullptr;
   QVBoxLayout *root;
   QVBoxLayout *historyLayout = nullptr;
   QWidget *historyBox = nullptr;
   QScrollArea *historyScroll = nullptr;
   QSplitter *splitter = nullptr, *verticalSplitter = nullptr;
-  QWidget *pinnedScroll = nullptr;
+  QWidget *pinnedScroll = nullptr, *pinnedCurrent = nullptr;
+  QVBoxLayout *boardContent = nullptr;
   QPushButton *configSave = nullptr, *configRebind = nullptr;
   QLabel *configStatus = nullptr, *shortcutStatus = nullptr;
   QList<QPushButton *> historyButtons;
@@ -395,6 +418,8 @@ class Frontend : public QWidget {
         activateWindow();
       }
       renderBoard(previous);
+      if (state.value("show_palette").toBool() && tabs)
+        tabs->setCurrentIndex(1);
     } else if (mode == "config")
       renderConfig();
     else
@@ -411,6 +436,10 @@ class Frontend : public QWidget {
   void preserveView(QWidget *old, QWidget *replacement) {
     auto oldScroll = qobject_cast<QScrollArea *>(old),
          newScroll = qobject_cast<QScrollArea *>(replacement);
+    if (!oldScroll && old->objectName() == "themePage")
+      oldScroll = old->findChild<QScrollArea *>();
+    if (!newScroll && replacement->objectName() == "themePage")
+      newScroll = replacement->findChild<QScrollArea *>();
     int vertical = oldScroll ? oldScroll->verticalScrollBar()->value() : 0,
         horizontal = oldScroll ? oldScroll->horizontalScrollBar()->value() : 0;
     QWidget *focus = QApplication::focusWidget();
@@ -485,6 +514,28 @@ class Frontend : public QWidget {
       c->setCurrentIndex(i);
     return c;
   }
+  QToolButton *toolButton(const QString &label, const QString &iconName,
+                          QWidget *parent, const std::function<void()> &action) {
+    auto b = new QToolButton(parent);
+    b->setText(label);
+    b->setAccessibleName(label);
+    b->setToolTip(label);
+    b->setProperty("boardAction", true);
+    b->setIcon(QIcon::fromTheme(iconName, style()->standardIcon(QStyle::SP_FileIcon)));
+    b->setToolButtonStyle(settings.value("board/toolbarLabels", true).toBool()
+                              ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
+    connect(b, &QToolButton::clicked, this, action);
+    return b;
+  }
+  QString actionIcon(const QString &op) const {
+    if (op.contains("undo")) return "edit-undo";
+    if (op.contains("redo")) return "edit-redo";
+    if (op.contains("copy")) return "edit-copy";
+    if (op.contains("save")) return "document-save";
+    if (op.contains("new")) return "document-new";
+    if (op.contains("mix")) return "applications-graphics";
+    return "list-add";
+  }
   QWidget *scroll(QWidget *content) {
     auto s = new QScrollArea;
     s->setWidgetResizable(true);
@@ -493,24 +544,10 @@ class Frontend : public QWidget {
   }
   QWidget *pinnedPalette() {
     auto p = object(state.value("palette"));
-    auto w = new QGroupBox("Active palette");
+    auto w = new QWidget;
     auto l = new QVBoxLayout(w);
-    auto controls = new QHBoxLayout;
-    controls->addWidget(new QLabel(str(p, "name"), w));
-    for (auto pair :
-         QList<QPair<QString, QString>>{{"Add current", "palette_add_current"},
-                                        {"Undo", "palette_undo"},
-                                        {"Redo", "palette_redo"}}) {
-      auto b =
-          button(pair.first, w, [this, pair] { send({{"op", pair.second}}); });
-      if (pair.second == "palette_undo")
-        b->setEnabled(p.value("can_undo").toBool());
-      if (pair.second == "palette_redo")
-        b->setEnabled(p.value("can_redo").toBool());
-      controls->addWidget(b);
-    }
-    controls->addStretch();
-    l->addLayout(controls);
+    l->setContentsMargins(0, 0, 0, 0);
+    l->setSpacing(0);
     auto swatches = array(p, "swatches");
     if (swatches.isEmpty())
       l->addWidget(new PaletteDrop(
@@ -521,63 +558,57 @@ class Frontend : public QWidget {
               send({{"op", "mixer_select"}, {"color", c}});
               send({{"op", "palette_add_current"}});
             }
-          },
-          w));
+          }, w));
     auto swatchRow = new QHBoxLayout;
+    swatchRow->setSpacing(0);
     l->addLayout(swatchRow);
     int i = 0;
     for (auto value : swatches) {
       auto o = value.toObject();
       int index = i++;
-      auto box = new QGroupBox(QString::number(index + 1), w);
-      auto layout = new QVBoxLayout(box);
-      auto sw = new Swatch(color(str(o, "color")), str(o, "name"), box);
-      sw->paletteDrop(index, [this, index, o](int from, QString c) {
-        if (from >= 0)
+      auto c = color(str(o, "color"));
+      auto sw = new Swatch(c, str(o, "name"), w);
+      sw->setText(str(o, "color").toUpper());
+      sw->setIcon(QIcon());
+      sw->setMinimumSize(100, 80);
+      sw->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+      auto textColor = c.lightness() < 140 ? "white" : "black";
+      sw->setStyleSheet(QString("QPushButton { background-color: %1; color: %2; border: 0; font-weight: bold; } QPushButton:focus { border: 2px solid %2; }")
+                            .arg(c.name(), textColor));
+      sw->setToolTip(str(o, "name") + " — click to select, drag to reorder; right-click for options");
+      connect(sw, &QPushButton::clicked, this, [this, c] {
+        send({{"op", "mixer_select"}, {"color", hex(c)}});
+        tabs->setCurrentIndex(0);
+      });
+      sw->paletteDrop(index, [this, index, o](int from, QString value) {
+        if (from >= 0 && from != index)
           send({{"op", "palette_move"}, {"from", from}, {"to", index}});
-        else if (color(c).isValid())
-          send({{"op", "palette_edit"},
-                {"index", index},
-                {"name", str(o, "name")},
-                {"color", c}});
+        else if (from < 0 && color(value).isValid())
+          send({{"op", "palette_edit"}, {"index", index},
+                {"name", str(o, "name")}, {"color", value}});
       });
-      layout->addWidget(sw);
-      auto name = line("Pinned swatch name", str(o, "name"), box),
-           c = line("Pinned swatch color", str(o, "color"), box);
-      auto fields = new QHBoxLayout;
-      fields->addWidget(name);
-      fields->addWidget(c);
-      layout->addLayout(fields);
-      auto apply = [this, index, name, c] {
-        send({{"op", "palette_edit"},
-              {"index", index},
-              {"name", name->text()},
-              {"color", c->text()}});
-      };
-      connect(name, &QLineEdit::editingFinished, this, apply);
-      connect(c, &QLineEdit::editingFinished, this, apply);
-      auto lock = new QCheckBox("Locked", box);
-      lock->setChecked(o.value("locked").toBool());
-      connect(lock, &QCheckBox::toggled, this, [this, index](bool v) {
-        send({{"op", "palette_lock"}, {"index", index}, {"locked", v}});
+      sw->setContextMenuPolicy(Qt::CustomContextMenu);
+      connect(sw, &QWidget::customContextMenuRequested, this,
+              [this, sw, index, o](const QPoint &point) {
+        QMenu menu;
+        auto edit = menu.addAction("Edit name and color…");
+        auto lock = menu.addAction(o.value("locked").toBool() ? "Unlock" : "Lock");
+        auto remove = menu.addAction("Delete");
+        auto chosen = menu.exec(sw->mapToGlobal(point));
+        if (chosen == edit) {
+          bool ok = false;
+          auto name = QInputDialog::getText(this, "Edit swatch", "Name", QLineEdit::Normal, str(o, "name"), &ok);
+          if (!ok) return;
+          auto value = QInputDialog::getText(this, "Edit swatch", "Color", QLineEdit::Normal, str(o, "color"), &ok);
+          if (ok) send({{"op", "palette_edit"}, {"index", index}, {"name", name}, {"color", value}});
+        } else if (chosen == lock) {
+          send({{"op", "palette_lock"}, {"index", index}, {"locked", !o.value("locked").toBool()}});
+        } else if (chosen == remove) {
+          send({{"op", "palette_delete_swatch"}, {"index", index}});
+        }
       });
-      auto row = new QHBoxLayout;
-      row->addWidget(lock);
-      row->addWidget(button("Up", box, [this, index] {
-        if (index > 0)
-          send({{"op", "palette_move"}, {"from", index}, {"to", index - 1}});
-      }));
-      row->addWidget(button("Down", box, [this, index, swatches] {
-        if (index + 1 < swatches.size())
-          send({{"op", "palette_move"}, {"from", index}, {"to", index + 1}});
-      }));
-      row->addWidget(button("Delete", box, [this, index] {
-        send({{"op", "palette_delete_swatch"}, {"index", index}});
-      }));
-      layout->addLayout(row);
-      swatchRow->addWidget(box);
+      swatchRow->addWidget(sw, 1);
     }
-    swatchRow->addStretch();
     return w;
   }
   void renderBoard(const QJsonObject &previous) {
@@ -585,8 +616,31 @@ class Frontend : public QWidget {
     if (first) {
       auto outer = new QWidget;
       auto layout = new QVBoxLayout(outer);
-      auto top = new QHBoxLayout;
-      pickButton = button("Pick color", outer, [this] {
+      auto toolbar = new QToolBar(outer);
+      toolbar->setMovable(false);
+      bool labels = settings.value("board/toolbarLabels", true).toBool();
+      toolbar->setToolButtonStyle(labels ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
+      auto addAction = [this, toolbar](const QString &name, QStyle::StandardPixmap icon,
+                                       const std::function<void()> &action) {
+        auto a = toolbar->addAction(style()->standardIcon(icon), name);
+        connect(a, &QAction::triggered, this, action);
+        return a;
+      };
+      auto nav = new QActionGroup(toolbar);
+      nav->setExclusive(true);
+      QList<QAction *> pages;
+      for (auto pair : QList<QPair<QString, QStyle::StandardPixmap>>{
+               {"Mixer", QStyle::SP_ComputerIcon}, {"Palette", QStyle::SP_DirIcon},
+               {"Theme", QStyle::SP_DesktopIcon}}) {
+        auto action = toolbar->addAction(style()->standardIcon(pair.second), pair.first);
+        action->setCheckable(true);
+        nav->addAction(action);
+        int index = pages.size();
+        connect(action, &QAction::triggered, this, [this, index] { tabs->setCurrentIndex(index); });
+        pages.append(action);
+      }
+      toolbar->addSeparator();
+      auto pick = addAction("Pick color", QStyle::SP_DialogOpenButton, [this] {
         if (state.value("hide_board_while_picking").toBool()) {
           hiddenForPick = true;
           hide();
@@ -594,16 +648,25 @@ class Frontend : public QWidget {
         }
         send({{"op", "pick"}});
       });
-      top->addWidget(pickButton);
-      top->addWidget(
-          button("Settings", outer, [this] { send({{"op", "configure"}}); }));
-      connectionStatus = new QLabel(outer);
-      top->addWidget(connectionStatus);
-      auto toggle = new QCheckBox("Show history", outer);
+      pickAction = pick;
+      addAction("Settings", QStyle::SP_FileDialogDetailedView, [this] { send({{"op", "configure"}}); });
+      auto toggle = toolbar->addAction(style()->standardIcon(QStyle::SP_FileDialogListView), "History");
+      toggle->setCheckable(true);
       toggle->setChecked(settings.value("board/historyVisible", true).toBool());
-      top->addWidget(toggle);
-      top->addStretch();
-      layout->addLayout(top);
+      auto labelToggle = toolbar->addAction("Show labels");
+      labelToggle->setCheckable(true);
+      labelToggle->setChecked(labels);
+      connect(labelToggle, &QAction::toggled, this, [this, toolbar](bool visible) {
+        toolbar->setToolButtonStyle(visible ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
+        settings.setValue("board/toolbarLabels", visible);
+        for (auto b : findChildren<QToolButton *>())
+          if (b->property("boardAction").toBool())
+            b->setToolButtonStyle(visible ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
+      });
+      labelToggle->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
+      layout->addWidget(toolbar);
+      connectionStatus = new QLabel(outer);
+      layout->addWidget(connectionStatus);
       splitter = new QSplitter(Qt::Horizontal, outer);
       historyBox = new QGroupBox("History");
       historyLayout = new QVBoxLayout(historyBox);
@@ -611,7 +674,7 @@ class Frontend : public QWidget {
       historyScroll->setWidgetResizable(true);
       historyScroll->setWidget(historyBox);
       historyScroll->setVisible(toggle->isChecked());
-      connect(toggle, &QCheckBox::toggled, this, [this](bool visible) {
+      connect(toggle, &QAction::toggled, this, [this](bool visible) {
         historyScroll->setVisible(visible);
         settings.setValue("board/historyVisible", visible);
       });
@@ -620,12 +683,25 @@ class Frontend : public QWidget {
       tabs->setAccessibleName("Board sections");
       tabs->addTab(scroll(mixer()), "Mixer");
       tabs->addTab(scroll(palettePage()), "Palette");
-      tabs->addTab(scroll(themePage()), "Theme");
+      tabs->addTab(themePage(), "Theme");
       tabs->setCurrentIndex(
           qBound(0, settings.value("board/tab", 0).toInt(), 2));
+      tabs->tabBar()->hide();
+      auto content = new QWidget(splitter);
+      boardContent = new QVBoxLayout(content);
+      boardContent->setContentsMargins(0, 0, 0, 0);
+      pinnedCurrent = currentColor();
+      boardContent->addWidget(pinnedCurrent);
+      boardContent->addWidget(tabs, 1);
+      pinnedCurrent->setVisible(tabs->currentIndex() == 0);
+      pages[tabs->currentIndex()]->setChecked(true);
       connect(tabs, &QTabWidget::currentChanged, this,
-              [this](int i) { settings.setValue("board/tab", i); });
-      splitter->addWidget(tabs);
+              [this, pages](int i) {
+                settings.setValue("board/tab", i);
+                pinnedCurrent->setVisible(i == 0);
+                pages[i]->setChecked(true);
+              });
+      splitter->addWidget(content);
       verticalSplitter = new QSplitter(Qt::Vertical, outer);
       verticalSplitter->addWidget(splitter);
       pinnedScroll = scroll(pinnedPalette());
@@ -636,7 +712,7 @@ class Frontend : public QWidget {
           settings.value("board/horizontalSplitter").toByteArray());
       if (!verticalSplitter->restoreState(
               settings.value("board/verticalSplitter").toByteArray()))
-        verticalSplitter->setSizes({450, 250});
+        verticalSplitter->setSizes({540, 110});
       layout->addWidget(verticalSplitter, 1);
       status = new QLabel(outer);
       status->setWordWrap(true);
@@ -644,10 +720,17 @@ class Frontend : public QWidget {
       replace(outer);
     } else {
       int current = tabs->currentIndex();
+      if (previous.value("mixer") != state.value("mixer")) {
+        auto replacement = currentColor();
+        boardContent->replaceWidget(pinnedCurrent, replacement);
+        pinnedCurrent->deleteLater();
+        pinnedCurrent = replacement;
+        pinnedCurrent->setVisible(current == 0);
+      }
       QSignalBlocker blocker(tabs);
       auto refresh = [this](int index, QWidget *page, const QString &title) {
         auto old = tabs->widget(index);
-        auto replacement = scroll(page);
+        auto replacement = index == 2 ? page : scroll(page);
         preserveView(old, replacement);
         tabs->removeTab(index);
         tabs->insertTab(index, replacement, title);
@@ -700,7 +783,7 @@ class Frontend : public QWidget {
       historyLayout->addStretch();
     }
     status->setText(message());
-    pickButton->setEnabled(state.value("loaded").toBool() &&
+    pickAction->setEnabled(state.value("loaded").toBool() &&
                            state.value("connected").toBool() &&
                            !state.value("picking").toBool());
     connectionStatus->setText(state.value("picking").toBool()   ? "Picking…"
@@ -709,18 +792,21 @@ class Frontend : public QWidget {
                                   ? "Connected"
                                   : "Disconnected");
   }
+  QWidget *currentColor() {
+    auto current = new Swatch(color(str(object(state.value("mixer")), "current")), "Current color");
+    current->setText("Current color  " + str(object(state.value("mixer")), "current"));
+    current->paletteDrop(-1, [this](int, QString c) {
+      if (color(c).isValid())
+        send({{"op", "mixer_select"}, {"color", c}});
+    });
+    return current;
+  }
   QWidget *mixer() {
     auto m = object(state.value("mixer"));
     auto w = new QWidget;
     auto l = new QVBoxLayout(w);
     auto hsv = array(m, "hsv"), rgba = array(m, "rgba");
     double h = hsv[0].toDouble(), s = hsv[1].toDouble(), v = hsv[2].toDouble();
-    auto current = new Swatch(color(str(m, "current")), "Current color", w);
-    current->paletteDrop(-1, [this](int, QString c) {
-      if (color(c).isValid())
-        send({{"op", "mixer_select"}, {"color", c}});
-    });
-    l->addWidget(current);
     l->addWidget(new Spectrum(
         qRound(h), qRound(s), qRound(v),
         [this](int h, int s, int v, bool final) {
@@ -805,7 +891,7 @@ class Frontend : public QWidget {
              {"Add source", "mixer_source_add"},
              {"Mix", "mixer_mix"}}) {
       auto b =
-          button(pair.first, w, [this, pair] { send({{"op", pair.second}}); });
+          toolButton(pair.first, actionIcon(pair.second), w, [this, pair] { send({{"op", pair.second}}); });
       if (pair.second == "mixer_undo")
         b->setEnabled(m.value("can_undo").toBool());
       if (pair.second == "mixer_redo")
@@ -939,7 +1025,7 @@ public:
         check(grab().save(dir + "/" + name + ".png"), "Screenshot " + name);
       };
       auto click = [&](QWidget *root, const QString &name) {
-        for (auto b : root->findChildren<QPushButton *>())
+        for (auto b : root->findChildren<QAbstractButton *>())
           if (b->accessibleName() == name) {
             b->click();
             return true;
@@ -976,43 +1062,13 @@ public:
         shot("mixer");
         tabs->setCurrentIndex(1);
         click(tabs->widget(1), "New draft");
-        click(pinnedScroll, "Add current");
+        tabs->setCurrentIndex(0);
+        click(tabs->widget(0), "Add to palette");
+        tabs->setCurrentIndex(1);
         check(!array(object(state.value("palette")), "swatches").isEmpty(),
               "Add swatch");
         shot("palette");
-        auto checks = pinnedScroll->findChildren<QCheckBox *>();
-        for (auto c : checks)
-          if (c->text() == "Locked") {
-            c->click();
-            break;
-          }
-        auto edits = pinnedScroll->findChildren<QLineEdit *>();
-        for (auto e : edits)
-          if (e->accessibleName() == "Pinned swatch color") {
-            e->setText("#010203FF");
-            QMetaObject::invokeMethod(e, "editingFinished");
-            break;
-          }
-        check(!str(object(state.value("palette")), "error").isEmpty(),
-              "Locked edit refusal");
-        checks = pinnedScroll->findChildren<QCheckBox *>();
-        for (auto c : checks)
-          if (c->text() == "Locked") {
-            c->click();
-            break;
-          }
-        edits = pinnedScroll->findChildren<QLineEdit *>();
-        for (auto e : edits)
-          if (e->accessibleName() == "Pinned swatch color") {
-            e->setText("#010203FF");
-            QMetaObject::invokeMethod(e, "editingFinished");
-            break;
-          }
-        check(
-            str(array(object(state.value("palette")), "swatches")[0].toObject(),
-                "color") == "#010203FF",
-            "Unlocked edit");
-        edits = tabs->widget(1)->findChildren<QLineEdit *>();
+        auto edits = tabs->widget(1)->findChildren<QLineEdit *>();
         for (auto e : edits)
           if (e->accessibleName() == "Palette name") {
             e->setText("Qt smoke palette");
@@ -1028,7 +1084,6 @@ public:
         tabs->setCurrentIndex(2);
         if (!array(object(state.value("theme")), "plugins").isEmpty()) {
           click(tabs->widget(2), "New theme");
-          click(tabs->widget(2), "Render preview");
         }
         shot("theme");
       } else if (mode == "config") {
@@ -1104,6 +1159,7 @@ QWidget *Frontend::palettePage() {
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
   auto name = line("Palette name", str(p, "name"), w);
+  name->setMaximumWidth(260);
   l->addWidget(name);
   connect(name, &QLineEdit::editingFinished, this, [this, name] {
     send({{"op", "palette_name"}, {"name", name->text()}});
@@ -1114,7 +1170,7 @@ QWidget *Frontend::palettePage() {
                                       {"Save", "palette_save"},
                                       {"Duplicate", "palette_duplicate"}}) {
     auto b =
-        button(pair.first, w, [this, pair] { send({{"op", pair.second}}); });
+        toolButton(pair.first, actionIcon(pair.second), w, [this, pair] { send({{"op", pair.second}}); });
     actions->addWidget(b);
   }
   l->addLayout(actions);
@@ -1134,7 +1190,7 @@ QWidget *Frontend::palettePage() {
   saved->completer()->setFilterMode(Qt::MatchContains);
   saved->completer()->setCompletionMode(QCompleter::PopupCompletion);
   lib->addWidget(saved);
-  lib->addWidget(button("Open", library, [this, saved] {
+  lib->addWidget(toolButton("Open", "document-open", library, [this, saved] {
     send({{"op", "palette_open"}, {"id", saved->currentData().toString()}});
   }));
   lib->addWidget(button("Delete", library, [this, saved] {
@@ -1155,7 +1211,7 @@ QWidget *Frontend::palettePage() {
       generations, &QComboBox::currentIndexChanged, this, [this, generations] {
         generationDraft["generation"] = generations->currentData().toString();
       });
-  auto load = button("Load generation", gen, [this, generations] {
+  auto load = toolButton("Load generation", "document-open-recent", gen, [this, generations] {
     send({{"op", "palette_generation"},
           {"id", generations->currentData().toString()}});
   });
@@ -1186,14 +1242,26 @@ QWidget *Frontend::palettePage() {
   f->addRow("Count", count);
   auto seed =
       line("Random seed", generationDraft.value("seed").toString("0"), gen);
+  seed->setMaximumWidth(160);
   connect(seed, &QLineEdit::textChanged, this,
           [this](const QString &value) { generationDraft["seed"] = value; });
   f->addRow("Seed", seed);
   auto base = line("Base color (empty for current)",
                    generationDraft.value("base").toString(), gen);
+  base->setMaximumWidth(160);
   connect(base, &QLineEdit::textChanged, this,
           [this](const QString &value) { generationDraft["base"] = value; });
   f->addRow("Base color", base);
+  QColor initialBase = color(base->text().isEmpty()
+                                 ? str(object(state.value("mixer")), "current")
+                                 : base->text());
+  auto wheel = new GeneratorWheel(initialBase, [base](QColor c) {
+    base->setText(hex(c));
+  }, gen);
+  connect(base, &QLineEdit::textChanged, wheel, [wheel](const QString &text) {
+    wheel->setColor(color(text));
+  });
+  f->addRow("Choose base", wheel);
   auto hmin = decimal("Minimum hue", generationDraft.value("hmin").toDouble(0),
                       0, 360, gen),
        hmax = decimal("Maximum hue",
@@ -1212,9 +1280,12 @@ QWidget *Frontend::palettePage() {
                                                            {lmax, "lmax"},
                                                            {cmin, "cmin"},
                                                            {cmax, "cmax"}})
+    {
+    pair.first->setMaximumWidth(110);
     connect(
         pair.first, &QDoubleSpinBox::valueChanged, this,
         [this, pair](double value) { generationDraft[pair.second] = value; });
+    }
   f->addRow("Hue minimum", hmin);
   f->addRow("Hue maximum", hmax);
   f->addRow("Lightness minimum", lmin);
@@ -1223,6 +1294,7 @@ QWidget *Frontend::palettePage() {
   f->addRow("Chroma maximum", cmax);
   auto contrast = line("Contrast (optional)",
                        generationDraft.value("contrast").toString(), gen);
+  contrast->setMaximumWidth(110);
   connect(
       contrast, &QLineEdit::textChanged, this,
       [this](const QString &value) { generationDraft["contrast"] = value; });
@@ -1270,6 +1342,9 @@ QWidget *Frontend::palettePage() {
 
 QWidget *Frontend::themePage(Scene *reuse) {
   auto t = object(state.value("theme")), project = object(t.value("project"));
+  auto outer = new QWidget;
+  outer->setObjectName("themePage");
+  auto outerLayout = new QVBoxLayout(outer);
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
   auto selection = new QHBoxLayout;
@@ -1286,7 +1361,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
                                  "Discard unsaved theme changes?") ==
                QMessageBox::Yes;
   };
-  selection->addWidget(button("New theme", w, [this, plugins, discard] {
+  selection->addWidget(toolButton("New theme", "document-new", w, [this, plugins, discard] {
     if (discard())
       send({{"op", "theme_choose"},
             {"id", plugins->currentData().toString()},
@@ -1298,14 +1373,14 @@ QWidget *Frontend::themePage(Scene *reuse) {
     themeDraft["saved"] = saved->currentData().toString();
   });
   selection->addWidget(saved);
-  selection->addWidget(button("Open theme", w, [this, saved, discard] {
+  selection->addWidget(toolButton("Open theme", "document-open", w, [this, saved, discard] {
     if (discard())
       send({{"op", "theme_open"},
             {"id", saved->currentData().toString()},
             {"discard", true}});
   }));
   selection->addWidget(
-      button("Reload", w, [this] { send({{"op", "theme_reload"}}); }));
+      toolButton("Reload", "view-refresh", w, [this] { send({{"op", "theme_reload"}}); }));
   l->addLayout(selection);
   auto name = line("Theme name", str(project, "name"), w);
   l->addWidget(name);
@@ -1317,10 +1392,9 @@ QWidget *Frontend::themePage(Scene *reuse) {
            {"Save", "theme_save"},
            {"Undo", "theme_undo"},
            {"Redo", "theme_redo"},
-           {"Use active palette", "theme_palette_bind"},
-           {"Render preview", "theme_preview"}}) {
+           {"Use active palette", "theme_palette_bind"}}) {
     auto b =
-        button(pair.first, w, [this, pair] { send({{"op", pair.second}}); });
+        toolButton(pair.first, actionIcon(pair.second), w, [this, pair] { send({{"op", pair.second}}); });
     if (pair.second == "theme_undo")
       b->setEnabled(t.value("can_undo").toBool());
     if (pair.second == "theme_redo")
@@ -1333,14 +1407,14 @@ QWidget *Frontend::themePage(Scene *reuse) {
   connect(scene, &QComboBox::activated, this, [this, scene](int) {
     send({{"op", "theme_scene"}, {"id", scene->currentData().toString()}});
   });
-  l->addWidget(scene);
+  outerLayout->addWidget(scene);
   if (t.value("scene").isObject()) {
     if (reuse) {
-      reuse->setParent(w);
-      l->addWidget(reuse);
+      reuse->setParent(outer);
+      outerLayout->addWidget(reuse);
     } else {
-      l->addWidget(new Scene(
-          t.value("scene").toObject(), [this](QJsonObject o) { send(o); }, w));
+      outerLayout->addWidget(new Scene(
+          t.value("scene").toObject(), [this](QJsonObject o) { send(o); }, outer));
     }
   }
   auto roles = new QGroupBox("Theme roles", w);
@@ -1356,7 +1430,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
     r->addWidget(sw);
     connect(sw, &QPushButton::clicked, this,
             [this, id] { send({{"op", "theme_select"}, {"role", id}}); });
-    auto edit = line("Role color", str(o, "value"), row);
+    auto edit = new ColorLineEdit(str(o, "value"), row);
     r->addWidget(edit);
     connect(edit, &QLineEdit::editingFinished, this, [this, id, edit] {
       send({{"op", "theme_assign"}, {"role", id}, {"color", edit->text()}});
@@ -1383,14 +1457,6 @@ QWidget *Frontend::themePage(Scene *reuse) {
     rl->addWidget(row);
   }
   l->addWidget(roles);
-  auto palette = new QGroupBox("Active palette (drag to scene)", w);
-  auto pl = new QHBoxLayout(palette);
-  for (auto v : array(t, "palette_swatches")) {
-    auto o = v.toObject();
-    pl->addWidget(new Swatch(color(str(o, "color")), str(o, "name"), palette));
-  }
-  pl->addStretch();
-  l->addWidget(palette);
   for (auto value : array(t, "preview")) {
     auto o = value.toObject();
     auto group = new QGroupBox(str(o, "path"), w);
@@ -1432,7 +1498,8 @@ QWidget *Frontend::themePage(Scene *reuse) {
   error->setWordWrap(true);
   l->addWidget(error);
   l->addStretch();
-  return w;
+  outerLayout->addWidget(scroll(w), 1);
+  return outer;
 }
 
 void Frontend::renderConfig() {

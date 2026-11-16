@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -30,6 +31,8 @@ struct Project {
     dirty: bool,
 }
 
+type PreviewCache = Option<(BTreeMap<String, String>, Result<Vec<RenderedFile>, String>)>;
+
 pub struct ThemeEditor {
     plugins: Vec<PluginMetadata>,
     plugin: Option<Plugin>,
@@ -40,6 +43,7 @@ pub struct ThemeEditor {
     redo: Vec<Project>,
     selected: Option<String>,
     preview: Vec<RenderedFile>,
+    preview_cache: RefCell<PreviewCache>,
     error: Option<String>,
 }
 
@@ -59,6 +63,7 @@ impl ThemeEditor {
             redo: Vec::new(),
             selected: None,
             preview: Vec::new(),
+            preview_cache: RefCell::new(None),
             error,
         };
         if let Some(repo) = &this.repo {
@@ -88,6 +93,7 @@ impl ThemeEditor {
     fn reload(&mut self) {
         let (plugins, errors) = core::discover();
         self.plugins = plugins;
+        self.preview_cache.replace(None);
         self.plugin = None;
         if let Some(project) = &self.project {
             if let Some(meta) = self.plugins.iter().find(|p| {
@@ -156,6 +162,7 @@ impl ThemeEditor {
                     assignments: BTreeMap::new(),
                     dirty: true,
                 });
+                self.preview_cache.replace(None);
                 self.plugin = Some(plugin);
                 self.selected = None;
                 self.undo.clear();
@@ -261,6 +268,15 @@ impl ThemeEditor {
     pub fn snapshot(&self, palette: &PaletteEditor, format: Format) -> Value {
         let resolved = self.project.as_ref().map(|_| self.resolved(palette));
         let values = resolved.as_ref().and_then(|r| r.as_ref().ok());
+        let rendered = values.and_then(|v| {
+            self.plugin.as_ref().map(|p| {
+                let mut cache = self.preview_cache.borrow_mut();
+                if cache.as_ref().is_none_or(|(key, _)| key != v) {
+                    *cache = Some((v.clone(), p.render(v)));
+                }
+                cache.as_ref().unwrap().1.clone()
+            })
+        });
         let (palette_id, palette_name, swatches) = palette.theme_palette();
         let mut scene_error = None;
         let scene = self.plugin.as_ref().and_then(|plugin| {
@@ -327,6 +343,7 @@ impl ThemeEditor {
             .error
             .as_ref()
             .or(scene_error.as_ref())
+            .or_else(|| rendered.as_ref().and_then(|r| r.as_ref().err()))
             .or_else(|| resolved.as_ref().and_then(|r| r.as_ref().err()));
         json!({
             "plugins": self.plugins.iter().map(|p| json!({"id":p.manifest.id,"name":p.manifest.name})).collect::<Vec<_>>(),
@@ -335,7 +352,7 @@ impl ThemeEditor {
             "scenes": self.plugin.as_ref().map(|p| p.scenes.iter().map(|s| json!({"id":s.id,"name":s.title})).collect::<Vec<_>>()).unwrap_or_default(),
             "roles": roles, "palette_swatches": swatches.iter().map(|(name,color)| json!({"name":name,"color":color.format(Format::HexRgba)})).collect::<Vec<_>>(),
             "palette_id": palette_id, "palette_name": palette_name,
-            "selected": self.selected, "preview": self.preview, "scene": scene,
+            "selected": self.selected, "preview": rendered.as_ref().and_then(|r| r.as_ref().ok()), "scene": scene,
             "can_undo": !self.undo.is_empty(), "can_redo": !self.redo.is_empty(), "error": error
         })
     }
@@ -480,38 +497,20 @@ impl ThemeEditor {
             }
             "theme_export" => {
                 let directory = field("directory")?;
-                if directory.trim().is_empty() || self.preview.is_empty() {
-                    return Err("Preview files and select an export directory first".into());
+                if directory.trim().is_empty() {
+                    return Err("Select an export directory first".into());
                 }
-                let current = self.resolved(palette).and_then(|v| {
-                    self.plugin
-                        .as_ref()
-                        .ok_or_else(|| "The selected plugin is unavailable".to_owned())?
-                        .render(&v)
-                });
-                match current {
-                    Ok(files)
-                        if files.len() == self.preview.len()
-                            && files
-                                .iter()
-                                .zip(&self.preview)
-                                .all(|(a, b)| a.path == b.path && a.content == b.content) =>
-                    {
-                        core::export(
-                            &PathBuf::from(directory),
-                            &self.preview,
-                            request.get("overwrite").and_then(Value::as_bool) == Some(true),
-                        )?;
-                    }
-                    Ok(_) => {
-                        self.preview.clear();
-                        return Err("Palette changed; preview export again.".into());
-                    }
-                    Err(e) => {
-                        self.preview.clear();
-                        return Err(e);
-                    }
-                }
+                let values = self.resolved(palette)?;
+                let files = self
+                    .plugin
+                    .as_ref()
+                    .ok_or("The selected plugin is unavailable")?
+                    .render(&values)?;
+                core::export(
+                    &PathBuf::from(directory),
+                    &files,
+                    request.get("overwrite").and_then(Value::as_bool) == Some(true),
+                )?;
             }
             _ => return Err(format!("Unknown theme operation {op}")),
         }
@@ -678,9 +677,9 @@ mod tests {
     }
 
     #[test]
-    fn named_links_follow_palette_and_stale_preview_is_rejected() {
+    fn named_links_follow_palette_and_export_current_values() {
         isolated(
-            "named_links_follow_palette_and_stale_preview_is_rejected",
+            "named_links_follow_palette_and_export_current_values",
             |root| {
                 install_package(root);
                 let mut repo = swatch_board_storage::PaletteRepository::open_default().unwrap();
@@ -727,11 +726,20 @@ mod tests {
                     )
                     .unwrap();
                 assert_eq!(editor.resolved(&palette).unwrap()["ink"], "#102030");
+                assert!(
+                    editor.snapshot(&palette, Format::HexRgba)["preview"][0]["content"]
+                        .as_str()
+                        .unwrap()
+                        .contains("#102030")
+                );
                 let output = root.join("export");
                 fs::create_dir(&output).unwrap();
-                assert!(editor.command(&json!({"op":"theme_export","directory":output.to_str().unwrap(),"overwrite":false}), &palette).is_err());
-                assert!(editor.preview.is_empty());
-                assert!(!output.join("example.txt").exists());
+                assert!(editor.command(&json!({"op":"theme_export","directory":output.to_str().unwrap(),"overwrite":false}), &palette).is_ok());
+                assert!(
+                    fs::read_to_string(output.join("example.txt"))
+                        .unwrap()
+                        .contains("#102030")
+                );
                 palette
                     .command(
                         &json!({"op":"palette_edit","index":0,"name":"Renamed","color":"#102030"}),
