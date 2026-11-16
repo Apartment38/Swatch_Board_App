@@ -2,6 +2,7 @@
 
 Requested 2026-11-16. Work started from freshly fetched `origin/main`.
 
+- [x] Place a synchronized mixer color wheel and saturation/value gradient side by side.
 - [x] Pin the mixer current color; use adjacent clickable, reorderable hex swatches; make history a collapsible sidebar.
 - [x] Add icon navigation buttons and a persistent label toggle; convert the main editing actions to icon buttons.
 - [x] Replace theme color fields on drop, remove the duplicate palette, and keep an automatically updating preview visible.

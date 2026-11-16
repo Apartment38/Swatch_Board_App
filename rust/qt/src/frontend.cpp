@@ -180,30 +180,35 @@ protected:
   }
 };
 class Spectrum : public QWidget {
-  int h, s, v;
-  std::function<void(int, int, int, bool)> changed;
+  double h, s, v;
+  std::function<void(double, double, double, bool)> changed;
   void choose(QPoint p, bool final) {
-    s = qBound(0, p.x() * 100 / qMax(1, width() - 1), 100);
-    v = qBound(0, 100 - p.y() * 100 / qMax(1, height() - 1), 100);
+    s = qBound(0.0, p.x() * 100.0 / qMax(1, width() - 1), 100.0);
+    v = qBound(0.0, 100.0 - p.y() * 100.0 / qMax(1, height() - 1), 100.0);
     update();
     changed(h, s, v, final);
   }
 
 public:
-  Spectrum(int hue, int sat, int val,
-           std::function<void(int, int, int, bool)> f, QWidget *parent)
+  Spectrum(double hue, double sat, double val,
+           std::function<void(double, double, double, bool)> f, QWidget *parent)
       : QWidget(parent), h(hue), s(sat), v(val), changed(f) {
     setMinimumSize(180, 120);
     setFocusPolicy(Qt::StrongFocus);
     setAccessibleName("Saturation and value spectrum; arrow keys adjust");
   }
+  void setHsv(double hue, double sat, double val) {
+    h = hue; s = sat; v = val; update();
+  }
+  double saturation() const { return s; }
+  double hue() const { return h; }
 
 protected:
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
     QLinearGradient a(0, 0, width(), 0);
     a.setColorAt(0, Qt::white);
-    a.setColorAt(1, QColor::fromHsv(h % 360, 255, 255));
+    a.setColorAt(1, QColor::fromHsvF(std::fmod(h, 360.0) / 360.0, 1, 1));
     p.fillRect(rect(), a);
     QLinearGradient b(0, 0, 0, height());
     b.setColorAt(0, Qt::transparent);
@@ -211,7 +216,7 @@ protected:
     p.fillRect(rect(), b);
     p.setPen(Qt::white);
     p.drawEllipse(
-        QPoint(s * (width() - 1) / 100, (100 - v) * (height() - 1) / 100), 5,
+        QPoint(qRound(s * (width() - 1) / 100), qRound((100 - v) * (height() - 1) / 100)), 5,
         5);
   }
   void mousePressEvent(QMouseEvent *e) override { choose(e->pos(), false); }
@@ -219,7 +224,9 @@ protected:
     if (e->buttons() & Qt::LeftButton)
       choose(e->pos(), false);
   }
-  void mouseReleaseEvent(QMouseEvent *e) override { choose(e->pos(), true); }
+  void mouseReleaseEvent(QMouseEvent *e) override {
+    if (e->button() == Qt::LeftButton) choose(e->pos(), true);
+  }
   void keyPressEvent(QKeyEvent *e) override {
     int ds = 0, dv = 0;
     if (e->key() == Qt::Key_Left)
@@ -234,10 +241,86 @@ protected:
       QWidget::keyPressEvent(e);
       return;
     }
-    s = qBound(0, s + ds, 100);
-    v = qBound(0, v + dv, 100);
+    s = qBound(0.0, s + ds, 100.0);
+    v = qBound(0.0, v + dv, 100.0);
     update();
     changed(h, s, v, true);
+  }
+};
+// The mixer wheel selects hue and saturation; value and alpha stay in the model.
+class MixerWheel : public QWidget {
+  double h, s, v;
+  std::function<void(double, double, double, bool)> changed;
+  QRectF wheelRect() const {
+    const double side = qMax(1, qMin(width(), height()) - 16);
+    return QRectF((width() - side) / 2, (height() - side) / 2, side, side);
+  }
+  void choose(QPointF point, bool final) {
+    const auto r = wheelRect();
+    const auto d = point - r.center();
+    h = std::atan2(-d.y(), d.x()) * 180.0 / M_PI;
+    if (h < 0) h += 360;
+    s = qMin(100.0, std::hypot(d.x(), d.y()) * 200.0 / r.width());
+    update();
+    changed(h, s, v, final);
+  }
+public:
+  MixerWheel(double hue, double sat, double val,
+             std::function<void(double, double, double, bool)> callback,
+             QWidget *parent)
+      : QWidget(parent), h(hue), s(sat), v(val), changed(callback) {
+    setMinimumSize(120, 120);
+    setMaximumSize(240, 240);
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    setFocusPolicy(Qt::StrongFocus);
+    setAccessibleName("Mixer color wheel; arrow keys adjust hue and saturation");
+  }
+  void setHsv(double hue, double sat, double val) {
+    h = hue; s = sat; v = val; update();
+  }
+  double hue() const { return h; }
+  double saturation() const { return s; }
+protected:
+  void paintEvent(QPaintEvent *) override {
+    const auto r = wheelRect();
+    const int side = qMax(1, int(r.width()));
+    QImage image(side, side, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    const double radius = side / 2.0;
+    for (int y = 0; y < side; ++y) for (int x = 0; x < side; ++x) {
+      double dx = x + .5 - radius, dy = y + .5 - radius;
+      double sat = std::hypot(dx, dy) / radius;
+      if (sat <= 1) {
+        double hue = std::atan2(-dy, dx) / (2 * M_PI);
+        if (hue < 0) hue += 1;
+        image.setPixelColor(x, y, QColor::fromHsvF(hue, sat, 1));
+      }
+    }
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.drawImage(r.topLeft(), image);
+    const double angle = h * M_PI / 180.0;
+    const QPointF marker = r.center() + QPointF(std::cos(angle), -std::sin(angle)) * (s * r.width() / 200.0);
+    p.setPen(QPen(Qt::black, 3)); p.drawEllipse(marker, 6, 6);
+    p.setPen(QPen(Qt::white, 1.5)); p.drawEllipse(marker, 6, 6);
+    if (hasFocus()) { p.setPen(QPen(palette().color(QPalette::Highlight), 2)); p.drawRect(rect().adjusted(1, 1, -2, -2)); }
+  }
+  void mousePressEvent(QMouseEvent *e) override {
+    if (e->button() == Qt::LeftButton) { setFocus(Qt::MouseFocusReason); choose(e->position(), false); }
+  }
+  void mouseMoveEvent(QMouseEvent *e) override {
+    if (e->buttons() & Qt::LeftButton) choose(e->position(), false);
+  }
+  void mouseReleaseEvent(QMouseEvent *e) override {
+    if (e->button() == Qt::LeftButton) choose(e->position(), true);
+  }
+  void keyPressEvent(QKeyEvent *e) override {
+    if (e->key() == Qt::Key_Left) h = std::fmod(h + 359.0, 360.0);
+    else if (e->key() == Qt::Key_Right) h = std::fmod(h + 1.0, 360.0);
+    else if (e->key() == Qt::Key_Up) s = qMin(100.0, s + 1);
+    else if (e->key() == Qt::Key_Down) s = qMax(0.0, s - 1);
+    else { QWidget::keyPressEvent(e); return; }
+    update(); changed(h, s, v, true);
   }
 };
 class Scene : public QWidget {
@@ -377,6 +460,8 @@ class Frontend : public QWidget {
   QLabel *configStatus = nullptr, *shortcutStatus = nullptr;
   QList<QPushButton *> historyButtons;
   bool hiddenForPick = false, spectrumDragging = false;
+  QPointer<Spectrum> mixerSpectrum;
+  QPointer<MixerWheel> mixerWheel;
   QJsonObject configDraft, generationDraft, themeDraft;
   bool configInitialized = false;
   QJsonValue request(QJsonObject req) {
@@ -742,8 +827,16 @@ class Frontend : public QWidget {
         tabs->insertTab(index, replacement, title);
         old->deleteLater();
       };
-      if (!spectrumDragging && previous.value("mixer") != state.value("mixer"))
-        refresh(0, mixer(), "Mixer");
+      if (previous.value("mixer") != state.value("mixer")) {
+        if (spectrumDragging) {
+          auto hsv = array(object(state.value("mixer")), "hsv");
+          if (hsv.size() == 3) {
+            if (mixerSpectrum) mixerSpectrum->setHsv(hsv[0].toDouble(), hsv[1].toDouble(), hsv[2].toDouble());
+            if (mixerWheel) mixerWheel->setHsv(hsv[0].toDouble(), hsv[1].toDouble(), hsv[2].toDouble());
+          }
+        } else
+          refresh(0, mixer(), "Mixer");
+      }
       if (previous.value("palette") != state.value("palette") ||
           (generationDraft.value("base").toString().isEmpty() &&
            previous.value("mixer") != state.value("mixer")))
@@ -818,18 +911,22 @@ class Frontend : public QWidget {
     auto l = new QVBoxLayout(w);
     auto hsv = array(m, "hsv"), rgba = array(m, "rgba");
     double h = hsv[0].toDouble(), s = hsv[1].toDouble(), v = hsv[2].toDouble();
-    l->addWidget(new Spectrum(
-        qRound(h), qRound(s), qRound(v),
-        [this](int h, int s, int v, bool final) {
-          spectrumDragging = !final;
+    auto controls = new QHBoxLayout;
+    auto changed = [this](double h, double s, double v, bool final) {
+          spectrumDragging = true;
           send({{"op", "mixer_hsv"}, {"h", h}, {"s", s}, {"v", v}});
           if (final) {
+            spectrumDragging = false;
             auto previous = state;
             previous.remove("mixer");
             renderBoard(previous);
           }
-        },
-        w));
+        };
+    mixerWheel = new MixerWheel(h, s, v, changed, w);
+    mixerSpectrum = new Spectrum(h, s, v, changed, w);
+    controls->addWidget(mixerWheel);
+    controls->addWidget(mixerSpectrum, 1);
+    l->addLayout(controls);
     auto form = new QFormLayout;
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
@@ -1088,6 +1185,54 @@ public:
         click(tabs->widget(0), "Redo");
         check(str(object(state.value("mixer")), "current") == "#04050642",
               "Redo");
+        send({{"op", "mixer_hsv"}, {"h", 0}, {"s", 100}, {"v", 100}});
+        check(mixerWheel && mixerSpectrum, "Mixer wheel and gradient available");
+        if (mixerWheel && mixerSpectrum) {
+          QPointF top(mixerWheel->width() / 2.0, 8);
+          QMouseEvent wheelPress(QEvent::MouseButtonPress, top, Qt::LeftButton,
+                                 Qt::LeftButton, Qt::NoModifier);
+          QApplication::sendEvent(mixerWheel, &wheelPress);
+          auto hsv = array(object(state.value("mixer")), "hsv");
+          check(hsv.size() == 3 && qAbs(hsv[0].toDouble() - 90) < 2 &&
+                    qAbs(mixerSpectrum->hue() - hsv[0].toDouble()) < .01 &&
+                    qAbs(mixerSpectrum->saturation() - hsv[1].toDouble()) < .01,
+                "Wheel updates gradient while dragging");
+          QMouseEvent wheelRelease(QEvent::MouseButtonRelease, top, Qt::LeftButton,
+                                   Qt::NoButton, Qt::NoModifier);
+          QApplication::sendEvent(mixerWheel, &wheelRelease);
+          QPointF point(mixerSpectrum->width() / 4.0, mixerSpectrum->height() / 4.0);
+          QMouseEvent gradientPress(QEvent::MouseButtonPress, point, Qt::LeftButton,
+                                    Qt::LeftButton, Qt::NoModifier);
+          QApplication::sendEvent(mixerSpectrum, &gradientPress);
+          hsv = array(object(state.value("mixer")), "hsv");
+          check(hsv.size() == 3 && qAbs(hsv[1].toDouble() - 25) < 2 &&
+                    qAbs(hsv[2].toDouble() - 75) < 2 &&
+                    qAbs(mixerWheel->hue() - hsv[0].toDouble()) < .01 &&
+                    qAbs(mixerWheel->saturation() - hsv[1].toDouble()) < .01,
+                "Gradient updates wheel while dragging");
+          check(str(object(state.value("mixer")), "current").endsWith("42"),
+                "Mixer selectors preserve alpha");
+          QMouseEvent gradientRelease(QEvent::MouseButtonRelease, point, Qt::LeftButton,
+                                      Qt::NoButton, Qt::NoModifier);
+          QApplication::sendEvent(mixerSpectrum, &gradientRelease);
+          send({{"op", "mixer_hsv"}, {"h", 210}, {"s", 80}, {"v", 0}});
+          QPointF right(mixerWheel->width() - 8.0, mixerWheel->height() / 2.0);
+          QMouseEvent blackPress(QEvent::MouseButtonPress, right, Qt::LeftButton,
+                                 Qt::LeftButton, Qt::NoModifier);
+          QApplication::sendEvent(mixerWheel, &blackPress);
+          check(str(object(state.value("mixer")), "current") == "#00000042" &&
+                    qAbs(mixerSpectrum->hue() - mixerWheel->hue()) < .01,
+                "Wheel preserves black value and alpha while updating gradient hue");
+          QMouseEvent blackRelease(QEvent::MouseButtonRelease, right, Qt::LeftButton,
+                                   Qt::NoButton, Qt::NoModifier);
+          QApplication::sendEvent(mixerWheel, &blackRelease);
+        }
+        send({{"op", "mixer_select"}, {"color", "#04050642"}});
+        auto selectedHsv = array(object(state.value("mixer")), "hsv");
+        check(selectedHsv.size() == 3 && mixerWheel && mixerSpectrum &&
+                  qAbs(mixerWheel->hue() - selectedHsv[0].toDouble()) < .01 &&
+                  qAbs(mixerSpectrum->saturation() - selectedHsv[1].toDouble()) < .01,
+              "Color selection updates both mixer selectors");
         QAction *labels = nullptr, *historyToggle = nullptr;
         for (auto action : findChildren<QAction *>()) {
           if (action->text() == "Show labels") labels = action;

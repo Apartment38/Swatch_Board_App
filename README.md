@@ -158,10 +158,12 @@ color or a mix source. Edit HEX, RGB, RGBA, HSL, or HSV values and apply them;
 editing a format without alpha preserves the current alpha. CMYK is approximate
 and unprofiled. Copy uses the configured clipboard format.
 
-Click or drag the saturation/value spectrum, or edit hue with the native numeric
-control. HSV values use degrees/percent; RGB and alpha use 0–255. Format fields
-have explicit Apply buttons and support Enter. Color edits participate in
-undo/redo; the channel controls use the desktop's native spin boxes.
+Click or drag the mixer wheel to choose hue and saturation, or use the adjacent
+saturation/value gradient. Both selectors follow the current color and update
+each other while dragging; arrow keys adjust the focused selector. HSV values
+use degrees/percent; RGB and alpha use 0–255. Format fields have explicit Apply
+buttons and support Enter. Color edits participate in undo/redo; the channel
+controls use the desktop's native spin boxes.
 
 Mix two or more sources with normalized weights in encoded sRGB or OKLCH.
 OKLCH averages hue along the shortest arc relative to the first chromatic source,

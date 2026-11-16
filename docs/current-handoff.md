@@ -1,5 +1,19 @@
 # Swatch Board current handoff
 
+## Mixer wheel and gradient — 2026-11-16
+
+The mixer shows a hue/saturation wheel beside the saturation/value gradient.
+Both follow the shared HSV state during drags and after other color edits;
+wheel interaction preserves value and alpha, including at black. Both controls
+support arrow keys. The Board smoke checks wheel-to-gradient and gradient-to-
+wheel synchronization, color selection, alpha and black preservation.
+
+Workspace build/tests, strict Clippy and formatting passed locally. The full
+container suite passed, including Qt offscreen and private Weston Wayland UI
+smokes (one existing ignored Rust test and one Arch-only packaging skip). The
+final, strengthened event-position assertions also passed in local offscreen
+smoke. Physical KDE input and accessibility remain separate open checks.
+
 ## Isolated X11 interaction check — 2026-11-16
 
 A disposable container/Xvfb session exercised pointer and keyboard interaction
