@@ -1,5 +1,15 @@
 # Swatch Board current handoff
 
+## Isolated X11 interaction check — 2026-11-16
+
+A disposable container/Xvfb session exercised pointer and keyboard interaction
+with Board and Settings at source `21ff8b1`. Swatch reordering/selection,
+toolbar toggles, theme drop and live preview, small-window scrolling, wheel
+mouse/keyboard input, and Settings validation/save received bounded X11 input
+checks. See [the evidence](evidence/ui-x11-2026-11-16/report.md) for results,
+fixture details, screenshots and limits. This is not physical KDE/Wayland,
+tray, portal or screen-reader acceptance; the remaining ToDos stay open.
+
 ## Settings portal registration diagnosis — 2026-11-16
 
 The user-supplied transcript reports an earlier interpretation that the desktop
