@@ -8,7 +8,7 @@ Requested 2026-11-16. Work started from freshly fetched `origin/main`.
 - [x] Route the tray's Show Palette action to the Board Palette page, including an already running Board.
 - [ ] Identify and fix the reported settings footer error. The footer can display real shortcut-service errors; the specific message has not been established.
 - [x] Add a live, lock-aware generator preview and draggable harmony markers; Generate explicitly applies the result.
-- [ ] Continue responsive layout verification across all views, especially small windows, keyboard use, and accessibility on the target desktop. Mixer, Theme, and Settings controls have been compacted and offscreen small-window snapshots inspected; Theme could not shrink below 540×434 in the tested configuration.
+- [ ] Continue responsive layout verification across all views, especially small windows, keyboard use, and accessibility on the target desktop. Mixer, Theme, and Settings controls have been compacted and offscreen checks now reach 540×360 and verify the preview, controls, and palette are visible.
 - [ ] Verify the tray action, drag/drop, theme preview and toolbar behavior on a real Plasma Wayland desktop.
 
-Plan: continue the open items with concrete desktop observations, diagnose the specific Settings message, and record verification in the handoff.
+Plan: complete private Wayland and real desktop verification, diagnose the specific Settings message, and record verification in the handoff.

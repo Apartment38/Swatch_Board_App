@@ -572,7 +572,7 @@ class Frontend : public QWidget {
       auto sw = new Swatch(c, str(o, "name"), w);
       sw->setText(str(o, "color").toUpper());
       sw->setIcon(QIcon());
-      sw->setMinimumSize(100, 80);
+      sw->setMinimumSize(100, 30);
       sw->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
       auto textColor = c.lightness() < 140 ? "white" : "black";
       sw->setStyleSheet(QString("QPushButton { background-color: %1; color: %2; border: 0; font-weight: bold; } QPushButton:focus { border: 2px solid %2; }")
@@ -618,6 +618,7 @@ class Frontend : public QWidget {
     if (first) {
       auto outer = new QWidget;
       auto layout = new QVBoxLayout(outer);
+      layout->setContentsMargins(0, 0, 0, 0);
       auto toolbar = new QToolBar(outer);
       toolbar->setMovable(false);
       bool labels = settings.value("board/toolbarLabels", true).toBool();
@@ -707,6 +708,8 @@ class Frontend : public QWidget {
       verticalSplitter = new QSplitter(Qt::Vertical, outer);
       verticalSplitter->addWidget(splitter);
       pinnedScroll = scroll(pinnedPalette());
+      pinnedScroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+      pinnedScroll->setMinimumHeight(38);
       verticalSplitter->addWidget(pinnedScroll);
       splitter->setStretchFactor(1, 1);
       verticalSplitter->setStretchFactor(0, 1);
@@ -757,6 +760,8 @@ class Frontend : public QWidget {
       }
       if (previous.value("palette") != state.value("palette")) {
         auto replacement = scroll(pinnedPalette());
+        replacement->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+        replacement->setMinimumHeight(38);
         preserveView(pinnedScroll, replacement);
         auto old = verticalSplitter->replaceWidget(1, replacement);
         pinnedScroll = replacement;
@@ -1083,7 +1088,35 @@ public:
         click(tabs->widget(0), "Redo");
         check(str(object(state.value("mixer")), "current") == "#04050642",
               "Redo");
+        QAction *labels = nullptr, *historyToggle = nullptr;
+        for (auto action : findChildren<QAction *>()) {
+          if (action->text() == "Show labels") labels = action;
+          if (action->text() == "History") historyToggle = action;
+        }
+        check(labels && historyToggle, "Toolbar actions available");
+        if (labels) {
+          labels->setChecked(false);
+          auto buttons = tabs->widget(0)->findChildren<QToolButton *>();
+          bool hidden = false;
+          for (auto b : buttons)
+            if (b->property("boardAction").toBool()) {
+              hidden = b->toolButtonStyle() == Qt::ToolButtonIconOnly;
+              break;
+            }
+          check(hidden, "Toolbar labels can be hidden");
+          labels->setChecked(true);
+        }
+        if (historyToggle) {
+          historyToggle->setChecked(false);
+          check(!historyScroll->isVisible(), "History collapses");
+          historyToggle->setChecked(true);
+          check(historyScroll->isVisible(), "History expands");
+        }
         shot("mixer");
+        auto activation = state;
+        activation["show_palette"] = true;
+        updateState(activation);
+        check(tabs->currentIndex() == 1, "Palette activation selects Palette");
         tabs->setCurrentIndex(1);
         click(tabs->widget(1), "New draft");
         tabs->setCurrentIndex(0);
@@ -1092,8 +1125,29 @@ public:
         check(!array(object(state.value("palette")), "swatches").isEmpty(),
               "Add swatch");
         send({{"op", "mixer_select"}, {"color", "#AABBCCFF"}});
+        send({{"op", "palette_add_current"}});
+        QList<Swatch *> swatches;
         for (auto b : pinnedScroll->findChildren<QPushButton *>())
-          if (dynamic_cast<Swatch *>(b)) {
+          if (auto swatch = dynamic_cast<Swatch *>(b)) swatches.append(swatch);
+        check(swatches.size() == 2, "Two palette swatches available");
+        if (swatches.size() == 2) {
+          QMimeData mime;
+          mime.setText("#04050642");
+          mime.setData("application/x-swatch-board-index", "0");
+          QDragEnterEvent enter(QPoint(1, 1), Qt::CopyAction, &mime,
+                                Qt::LeftButton, Qt::NoModifier);
+          QApplication::sendEvent(swatches[1], &enter);
+          QDropEvent drop(QPointF(1, 1), Qt::CopyAction, &mime,
+                          Qt::LeftButton, Qt::NoModifier);
+          QApplication::sendEvent(swatches[1], &drop);
+          auto reordered = array(object(state.value("palette")), "swatches");
+          check(reordered.size() == 2 &&
+                    str(reordered[0].toObject(), "color") == "#AABBCCFF" &&
+                    str(reordered[1].toObject(), "color") == "#04050642",
+                "Palette drag reorders colors");
+        }
+        for (auto b : pinnedScroll->findChildren<QPushButton *>())
+          if (dynamic_cast<Swatch *>(b) && b->text() == "#04050642") {
             b->click();
             break;
           }
@@ -1115,6 +1169,8 @@ public:
         check(str(object(state.value("palette")), "id") == id,
               "Reopen palette");
         tabs->setCurrentIndex(2);
+        check(!array(object(state.value("theme")), "plugins").isEmpty(),
+              "Theme plugin available");
         if (!array(object(state.value("theme")), "plugins").isEmpty()) {
           click(tabs->widget(2), "New theme");
           check(!pinnedCurrent->isVisible(), "Mixer current color hidden on Theme");
@@ -1122,10 +1178,13 @@ public:
             if (b->accessibleName().startsWith("Current color"))
               check(!b->isVisible(), "No stale mixer color on Theme");
           auto roles = array(object(state.value("theme")), "roles");
+          auto previewBefore = object(state.value("theme")).value("preview");
           auto fields = tabs->widget(2)->findChildren<QLineEdit *>();
+          bool roleFieldFound = false;
           for (auto field : fields) {
             if (field->accessibleName() != "Role color")
               continue;
+            roleFieldFound = true;
             QMimeData mime;
             mime.setText("#112233FF");
             QDragEnterEvent enter(QPoint(1, 1), Qt::CopyAction, &mime,
@@ -1138,12 +1197,37 @@ public:
             check(!roles.isEmpty() && !updated.isEmpty() &&
                       str(updated[0].toObject(), "color") == "#112233FF",
                   "Theme color drop replaces value");
+            check(object(state.value("theme")).value("preview") != previewBefore,
+                  "Theme preview updates after color drop");
             break;
           }
+          check(roleFieldFound, "Theme role color field available");
         }
         shot("theme");
         resize(540, 360);
         shot("theme-small");
+        check(size() == QSize(540, 360), "Board reaches 540x360");
+        auto visibleInWindow = [this](QWidget *widget) {
+          if (!widget || !widget->isVisible()) return false;
+          QRect bounds(widget->mapTo(this, QPoint()), widget->size());
+          return bounds.intersected(rect()).height() >= 20 &&
+                 bounds.intersected(rect()).width() >= 20;
+        };
+        Scene *scene = nullptr;
+        for (auto widget : tabs->widget(2)->findChildren<QWidget *>())
+          if ((scene = dynamic_cast<Scene *>(widget))) break;
+        check(visibleInWindow(scene), "Theme preview visible at small size");
+        auto themeScrolls = tabs->widget(2)->findChildren<QScrollArea *>();
+        check(!themeScrolls.isEmpty() && visibleInWindow(themeScrolls.first()),
+              "Theme controls visible at small size");
+        check(visibleInWindow(pinnedScroll), "Palette visible at small size");
+        for (int page : {0, 1}) {
+          tabs->setCurrentIndex(page);
+          QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          check(visibleInWindow(tabs->widget(page)),
+                page == 0 ? "Mixer visible at small size" : "Palette page visible at small size");
+          check(visibleInWindow(pinnedScroll), "Shared palette remains visible at small size");
+        }
       } else if (mode == "config") {
         auto path = qEnvironmentVariable("XDG_CONFIG_HOME") +
                     "/swatch-board/config.toml";
@@ -1454,6 +1538,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
   auto outer = new QWidget;
   outer->setObjectName("themePage");
   auto outerLayout = new QVBoxLayout(outer);
+  outerLayout->setContentsMargins(5, 5, 5, 5);
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
   auto selection = new QFormLayout;
@@ -1626,7 +1711,10 @@ QWidget *Frontend::themePage(Scene *reuse) {
   error->setWordWrap(true);
   l->addWidget(error);
   l->addStretch();
-  outerLayout->addWidget(scroll(w), 1);
+  auto controlsScroll = scroll(w);
+  controlsScroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+  controlsScroll->setMinimumHeight(48);
+  outerLayout->addWidget(controlsScroll, 1);
   return outer;
 }
 

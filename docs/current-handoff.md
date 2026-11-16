@@ -1,5 +1,26 @@
 # Swatch Board current handoff
 
+## Responsive layout and automated verification — 2026-11-16
+
+The Board now reaches 540×360 in the Qt control smoke while keeping its pinned
+Theme preview, scrollable controls, and shared palette visible. The palette
+shelf and Theme controls can shrink, and compact swatch labels remain visible.
+The smoke now exercises palette reorder, toolbar labels, history visibility,
+selection, incoming Palette activation, color drops and automatic theme preview
+updates. A separate wheel check sends key and marker-drag events. Private D-Bus
+regressions cover tray menu dispatch, activation of an existing Board, and
+Settings recovery when a tray service appears.
+
+`testing/container-tests.sh` now runs Board and Settings checks both with Qt
+Offscreen and a private headless Weston Wayland compositor. The full container
+run passed workspace build/tests, strict Clippy, formatting, packaging tests,
+wheel test, and all four UI smokes; the existing Rust and Arch-only packaging
+skips remain. The Wayland Theme client screenshot measured 540×360. These use
+synthetic Qt events, not physical pointer/keyboard input, and do not establish
+KDE Plasma, live tray, accessibility or physical desktop acceptance. The
+reported Settings error is still unidentified: the new test confirms a genuine
+missing-service status and recovery, not the cause of the user's report.
+
 ## Containerized test automation — 2026-11-16
 
 Run `testing/container-tests.sh` for an isolated Docker build and the locked

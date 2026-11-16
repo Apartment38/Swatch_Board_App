@@ -156,3 +156,78 @@ fn main() {
         settings.request(request)
     }));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{process::Command, thread};
+    use swatch_board_ipc::{PATH, SERVICE};
+
+    struct TrayFixture;
+
+    #[zbus::interface(name = "org.apartment38.SwatchBoard1")]
+    impl TrayFixture {
+        fn shortcut_status(&self) -> &str {
+            "Global shortcuts ready"
+        }
+    }
+
+    fn await_status(settings: &mut Settings, expected: &str) {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < deadline {
+            settings.request(json!({"op": "poll"}));
+            if settings.shortcut_status.contains(expected) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        panic!("expected {expected:?}, got {:?}", settings.shortcut_status);
+    }
+
+    #[test]
+    fn status_recovers_when_tray_appears() {
+        // The child owns a private bus and XDG root; this avoids altering the
+        // user's settings or depending on an already running desktop session.
+        if std::env::var_os("SWATCH_CONFIG_TEST_CHILD").is_none() {
+            let root =
+                std::env::temp_dir().join(format!("swatch-config-test-{}", std::process::id()));
+            std::fs::create_dir_all(&root).unwrap();
+            let output = Command::new("dbus-run-session")
+                .arg("--")
+                .arg(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "tests::status_recovers_when_tray_appears",
+                    "--nocapture",
+                ])
+                .env("SWATCH_CONFIG_TEST_CHILD", "1")
+                .env("XDG_CONFIG_HOME", root.join("config"))
+                .env("XDG_DATA_HOME", root.join("data"))
+                .env("XDG_STATE_HOME", root.join("state"))
+                .output()
+                .expect("dbus-run-session is required for the Settings integration test");
+            let _ = std::fs::remove_dir_all(root);
+            assert!(
+                output.status.success(),
+                "child failed:\n{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+
+        let mut settings = Settings::new();
+        settings.request(json!({"op": "init"}));
+        await_status(&mut settings, "Shortcut status unavailable:");
+        let _tray = zbus::blocking::connection::Builder::session()
+            .unwrap()
+            .name(SERVICE)
+            .unwrap()
+            .serve_at(PATH, TrayFixture)
+            .unwrap()
+            .build()
+            .unwrap();
+        await_status(&mut settings, "Global shortcuts ready");
+        assert_eq!(settings.shortcut_status, "Global shortcuts ready");
+    }
+}

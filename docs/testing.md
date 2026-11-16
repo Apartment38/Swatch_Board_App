@@ -14,12 +14,13 @@ testing/container-tests.sh
 ```
 
 Docker builds a Debian/Rust test image from the current working tree and runs
-locked workspace builds and tests, strict Clippy, rustfmt, packaging tests, and
-Board and Settings Qt offscreen control smokes. The runner uses separate private
-D-Bus sessions and temporary XDG directories; it does not interact with the
-running desktop or its data. A temporary Git bundle supplies commit objects for the packaging source-pin
-test; it is deleted after the run. The first image build needs network access for
-system packages and locked crates; the test run itself uses Cargo offline mode.
+locked workspace builds and tests, strict Clippy, rustfmt, packaging tests, a
+wheel input test, and Board and Settings control smokes on both offscreen Qt and
+headless Weston/Wayland. The runner uses separate private D-Bus sessions and
+temporary XDG directories; it does not interact with the running desktop or its
+data. A temporary Git bundle supplies commit objects for the packaging source-pin
+test and is deleted after the run. The first image build needs network access
+for system packages and locked crates; the test run itself uses Cargo offline mode.
 
 To retain the smoke JSON and client-area screenshots, set an output directory:
 
@@ -28,8 +29,9 @@ SWATCH_TEST_ARTIFACTS="$PWD/target/test-artifacts" testing/container-tests.sh
 ```
 
 The runner exits nonzero on a failed command, timeout, or failed smoke result.
-The offscreen controls and snapshots do not test real Wayland input, the tray,
-compositor behavior, screen readers, or physical desktop acceptance. The
+The UI smokes send synthetic Qt events; the Weston run exercises Wayland-backed
+widgets but does not establish real pointer/keyboard input, KDE Plasma behavior,
+the tray UI, screen readers, or physical desktop acceptance. The
 existing ignored test and the Arch-only `makepkg` check remain skipped in this
 Debian image. System packages and the image tag can change upstream, so this is
 a repeatable test setup rather than a bit-for-bit reproducible release build.
