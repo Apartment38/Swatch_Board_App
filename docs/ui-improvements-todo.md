@@ -7,8 +7,8 @@ Requested 2026-11-16. Work started from freshly fetched `origin/main`.
 - [x] Replace theme color fields on drop, remove the duplicate palette, and keep an automatically updating preview visible.
 - [x] Route the tray's Show Palette action to the Board Palette page, including an already running Board.
 - [ ] Identify and fix the reported settings footer error. The footer can display real shortcut-service errors; the specific message has not been established.
-- [ ] Extend the generator's new interactive base-color wheel toward Adobe-style harmony handles and live palette generation.
-- [ ] Complete responsive layout and input sizing across all views, especially settings; verify small windows, keyboard use, and accessibility on the target desktop.
+- [x] Add a live, lock-aware generator preview and draggable harmony markers; Generate explicitly applies the result.
+- [ ] Continue responsive layout verification across all views, especially small windows, keyboard use, and accessibility on the target desktop. Mixer, Theme, and Settings controls have been compacted and offscreen small-window snapshots inspected; Theme could not shrink below 540×434 in the tested configuration.
 - [ ] Verify the tray action, drag/drop, theme preview and toolbar behavior on a real Plasma Wayland desktop.
 
-Plan: integrate and verify the current mixer, theme, generator, toolbar, and tray slices; record the remaining gaps in the handoff; commit coherent changes and push. Continue the open items with concrete desktop observations.
+Plan: continue the open items with concrete desktop observations, diagnose the specific Settings message, and record verification in the handoff.

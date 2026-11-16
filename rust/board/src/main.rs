@@ -80,6 +80,12 @@ impl Board {
     }
 
     fn request(&mut self, request: Value) -> Value {
+        if request["op"].as_str() == Some("palette_preview_generation") {
+            return match self.palette.preview_generation(&request) {
+                Ok(colors) => json!({"colors": colors}),
+                Err(error) => json!({"error": error}),
+            };
+        }
         let mut changed = false;
         let mut activate = false;
         let mut show_palette = std::mem::take(&mut self.initial_show_palette);

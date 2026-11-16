@@ -277,7 +277,8 @@ class Scene : public QWidget {
 public:
   Scene(QJsonObject data, std::function<void(QJsonObject)> f, QWidget *parent)
       : QWidget(parent), scene(data), send(f) {
-    setMinimumSize(300, 220);
+    setMinimumSize(140, 80);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     setAcceptDrops(true);
     setAccessibleName("Theme scene preview");
     setFocusPolicy(Qt::StrongFocus);
@@ -293,6 +294,7 @@ public:
       images.append(image);
     }
   }
+  QSize sizeHint() const override { return QSize(300, 180); }
 
 protected:
   void paintEvent(QPaintEvent *) override {
@@ -723,6 +725,7 @@ class Frontend : public QWidget {
       if (previous.value("mixer") != state.value("mixer")) {
         auto replacement = currentColor();
         boardContent->replaceWidget(pinnedCurrent, replacement);
+        pinnedCurrent->hide();
         pinnedCurrent->deleteLater();
         pinnedCurrent = replacement;
         pinnedCurrent->setVisible(current == 0);
@@ -738,7 +741,9 @@ class Frontend : public QWidget {
       };
       if (!spectrumDragging && previous.value("mixer") != state.value("mixer"))
         refresh(0, mixer(), "Mixer");
-      if (previous.value("palette") != state.value("palette"))
+      if (previous.value("palette") != state.value("palette") ||
+          (generationDraft.value("base").toString().isEmpty() &&
+           previous.value("mixer") != state.value("mixer")))
         refresh(1, palettePage(), "Palette");
       if (previous.value("theme") != state.value("theme")) {
         Scene *reused = nullptr;
@@ -758,6 +763,7 @@ class Frontend : public QWidget {
         old->deleteLater();
       }
       tabs->setCurrentIndex(current);
+      pinnedCurrent->setVisible(current == 0);
     }
     if (first || previous.value("history") != state.value("history")) {
       while (auto item = historyLayout->takeAt(0)) {
@@ -820,6 +826,8 @@ class Frontend : public QWidget {
         },
         w));
     auto form = new QFormLayout;
+    form->setRowWrapPolicy(QFormLayout::WrapLongRows);
+    form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
     auto hbox = new QWidget(w);
     auto hl = new QHBoxLayout(hbox);
     hl->setContentsMargins(0, 0, 0, 0);
@@ -830,6 +838,7 @@ class Frontend : public QWidget {
       x->setDecimals(6);
       x->setValue(x == hh ? h : x == ss ? s : v);
       x->setSingleStep(.1);
+      x->setMaximumWidth(x->sizeHint().width());
       hl->addWidget(x);
       connect(x, &QDoubleSpinBox::editingFinished, this,
               [this, hh, ss, vv, h, s, v] {
@@ -843,6 +852,7 @@ class Frontend : public QWidget {
                       {"v", vv->value()}});
               });
     }
+    hl->addStretch();
     form->addRow("Hue / saturation / value", hbox);
     auto rw = new QWidget(w);
     auto rl = new QHBoxLayout(rw);
@@ -851,9 +861,11 @@ class Frontend : public QWidget {
     const char *names[] = {"Red", "Green", "Blue", "Alpha"};
     for (int i = 0; i < 4; i++) {
       auto x = spin(names[i], rgba[i].toInt(), 0, 255, rw);
+      x->setMaximumWidth(x->sizeHint().width());
       channels << x;
       rl->addWidget(x);
     }
+    rl->addStretch();
     for (auto x : channels)
       connect(x, &QSpinBox::editingFinished, this, [this, channels] {
         send({{"op", "mixer_rgba"},
@@ -870,6 +882,11 @@ class Frontend : public QWidget {
       auto layout = new QHBoxLayout(row);
       layout->setContentsMargins(0, 0, 0, 0);
       auto e = line(labels[i], fields[i].toString(), row);
+      const int fieldChars[] = {10, 18, 25, 30, 30};
+      const int fieldWidth = e->fontMetrics().horizontalAdvance(
+                                 QString(fieldChars[i], QLatin1Char('0'))) + 20;
+      e->setMinimumWidth(fieldWidth);
+      e->setMaximumWidth(fieldWidth);
       layout->addWidget(e);
       auto apply = [this, e, i] {
         e->setModified(false);
@@ -877,12 +894,14 @@ class Frontend : public QWidget {
       };
       connect(e, &QLineEdit::returnPressed, this, apply);
       layout->addWidget(button(QString("Apply %1").arg(labels[i]), row, apply));
+      layout->addStretch();
       form->addRow(labels[i], row);
     }
     form->addRow("CMYK", new QLabel(str(m, "cmyk"), w));
     form->addRow("Output", new QLabel(str(m, "output"), w));
     l->addLayout(form);
-    auto actions = new QHBoxLayout;
+    auto actions = new QToolBar(w);
+    actions->setMovable(false);
     for (auto pair : QList<QPair<QString, QString>>{
              {"Copy", "mixer_copy"},
              {"Add to palette", "palette_add_current"},
@@ -898,12 +917,14 @@ class Frontend : public QWidget {
         b->setEnabled(m.value("can_redo").toBool());
       actions->addWidget(b);
     }
-    l->addLayout(actions);
+    l->addWidget(actions);
     auto space = new QComboBox(w);
     space->setAccessibleName("Mixing color space");
     space->addItem("sRGB", "srgb");
     space->addItem("OKLCH", "oklch");
     space->setCurrentIndex(qMax(0, space->findData(str(m, "space"))));
+    space->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    space->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
     connect(space, &QComboBox::currentIndexChanged, this, [this, space] {
       send({{"op", "mixer_space"}, {"space", space->currentData().toString()}});
     });
@@ -915,8 +936,10 @@ class Frontend : public QWidget {
       auto row = new QWidget(w);
       auto r = new QHBoxLayout(row);
       auto c = line("Source color", str(o, "color"), row);
+      c->setMaximumWidth(c->fontMetrics().horizontalAdvance(QString(12, QLatin1Char('M'))) + 20);
       auto weight =
           decimal("Source weight", o.value("weight").toDouble(), 0, 1, row);
+      weight->setMaximumWidth(weight->sizeHint().width());
       auto source = new Swatch(color(str(o, "color")), "Source", row);
       source->paletteDrop(-1, [this, index, weight](int, QString c) {
         if (color(c).isValid())
@@ -939,6 +962,7 @@ class Frontend : public QWidget {
       r->addWidget(button("Remove", row, [this, index] {
         send({{"op", "mixer_source_remove"}, {"index", index}});
       }));
+      r->addStretch();
       l->addWidget(row);
     }
     auto error = new QLabel(str(m, "error"), w);
@@ -1067,6 +1091,15 @@ public:
         tabs->setCurrentIndex(1);
         check(!array(object(state.value("palette")), "swatches").isEmpty(),
               "Add swatch");
+        send({{"op", "mixer_select"}, {"color", "#AABBCCFF"}});
+        for (auto b : pinnedScroll->findChildren<QPushButton *>())
+          if (dynamic_cast<Swatch *>(b)) {
+            b->click();
+            break;
+          }
+        check(str(object(state.value("mixer")), "current") == "#04050642",
+              "Palette swatch selects mixer color");
+        tabs->setCurrentIndex(1);
         shot("palette");
         auto edits = tabs->widget(1)->findChildren<QLineEdit *>();
         for (auto e : edits)
@@ -1084,8 +1117,33 @@ public:
         tabs->setCurrentIndex(2);
         if (!array(object(state.value("theme")), "plugins").isEmpty()) {
           click(tabs->widget(2), "New theme");
+          check(!pinnedCurrent->isVisible(), "Mixer current color hidden on Theme");
+          for (auto b : boardContent->parentWidget()->findChildren<QPushButton *>())
+            if (b->accessibleName().startsWith("Current color"))
+              check(!b->isVisible(), "No stale mixer color on Theme");
+          auto roles = array(object(state.value("theme")), "roles");
+          auto fields = tabs->widget(2)->findChildren<QLineEdit *>();
+          for (auto field : fields) {
+            if (field->accessibleName() != "Role color")
+              continue;
+            QMimeData mime;
+            mime.setText("#112233FF");
+            QDragEnterEvent enter(QPoint(1, 1), Qt::CopyAction, &mime,
+                                  Qt::LeftButton, Qt::NoModifier);
+            QApplication::sendEvent(field, &enter);
+            QDropEvent drop(QPointF(1, 1), Qt::CopyAction, &mime,
+                            Qt::LeftButton, Qt::NoModifier);
+            QApplication::sendEvent(field, &drop);
+            auto updated = array(object(state.value("theme")), "roles");
+            check(!roles.isEmpty() && !updated.isEmpty() &&
+                      str(updated[0].toObject(), "color") == "#112233FF",
+                  "Theme color drop replaces value");
+            break;
+          }
         }
         shot("theme");
+        resize(540, 360);
+        shot("theme-small");
       } else if (mode == "config") {
         auto path = qEnvironmentVariable("XDG_CONFIG_HOME") +
                     "/swatch-board/config.toml";
@@ -1104,6 +1162,8 @@ public:
           after = afterFile.readAll();
         check(before == after, "Invalid settings unchanged on disk");
         shot("settings");
+        resize(540, 360);
+        shot("settings-small");
       } else {
         check(state.contains("entries"), "History entries");
         shot("history");
@@ -1299,37 +1359,86 @@ QWidget *Frontend::palettePage() {
       contrast, &QLineEdit::textChanged, this,
       [this](const QString &value) { generationDraft["contrast"] = value; });
   f->addRow("Contrast", contrast);
-  f->addRow(button("Generate", gen, [=, this] {
+  auto preview = new QWidget(gen);
+  auto previewLayout = new QHBoxLayout(preview);
+  previewLayout->setContentsMargins(0, 0, 0, 0);
+  previewLayout->setSpacing(0);
+  auto previewScroll = new QScrollArea(gen);
+  previewScroll->setWidgetResizable(true);
+  previewScroll->setFixedHeight(76);
+  previewScroll->setWidget(preview);
+  previewScroll->setAccessibleName("Generated palette preview");
+  f->addRow("Preview", previewScroll);
+  auto previewError = new QLabel(gen);
+  previewError->setWordWrap(true);
+  f->addRow(previewError);
+  auto makeRequest = [=, this](const QString &op) -> QJsonObject {
     bool ok = false;
     qulonglong sv = seed->text().toULongLong(&ok);
-    if (!ok) {
-      QMessageBox::warning(this, "Invalid seed",
-                           "Enter a non-negative integer seed.");
-      return;
-    }
+    if (!ok) return {};
     QJsonValue cv = QJsonValue::Null;
     if (!contrast->text().trimmed().isEmpty()) {
       double x = contrast->text().toDouble(&ok);
-      if (!ok) {
-        QMessageBox::warning(this, "Invalid contrast",
-                             "Enter a numeric contrast.");
-        return;
-      }
+      if (!ok) return {};
       cv = x;
     }
-    send({{"op", "palette_generate"},
-          {"mode", mode->currentData().toString()},
-          {"count", count->value()},
-          {"seed", QString::number(sv)},
-          {"base", base->text().isEmpty() ? QJsonValue(QJsonValue::Null)
-                                          : QJsonValue(base->text())},
-          {"hue_min", hmin->value()},
-          {"hue_max", hmax->value()},
-          {"lightness_min", lmin->value()},
-          {"lightness_max", lmax->value()},
-          {"chroma_min", cmin->value()},
-          {"chroma_max", cmax->value()},
-          {"contrast", cv}});
+    return {{"op", op},
+            {"mode", mode->currentData().toString()},
+            {"count", count->value()},
+            {"seed", QString::number(sv)},
+            {"base", base->text().isEmpty()
+                         ? str(object(state.value("mixer")), "current")
+                         : base->text()},
+            {"hue_min", hmin->value()}, {"hue_max", hmax->value()},
+            {"lightness_min", lmin->value()}, {"lightness_max", lmax->value()},
+            {"chroma_min", cmin->value()}, {"chroma_max", cmax->value()},
+            {"contrast", cv}};
+  };
+  auto previewTimer = new QTimer(gen);
+  previewTimer->setSingleShot(true);
+  previewTimer->setInterval(80);
+  connect(previewTimer, &QTimer::timeout, gen, [=, this] {
+    auto req = makeRequest("palette_preview_generation");
+    QJsonObject result = req.isEmpty() ? QJsonObject{{"error", "Enter a valid seed and contrast."}}
+                                       : request(req).toObject();
+    previewError->setText(str(result, "error"));
+    while (auto item = previewLayout->takeAt(0)) {
+      if (item->widget()) item->widget()->deleteLater();
+      delete item;
+    }
+    QList<QColor> colors;
+    for (const auto &value : array(result, "colors")) {
+      auto c = color(value.toString());
+      if (!c.isValid()) continue;
+      colors.append(c);
+      auto swatch = new QLabel(value.toString(), preview);
+      swatch->setAccessibleName("Generated color " + value.toString());
+      swatch->setAlignment(Qt::AlignCenter);
+      swatch->setMinimumWidth(100);
+      swatch->setStyleSheet(QString("background-color: %1; color: %2;")
+                                .arg(c.name(), c.lightness() < 140 ? "white" : "black"));
+      previewLayout->addWidget(swatch);
+    }
+    wheel->setColors(colors);
+    const auto selectedMode = mode->currentData().toString();
+    wheel->setHarmonyHandles(selectedMode != "random" && selectedMode != "perceptual-contrast");
+  });
+  auto schedulePreview = [previewTimer] { previewTimer->start(); };
+  connect(mode, &QComboBox::currentIndexChanged, gen, schedulePreview);
+  connect(count, &QSpinBox::valueChanged, gen, schedulePreview);
+  for (auto edit : {base, seed, contrast})
+    connect(edit, &QLineEdit::textChanged, gen, schedulePreview);
+  for (auto control : {hmin, hmax, lmin, lmax, cmin, cmax})
+    connect(control, &QDoubleSpinBox::valueChanged, gen, schedulePreview);
+  previewTimer->start(0);
+  f->addRow(button("Generate", gen, [=, this] {
+    auto req = makeRequest("palette_generate");
+    if (req.isEmpty()) {
+      QMessageBox::warning(this, "Invalid generation settings",
+                           "Enter a valid non-negative integer seed and numeric contrast.");
+      return;
+    }
+    send(req);
   }));
   l->addWidget(gen);
   auto status = new QLabel(
@@ -1347,47 +1456,58 @@ QWidget *Frontend::themePage(Scene *reuse) {
   auto outerLayout = new QVBoxLayout(outer);
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
-  auto selection = new QHBoxLayout;
+  auto selection = new QFormLayout;
+  selection->setRowWrapPolicy(QFormLayout::WrapLongRows);
   auto plugins =
       combo("Theme plugins", array(t, "plugins"), w,
             themeDraft.value("plugin").toString(str(project, "plugin_id")));
   connect(plugins, &QComboBox::currentIndexChanged, this, [this, plugins] {
     themeDraft["plugin"] = plugins->currentData().toString();
   });
-  selection->addWidget(plugins);
+  auto pluginRow = new QWidget(w);
+  auto pluginLayout = new QHBoxLayout(pluginRow);
+  pluginLayout->setContentsMargins(0, 0, 0, 0);
+  pluginLayout->addWidget(plugins, 1);
   auto discard = [this, project] {
     return !project.value("dirty").toBool() ||
            QMessageBox::question(this, "Unsaved theme",
                                  "Discard unsaved theme changes?") ==
                QMessageBox::Yes;
   };
-  selection->addWidget(toolButton("New theme", "document-new", w, [this, plugins, discard] {
+  pluginLayout->addWidget(toolButton("New theme", "document-new", w, [this, plugins, discard] {
     if (discard())
       send({{"op", "theme_choose"},
             {"id", plugins->currentData().toString()},
             {"discard", true}});
   }));
+  selection->addRow("Plugin", pluginRow);
   auto saved = combo("Saved themes", array(t, "saved"), w,
                      themeDraft.value("saved").toString());
   connect(saved, &QComboBox::currentIndexChanged, this, [this, saved] {
     themeDraft["saved"] = saved->currentData().toString();
   });
-  selection->addWidget(saved);
-  selection->addWidget(toolButton("Open theme", "document-open", w, [this, saved, discard] {
+  auto savedRow = new QWidget(w);
+  auto savedLayout = new QHBoxLayout(savedRow);
+  savedLayout->setContentsMargins(0, 0, 0, 0);
+  savedLayout->addWidget(saved, 1);
+  savedLayout->addWidget(toolButton("Open theme", "document-open", w, [this, saved, discard] {
     if (discard())
       send({{"op", "theme_open"},
             {"id", saved->currentData().toString()},
             {"discard", true}});
   }));
-  selection->addWidget(
+  savedLayout->addWidget(
       toolButton("Reload", "view-refresh", w, [this] { send({{"op", "theme_reload"}}); }));
+  selection->addRow("Saved", savedRow);
   l->addLayout(selection);
   auto name = line("Theme name", str(project, "name"), w);
+  name->setMaximumWidth(name->fontMetrics().horizontalAdvance(QString(32, QLatin1Char('M'))) + 20);
   l->addWidget(name);
   connect(name, &QLineEdit::editingFinished, this, [this, name] {
     send({{"op", "theme_name"}, {"name", name->text()}});
   });
-  auto actions = new QHBoxLayout;
+  auto actions = new QToolBar(w);
+  actions->setMovable(false);
   for (auto pair : QList<QPair<QString, QString>>{
            {"Save", "theme_save"},
            {"Undo", "theme_undo"},
@@ -1401,9 +1521,11 @@ QWidget *Frontend::themePage(Scene *reuse) {
       b->setEnabled(t.value("can_redo").toBool());
     actions->addWidget(b);
   }
-  l->addLayout(actions);
+  l->addWidget(actions);
   auto scene =
       combo("Preview scene", array(t, "scenes"), w, str(project, "scene"));
+  scene->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+  scene->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
   connect(scene, &QComboBox::activated, this, [this, scene](int) {
     send({{"op", "theme_scene"}, {"id", scene->currentData().toString()}});
   });
@@ -1423,28 +1545,34 @@ QWidget *Frontend::themePage(Scene *reuse) {
     auto o = value.toObject();
     auto id = str(o, "id");
     auto row = new QWidget(roles);
-    auto r = new QHBoxLayout(row);
+    auto r = new QGridLayout(row);
+    r->setContentsMargins(0, 0, 0, 0);
     auto sw = new Swatch(
         color(str(o, "color")),
         str(o, "name") + (str(t, "selected") == id ? " (selected)" : ""), row);
-    r->addWidget(sw);
+    r->addWidget(sw, 0, 0);
     connect(sw, &QPushButton::clicked, this,
             [this, id] { send({{"op", "theme_select"}, {"role", id}}); });
     auto edit = new ColorLineEdit(str(o, "value"), row);
-    r->addWidget(edit);
+    edit->setMaximumWidth(edit->fontMetrics().horizontalAdvance(QString(12, QLatin1Char('M'))) + 20);
+    r->addWidget(edit, 0, 1);
     connect(edit, &QLineEdit::editingFinished, this, [this, id, edit] {
       send({{"op", "theme_assign"}, {"role", id}, {"color", edit->text()}});
     });
     r->addWidget(button("Default", row, [this, id] {
       send({{"op", "theme_default"}, {"role", id}});
-    }));
+    }), 0, 2);
     auto link = new QComboBox(row);
     link->setAccessibleName("Palette swatch link");
     link->setEditable(true);
     for (auto v : array(t, "palette_swatches"))
       link->addItem(str(v.toObject(), "name"));
     link->setEditText(str(o, "link"));
-    r->addWidget(link);
+    link->setMinimumContentsLength(12);
+    link->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    r->addWidget(new QLabel("Palette link", row), 1, 0);
+    r->addWidget(link, 1, 1, 1, 2);
+    r->setColumnStretch(3, 1);
     connect(link, &QComboBox::activated, this, [this, id, link](int) {
       send({{"op", "theme_link"}, {"role", id}, {"name", link->currentText()}});
     });
@@ -1467,23 +1595,23 @@ QWidget *Frontend::themePage(Scene *reuse) {
     gl->addWidget(text);
     l->addWidget(group);
   }
-  auto exportRow = new QHBoxLayout;
+  auto exportRow = new QGridLayout;
   auto dir =
       line("Export directory", themeDraft.value("directory").toString(), w);
   connect(dir, &QLineEdit::textChanged, this,
           [this](const QString &value) { themeDraft["directory"] = value; });
-  exportRow->addWidget(dir);
+  exportRow->addWidget(dir, 0, 0, 1, 2);
   exportRow->addWidget(button("Choose directory", w, [this, dir] {
     auto path =
         QFileDialog::getExistingDirectory(this, "Export theme", dir->text());
     if (!path.isEmpty())
       dir->setText(path);
-  }));
+  }), 0, 2);
   auto overwrite = new QCheckBox("Overwrite existing files", w);
   overwrite->setChecked(themeDraft.value("overwrite").toBool());
   connect(overwrite, &QCheckBox::toggled, this,
           [this](bool value) { themeDraft["overwrite"] = value; });
-  exportRow->addWidget(overwrite);
+  exportRow->addWidget(overwrite, 1, 0);
   exportRow->addWidget(button("Export", w, [this, dir, overwrite] {
     if (dir->text().trimmed().isEmpty()) {
       QMessageBox::warning(this, "Export theme", "Choose an export directory.");
@@ -1492,7 +1620,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
     send({{"op", "theme_export"},
           {"directory", dir->text()},
           {"overwrite", overwrite->isChecked()}});
-  }));
+  }), 1, 2);
   l->addLayout(exportRow);
   auto error = new QLabel(str(t, "error"), w);
   error->setWordWrap(true);
@@ -1508,7 +1636,9 @@ void Frontend::renderConfig() {
                            !state.value("busy").toBool());
     configRebind->setEnabled(!state.value("busy").toBool());
     configStatus->setText(message());
+    configStatus->setVisible(!configStatus->text().isEmpty());
     shortcutStatus->setText(str(state, "shortcut_status"));
+    shortcutStatus->setVisible(!shortcutStatus->text().isEmpty());
     return;
   }
   if (!configInitialized && state.value("config").isObject()) {
@@ -1519,8 +1649,10 @@ void Frontend::renderConfig() {
   auto l = new QVBoxLayout(w);
   auto f = new QFormLayout;
   f->setRowWrapPolicy(QFormLayout::WrapLongRows);
+  f->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
   auto limit =
       line("Stored history limit", str(configDraft, "history_limit"), w);
+  limit->setMaximumWidth(limit->fontMetrics().horizontalAdvance(QString(20, QLatin1Char('0'))) + 24);
   limit->setValidator(new QRegularExpressionValidator(
       QRegularExpression("[0-9]{1,20}"), limit));
   f->addRow("Stored history limit", limit);
@@ -1528,6 +1660,7 @@ void Frontend::renderConfig() {
           [this](const QString &v) { configDraft["history_limit"] = v; });
   auto number = [&](const char *key, const QString &label, int min, int max) {
     auto s = spin(label, configDraft.value(key).toInt(), min, max, w);
+    s->setMaximumWidth(s->sizeHint().width());
     f->addRow(label, s);
     connect(s, &QSpinBox::valueChanged, this,
             [this, key](int v) { configDraft[key] = v; });
@@ -1548,6 +1681,7 @@ void Frontend::renderConfig() {
   check("autostart", "Start automatically");
   auto format = new QComboBox(w);
   format->setAccessibleName("Clipboard format");
+  format->setSizeAdjustPolicy(QComboBox::AdjustToContents);
   for (auto value : {"hex", "hex-rgba", "rgb", "rgba", "hsl", "hsv", "cmyk"})
     format->addItem(QString(value).toUpper(), value);
   format->setCurrentIndex(
@@ -1558,6 +1692,7 @@ void Frontend::renderConfig() {
   f->addRow("Clipboard format", format);
   auto text = [&](const char *key, const QString &label) {
     auto e = line(label, str(configDraft, key), w);
+    e->setMaximumWidth(e->fontMetrics().horizontalAdvance("Ctrl+Shift+Meta+F12") + 24);
     f->addRow(label, e);
     connect(e, &QLineEdit::textChanged, this,
             [this, key](const QString &v) { configDraft[key] = v; });
@@ -1571,19 +1706,28 @@ void Frontend::renderConfig() {
   });
   configSave->setEnabled(state.value("load_error").isNull() &&
                          !state.value("busy").toBool());
+  configSave->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
   row->addWidget(configSave);
   configRebind =
       button("Rebind shortcuts", w, [this] { send({{"op", "rebind"}}); });
   configRebind->setEnabled(!state.value("busy").toBool());
+  configRebind->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
   row->addWidget(configRebind);
-  row->addWidget(button("Close", w, [this] { close(); }));
+  auto closeButton = button("Close", w, [this] { close(); });
+  closeButton->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+  row->addWidget(closeButton);
+  row->addStretch();
   l->addLayout(row);
   configStatus = new QLabel(message(), w);
   configStatus->setWordWrap(true);
+  configStatus->setTextFormat(Qt::PlainText);
+  configStatus->setVisible(!configStatus->text().isEmpty());
   configStatus->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
   l->addWidget(configStatus);
   shortcutStatus = new QLabel(str(state, "shortcut_status"), w);
   shortcutStatus->setWordWrap(true);
+  shortcutStatus->setTextFormat(Qt::PlainText);
+  shortcutStatus->setVisible(!shortcutStatus->text().isEmpty());
   shortcutStatus->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
   l->addWidget(shortcutStatus);
   l->addStretch();

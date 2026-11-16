@@ -1,5 +1,28 @@
 # Swatch Board current handoff
 
+## UI improvements continuation — 2026-11-16
+
+The generator now previews lock-aware generated colors without changing the
+palette or saving a generation. Fixed-harmony modes show draggable markers;
+dragging a marker rotates the base harmony, and Generate explicitly applies the
+result. A blank base follows the current mixer color. Mixer, Theme, and Settings
+have more compact inputs and wrapping/overflow behavior; the pinned theme scene
+can shrink. A tab-refresh issue that left a stale mixer color visible on Theme
+was corrected. Empty Settings status labels are hidden, while real errors remain
+visible as plain text.
+
+Offline locked workspace build and tests passed (one existing ignored test),
+strict Clippy and rustfmt passed. Isolated offscreen Board and Settings control
+smokes passed, including palette selection, a synthetic theme color drop, and
+pinned-color visibility. Small resize snapshots were inspected: Settings reached 540×360, but Board
+Theme remained 540×434 due to its minimum size. Scrolling is still necessary,
+and those snapshots do not establish physical desktop,
+keyboard-only, screen-reader, or compositor behavior. A standalone offscreen
+wheel input smoke checked keyboard and marker drag callbacks. The reported
+Settings footer error remains unidentified; an isolated session without a tray
+shows a genuine D-Bus service-unavailable status, which is not evidence that it
+matches the user's message. See [the ToDos](ui-improvements-todo.md).
+
 ## UI improvements in progress — 2026-11-16
 
 Work began from freshly fetched `origin/main` (0f20cd7). The mixer has a pinned
