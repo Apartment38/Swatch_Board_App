@@ -15,13 +15,14 @@ the source pin.
 
 The recipe's native build requirements are Rust/Cargo, a C++ compiler, CMake,
 extra-cmake-modules, Qt 6 and matching KWin development headers, Git, pkgconf,
-Vulkan headers, Wayland and libxkbcommon development metadata. Runtime dependencies include glibc,
-GCC runtime, KWin, libglvnd, and hicolor-icon-theme. The latter is required for
-the installed icon hierarchy. `options=('!lto')` is deliberate: Arch's GCC LTO
-C objects for bundled SQLite cannot be consumed by Rust's LLVM linker.
-KDE's XDG portal provides the tray's optional GlobalShortcuts integration;
-`kscreen` is only used by the documented output-selection fallback.
-The picker uses KWin directly and does not require the ScreenCast portal.
+Vulkan headers, Wayland and libxkbcommon development metadata. Cargo's shared
+`swatch-board-qt` crate additionally compiles C++17 Qt Widgets sources using
+`pkg-config Qt6Widgets` and `ar`. Runtime dependencies include glibc, GCC runtime,
+KWin, Qt 6 Base/Wayland, Plasma Qt integration, Breeze, and hicolor-icon-theme.
+No Qt shared libraries, themes, or fonts are bundled by the installer.
+`options=('!lto')` is deliberate: Arch's GCC LTO C objects for bundled SQLite
+cannot be consumed by Rust's LLVM linker. KDE's XDG portal provides optional
+GlobalShortcuts integration; the picker uses KWin directly, not ScreenCast.
 
 Historically, a fresh Arch Docker container built the repaired payload, ran **180 tests**
 (one intentionally ignored) and strict Clippy, produced `0.1.0-2`, installed it
@@ -51,20 +52,18 @@ makechrootpkg -c -r "$CHROOT"
 namcap PKGBUILD swatch-board-*.pkg.tar.zst
 ```
 
-Review dependency licenses before every release. `THIRD_PARTY_NOTICES.txt` is a
-conservative collection for all 406 registry packages in the current lockfile,
-including build-time and non-Linux dependencies. It contains matching license,
-copyright and notice files from checksum-verified crate archives, the egui
-bundled font text files, and where available license files retrieved from the
-exact upstream Git commit recorded in the crate. The installer includes this
-collection alongside the project license. Its presence is not a completed
-license audit: filename-based collection can miss other notices or obligations.
-The collection explicitly marks eight packages for which no notice file was
-found. The default x86_64 and aarch64 Linux production and build dependency
-trees do not select any of them; `hexf-parse` is an optional dependency in the
-broader metadata inventory and declares CC0-1.0. See
-`docs/third-party-license-review.md` for the scope and evidence. Recollect and
-review the notices whenever the lockfile, target or features change.
+Review dependency licenses before every release. `THIRD_PARTY_NOTICES.txt`
+contains all 161 registry packages in the Qt cutover lockfile, including
+build-time and non-Linux dependencies. Obsolete renderer/font notice sections
+were removed; retained archive checksums and notices were preserved unchanged.
+It contains license/copyright files from checksum-verified crate archives and,
+where available, the exact upstream Git commit recorded in the crate.
+The installer includes this collection alongside the project license.
+This is not a completed license audit: filename-based collection can miss
+other notices or obligations. The retained `r-efi` record is marked unavailable;
+reassess target/feature selection before redistribution. Qt/KDE native library
+licenses are separate from Cargo's inventory. See
+`docs/third-party-license-review.md`; recollect/review whenever dependencies change.
 The `0.1.0-4` source checkpoint includes the custom effect and its GPL license.
 The source has not been pushed and this package revision has not been built or
 release-qualified.

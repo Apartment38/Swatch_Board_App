@@ -2,13 +2,13 @@
 
 Build beautiful palettes with swatches.
 
-Swatch Board is a KDE Plasma Wayland color utility with a Rust frontend and a
-GPL-2.0-or-later C++ KWin effect. The tray, history, settings, Board shell,
-Color Mixer, and Palette Editor have passed target-desktop acceptance. The
-replacement picker still needs desktop acceptance.
-The Theme Generator's runtime-authored external-plugin workflow has passed native
-KDE Wayland acceptance; this does not establish physical testing of every bundled
-target plugin. See the [current handoff](docs/current-handoff.md).
+Swatch Board is a KDE Plasma Wayland color utility with native Qt 6 Widgets
+interfaces, Rust application services, and a GPL-2.0-or-later C++ KWin effect.
+The Board, Settings, and history popup use the desktop Qt platform theme: KDE
+palette, fonts, widget style, icons, and scaling rather than a custom UI theme.
+Install Plasma's Qt platform integration and Breeze alongside Qt's Wayland plugin.
+Earlier frontend acceptance does not qualify this rewrite; see the
+[current handoff](docs/current-handoff.md) for verification and remaining gates.
 
 ## Build and test
 
@@ -22,9 +22,11 @@ cmake --build target/kwin
 ```
 
 Offline commands require cached Rust dependencies. A fresh build needs network
-access, a C++ compiler, CMake, extra-cmake-modules, Qt 6 and matching KWin
-development headers/libraries, Vulkan headers, and Wayland development packages. KWin's effect
-ABI depends on the installed KWin version: rebuild the plugin after KWin changes.
+access, a C++17 compiler, `ar`, `pkg-config`, Qt 6 Widgets development metadata,
+CMake, extra-cmake-modules, matching KWin development headers/libraries, Vulkan
+headers, and Wayland development packages. Cargo builds the Qt frontend through
+the shared `rust/qt` crate; no separate UI build or generated bindings are needed.
+KWin's effect ABI depends on the installed KWin version: rebuild after KWin changes.
 
 ## Run the tray
 
@@ -46,10 +48,9 @@ click outside to close without copying. **Configure** opens a separate settings
 window; closing it exits that process. **Open Board** launches the separate Board
 window. See the [D-Bus API](docs/ipc.md).
 
-When the pointer's output cannot be determined, the popup queries KDE's
-`kscreen-doctor` for the configured primary output. That executable must be
-installed for this fallback; an unavailable or ambiguous configuration produces
-an error instead of silently choosing another display.
+The history popup uses Qt's native popup dismissal and keyboard navigation.
+It opens on Qt's pointer screen, falling back to Qt's primary screen when the
+platform does not expose the pointer location.
 
 To run the picker directly from a KDE Plasma Wayland desktop session:
 
@@ -138,11 +139,10 @@ color or a mix source. Edit HEX, RGB, RGBA, HSL, or HSV values and apply them;
 editing a format without alpha preserves the current alpha. CMYK is approximate
 and unprofiled. Copy uses the configured clipboard format.
 
-Click or drag the spectrum to set hue and saturation; the adjacent vertical bar
-sets HSV brightness. The full spectrum stays above the scrolling details.
-Edit individual HSV (degrees/percent), RGB, and alpha (0–255) values by dragging
-their numbers or double-clicking to type. These controls update the current
-color immediately and participate in undo/redo.
+Click or drag the saturation/value spectrum, or edit hue with the native numeric
+control. HSV values use degrees/percent; RGB and alpha use 0–255. Format fields
+have explicit Apply buttons and support Enter. Color edits participate in
+undo/redo; the channel controls use the desktop's native spin boxes.
 
 Mix two or more sources with normalized weights in encoded sRGB or OKLCH.
 OKLCH averages hue along the shortest arc relative to the first chromatic source,
@@ -208,11 +208,12 @@ and atomically renamed individually; an error in a multi-file export can leave
 earlier files written. Export never applies a theme to the desktop.
 
 **Pick Color** requires the tray; **Settings** also works without it. When
-`hide_board_while_picking` is enabled, the Board closes its native window before
-requesting a pick and recreates it after selection, cancellation, or failure.
-It does not activate a window during the pick. Reopening preserves the selected
-tab and saved window geometry. Normal close exits the Board process; tray Quit
-does not close the Board. A second launch activates the existing Board instance.
+`hide_board_while_picking` is enabled, the Board hides and synchronizes its Qt
+window before requesting a pick, then restores it after selection, cancellation,
+or failure. The model stays alive while hidden. Tab, geometry, and splitter
+positions use Qt settings; existing library/config files are unchanged.
+Normal close exits Board; tray Quit does not close it. A second launch requests
+activation of the existing Board instance, subject to compositor focus policy.
 
 ## Project references
 

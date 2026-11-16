@@ -6,7 +6,8 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-eframe = { version = "=0.31.1", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+swatch-board-qt = { path = "../qt" }
+serde_json = "1"
 swatch-board-config-core = { path = "../config-core" }
 swatch-board-ipc = { path = "../ipc" }
 zbus.workspace = true

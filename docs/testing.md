@@ -5,6 +5,40 @@ Plasma/KWin and portal versions, GPU driver, output model/scale/transform, and
 whether the result came from an automated test, private session, or physical
 user observation. A headless result never substitutes for a physical GUI result.
 
+## Qt frontend cutover
+
+The Board, Settings, and history interfaces now use Qt 6 Widgets. All physical
+frontend observations in the table below describe the replaced implementation;
+they are not acceptance of the Qt rewrite. Re-run keyboard-only traversal,
+screen-reader inspection, live KDE palette/font changes, fractional/mixed scaling,
+history popup focus/outside dismissal, Board activation and hide/pick restoration
+on the target desktop. Do not restart live KWin for verification.
+
+The Rust model tests exercise the same parsing, mixing, palette locks and
+storage, theme links/drafts and worker-backed export used by the Qt controls.
+Build all normal binaries before model tests that launch the sibling theme
+worker. The Qt C++ sources are built as part of `cargo build --workspace`.
+
+To exercise real Qt controls and collect client-area images, use a fresh,
+isolated directory (the Board scenario writes a palette and theme draft):
+
+```sh
+root=$(mktemp -d)
+mkdir -p "$root"/{config,data,state,images}
+dbus-run-session -- env \
+  XDG_CONFIG_HOME="$root/config" XDG_DATA_HOME="$root/data" \
+  XDG_STATE_HOME="$root/state" SWATCH_BOARD_QT_SMOKE_DIR="$root/images" \
+  ./target/debug/swatch-board
+```
+
+Repeat with a fresh root and `swatch-board-config` for invalid-save protection.
+The opt-in hook clicks native controls, asserts resulting model values, writes
+`*-result.json` and `QWidget::grab` PNGs, then exits nonzero on failure. These
+client snapshots do not verify compositor decorations, focus policy, popup
+grabs, screen-reader exposure, or physical mouse/keyboard operation.
+
+## Historical acceptance matrix
+
 | Area | Automated/headless evidence | KDE Plasma Wayland evidence | Remaining gate |
 | --- | --- | --- | --- |
 | Build, data, and packaging | Repaired source: 180 tests (one ignored), strict Clippy, rustfmt, eight packaging checks; fresh Arch container makepkg 0.1.0-2 build/install, full data inventory and four installed-helper golden renders passed | Host-built release from same repaired source passed assigned Board/Settings round; container package bytes not GUI-tested | Official devtools clean-chroot and reproducibility qualification; redistribution notice audit |

@@ -1,14 +1,10 @@
 use std::{
     path::PathBuf,
     process::Stdio,
-    sync::{
-        Arc, Mutex,
-        mpsc::{self, Receiver, Sender, TryRecvError},
-    },
+    sync::mpsc::{self, Receiver, Sender, TryRecvError},
     time::Duration,
 };
 
-use eframe::egui;
 use futures_util::StreamExt;
 use swatch_board_config_core::Config;
 use swatch_board_ipc::{SERVICE, SwatchBoardProxy};
@@ -20,7 +16,6 @@ const BOARD_SERVICE: &str = "org.apartment38.SwatchBoard.Board1";
 const BOARD_PATH: &str = "/org/apartment38/SwatchBoard/Board1";
 
 pub enum Command {
-    RepaintContext(egui::Context),
     Pick,
     Configure,
 }
@@ -40,17 +35,11 @@ pub enum Event {
 #[derive(Clone)]
 struct Events {
     sender: Sender<Event>,
-    ctx: Arc<Mutex<egui::Context>>,
 }
 
 impl Events {
     fn send(&self, event: Event) {
-        if self.sender.send(event).is_ok() {
-            self.ctx
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .request_repaint();
-        }
+        let _ = self.sender.send(event);
     }
 }
 
@@ -73,7 +62,7 @@ enum PickState {
     Active,
 }
 
-pub fn start(ctx: egui::Context) -> Result<(Sender<Command>, Receiver<Event>), String> {
+pub fn start() -> Result<(Sender<Command>, Receiver<Event>), String> {
     let (commands, command_rx) = mpsc::channel();
     let (event_tx, events) = mpsc::channel();
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
@@ -90,14 +79,7 @@ pub fn start(ctx: egui::Context) -> Result<(Sender<Command>, Receiver<Event>), S
                     return;
                 }
             };
-            runtime.block_on(run(
-                command_rx,
-                Events {
-                    sender: event_tx,
-                    ctx: Arc::new(Mutex::new(ctx)),
-                },
-                ready_tx,
-            ));
+            runtime.block_on(run(command_rx, Events { sender: event_tx }, ready_tx));
         })
         .map_err(|error| format!("Cannot start Board worker: {error}"))?;
     ready_rx
@@ -260,10 +242,6 @@ async fn run(
             _ = tick.tick() => {
                 loop {
                     match commands.try_recv() {
-                        Ok(Command::RepaintContext(ctx)) => {
-                            *events.ctx.lock().unwrap_or_else(|e| e.into_inner()) = ctx.clone();
-                            ctx.request_repaint();
-                        }
                         Ok(Command::Configure) => {
                             match tokio::process::Command::new(config_program()).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).kill_on_drop(true).spawn() {
                                 Ok(child) => children.push(child),

@@ -1,25 +1,10 @@
-use eframe::egui;
+use serde_json::{Value, json};
 use std::{
     sync::mpsc::{self, Receiver, Sender},
     time::{Duration, Instant},
 };
 use swatch_board_config_core::Config;
 use swatch_board_ipc::SwatchBoardProxyBlocking;
-
-fn main() -> eframe::Result {
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title("Swatch Board Settings")
-            .with_inner_size([560.0, 700.0])
-            .with_min_inner_size([400.0, 400.0]),
-        ..Default::default()
-    };
-    eframe::run_native(
-        "Swatch Board Settings",
-        options,
-        Box::new(|cc| Ok(Box::new(Settings::new(cc)))),
-    )
-}
 
 enum Reply {
     Status(Result<String, String>),
@@ -48,7 +33,7 @@ fn call(
 }
 
 impl Settings {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    fn new() -> Self {
         let (config, load_error) = match Config::load() {
             Ok(config) => (config, None),
             Err(error) => (Config::default(), Some(error.to_string())),
@@ -67,40 +52,20 @@ impl Settings {
         }
     }
 
-    fn save(&mut self, ctx: &egui::Context) {
-        if let Err(error) = self.config.save() {
-            self.message = format!(
-                "Could not complete save: {error}. Settings have not been reloaded; check the file and autostart entry before retrying."
-            );
-            return;
-        }
-        self.message = "Settings saved; requesting tray reload…".into();
-        self.busy = true;
-        let sender = self.tx.clone();
-        let ctx = ctx.clone();
-        std::thread::spawn(move || {
-            let result = call(|proxy| proxy.reload_config());
-            let _ = sender.send(Reply::Applied(result));
-            ctx.request_repaint();
-        });
+    fn snapshot(&self) -> Value {
+        let mut config = serde_json::to_value(&self.config).expect("Config is serializable");
+        config["history_limit"] = json!(self.config.history_limit.to_string());
+        json!({
+            "config": config, "load_error": self.load_error,
+            "message": self.message, "shortcut_status": self.shortcut_status,
+            "busy": self.busy,
+        })
     }
 
-    fn rebind(&mut self, ctx: &egui::Context) {
-        self.busy = true;
-        self.message = "Requesting shortcut reassignment; portal approval may be required…".into();
-        let sender = self.tx.clone();
-        let ctx = ctx.clone();
-        std::thread::spawn(move || {
-            let result = call(|proxy| proxy.rebind_shortcuts());
-            let _ = sender.send(Reply::Rebound(result));
-            ctx.request_repaint();
-        });
-    }
-}
-
-impl eframe::App for Settings {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn request(&mut self, request: Value) -> Value {
+        let mut changed = false;
         while let Ok(reply) = self.rx.try_recv() {
+            changed = true;
             match reply {
                 Reply::Status(result) => {
                     self.status_in_flight = false;
@@ -110,17 +75,12 @@ impl eframe::App for Settings {
                 Reply::Applied(result) => {
                     self.busy = false;
                     self.next_status = Instant::now();
-                    match result {
-                        Ok(status) => {
-                            self.message =
-                                format!("Settings saved and tray reload requested: {status}")
-                        }
-                        Err(error) => {
-                            self.message = format!(
-                                "Settings were saved, but applying them failed: {error}. The tray may still use previous settings; retry Save."
-                            )
-                        }
-                    }
+                    self.message = match result {
+                        Ok(status) => format!("Settings saved and tray reload requested: {status}"),
+                        Err(error) => format!(
+                            "Settings were saved, but applying them failed: {error}. The tray may still use previous settings; retry Save."
+                        ),
+                    };
                 }
                 Reply::Rebound(result) => {
                     self.busy = false;
@@ -135,70 +95,64 @@ impl eframe::App for Settings {
             self.status_in_flight = true;
             self.next_status = Instant::now() + Duration::from_secs(3);
             let sender = self.tx.clone();
-            let repaint = ctx.clone();
             std::thread::spawn(move || {
                 let _ = sender.send(Reply::Status(call(|proxy| proxy.shortcut_status())));
-                repaint.request_repaint();
             });
         }
-        ctx.request_repaint_after(Duration::from_secs(3));
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Swatch Board Settings");
-            if let Some(error) = &self.load_error {
-                ui.colored_label(egui::Color32::RED, format!("Cannot load settings: {error}. Fix the file and reopen settings; saving is disabled to protect it."));
-            }
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.add_enabled_ui(self.load_error.is_none() && !self.busy, |ui| {
-                    ui.heading("History");
-                    number(ui, "Retained colors", &mut self.config.history_limit, 1..=usize::MAX);
-                    number(ui, "Displayed colors", &mut self.config.history_display_limit, 1..=10_000);
-                    number(ui, "Columns", &mut self.config.history_columns, 1..=12);
-                    number(ui, "Rows", &mut self.config.history_rows, 1..=12);
-                    ui.separator();
-                    ui.heading("Picker");
-                    ui.horizontal(|ui| {
-                        ui.label("Zoom");
-                        ui.add(egui::DragValue::new(&mut self.config.picker_zoom).range(1..=32).suffix("×"));
-                    });
-                    ui.separator();
-                    ui.heading("Clipboard");
-                    ui.checkbox(&mut self.config.auto_copy, "Automatically copy picked colors");
-                    egui::ComboBox::from_label("Format").selected_text(&self.config.clipboard_format).show_ui(ui, |ui| {
-                        for format in ["hex", "hex-rgba", "rgb", "rgba", "hsl", "hsv", "cmyk"] {
-                            ui.selectable_value(&mut self.config.clipboard_format, format.to_owned(), format);
+        match request["op"].as_str().unwrap_or("") {
+            "poll" if !changed => return Value::Null,
+            "poll" | "init" => {}
+            "save" if self.load_error.is_none() && !self.busy => {
+                let mut value = request["config"].clone();
+                if let Some(text) = value["history_limit"].as_str() {
+                    match text.parse::<usize>() {
+                        Ok(limit) => value["history_limit"] = json!(limit),
+                        Err(_) => {
+                            self.message = "Invalid retained history limit.".into();
+                            return self.snapshot();
                         }
-                    });
-                    ui.separator();
-                    ui.heading("Shortcuts");
-                    ui.horizontal(|ui| { ui.label("Pick color"); ui.text_edit_singleline(&mut self.config.pick_shortcut); });
-                    ui.horizontal(|ui| { ui.label("Show history"); ui.text_edit_singleline(&mut self.config.history_shortcut); });
-                    ui.label("Use modifiers and a letter, digit, or F1–F24, e.g. Meta+Shift+C.");
-                    ui.label("On KDE, Save requests assignment of both shortcuts after desktop approval. Conflicts or unassigned actions require changes in KDE Shortcuts; check the status below.");
-                    ui.separator();
-                    ui.checkbox(&mut self.config.hide_board_while_picking, "Hide Board while picking");
-                    ui.checkbox(&mut self.config.autostart, "Start tray automatically when signing in");
+                    }
+                }
+                match serde_json::from_value::<Config>(value) {
+                    Ok(config) => {
+                        if let Err(error) = config.save() {
+                            self.message = format!(
+                                "Could not complete save: {error}. Settings have not been reloaded; check the file and autostart entry before retrying."
+                            );
+                        } else {
+                            self.config = config;
+                            self.busy = true;
+                            self.message = "Settings saved; requesting tray reload…".into();
+                            let sender = self.tx.clone();
+                            std::thread::spawn(move || {
+                                let _ = sender.send(Reply::Applied(call(|p| p.reload_config())));
+                            });
+                        }
+                    }
+                    Err(error) => self.message = format!("Invalid settings: {error}"),
+                }
+            }
+            "rebind" if !self.busy => {
+                self.busy = true;
+                self.message = "Requesting shortcut reassignment…".into();
+                let sender = self.tx.clone();
+                std::thread::spawn(move || {
+                    let _ = sender.send(Reply::Rebound(call(|p| p.rebind_shortcuts())));
                 });
-                ui.separator();
-                ui.label(format!("Shortcut status: {}", self.shortcut_status));
-                if ui.add_enabled(!self.busy, egui::Button::new("Retry shortcut assignment")).clicked() { self.rebind(ctx); }
-                if !self.message.is_empty() { ui.label(&self.message); }
-                ui.horizontal(|ui| {
-                    if ui.add_enabled(self.load_error.is_none() && !self.busy, egui::Button::new("Save")).clicked() { self.save(ctx); }
-                    if ui.button("Cancel / Close").clicked() { ctx.send_viewport_cmd(egui::ViewportCommand::Close); }
-                });
-            });
-        });
+            }
+            "save" | "rebind" => {
+                self.message =
+                    "Settings are busy or could not be loaded; saving is disabled.".into();
+            }
+            _ => self.message = "Unknown settings operation.".into(),
+        };
+        self.snapshot()
     }
 }
 
-fn number<T: egui::emath::Numeric>(
-    ui: &mut egui::Ui,
-    label: &str,
-    value: &mut T,
-    range: std::ops::RangeInclusive<T>,
-) {
-    ui.horizontal(|ui| {
-        ui.label(label);
-        ui.add(egui::DragValue::new(value).range(range));
-    });
+fn main() {
+    let mut settings = Settings::new();
+    std::process::exit(swatch_board_qt::run("config", move |request| {
+        settings.request(request)
+    }));
 }

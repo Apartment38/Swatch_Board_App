@@ -1,5 +1,45 @@
 # Swatch Board current handoff
 
+## Native Qt frontend cutover
+
+Board, Settings, and the history popup now use Qt 6 Widgets through the shared
+`rust/qt` crate. Rust retains the color/generation models, SQLite/config formats,
+plugin discovery/render worker/export, tray/D-Bus services, and KWin picker.
+The egui frontend, custom history renderer, their dependencies and obsolete
+renderer tests were removed. Qt uses its system platform theme rather than
+application stylesheets or bundled fonts. Arch dependencies now explicitly
+include Qt Base/Wayland, Plasma integration, and Breeze.
+
+The Board retains its three tabs, collapsible history sidebar, bottom shared
+palette, drag/drop, lock-aware editing/reordering, saved palettes/generations,
+named theme links, project drafts, preview navigation and export. Geometry and
+splitters use QSettings. Settings keeps load-error protection and asynchronous
+tray/shortcut calls. The history popup uses native Qt focus/dismissal rather
+than custom fullscreen Wayland shields.
+
+Verification: workspace debug build; four targeted model tests; strict Clippy
+for the four changed frontend packages; twelve packaging tests passed. Native
+Qt 6.12 control-driven smoke verified HEX Apply, RGB alpha preservation,
+Undo/Redo, palette lock refusal/unlock/edit/save/reopen, and invalid Settings
+save leaving disk unchanged. Mixer, palette, theme and Settings client snapshots
+were inspected under ignored `target/qt-cutover-final/`; they are
+`QWidget::grab` images, not compositor/desktop captures. The smoke uses isolated
+XDG directories and invokes real application models and native controls.
+
+A separate native history smoke loaded four synthetic captures from the real
+tray on an isolated session bus with a minimal StatusNotifierWatcher fixture.
+The four correctly colored/labeled tiles were inspected; no color was copied.
+The fixture bus had no portal services, so no shortcut permissions were
+requested. Throwaway fixture scripts were removed.
+
+These checks are not physical frontend acceptance. The desktop capture backend
+reported unavailable Wayland capture; its AT-SPI listing did not expose the
+launched Settings window. Keyboard-only/screen-reader acceptance, runtime KDE
+theme/font changes, mixed output scales, popup grabs/outside dismissal, Board
+activation and hide/pick restoration still require target-desktop validation.
+Earlier frontend acceptance below applies to the replaced implementation.
+No live KWin restart, system install, shortcut authorization, or push occurred.
+
 ## KWin picker cutover
 
 The picker now targets a required custom KWin effect: crosshair with a square

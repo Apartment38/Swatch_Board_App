@@ -1,5 +1,15 @@
 # Third-party licensing review
 
+## Qt frontend cutover
+
+The application now dynamically links system Qt 6 Core, Gui, and Widgets.
+Qt, its Wayland platform plugin, KDE platform integration, and Breeze are system
+dependencies, not embedded payloads. The frontend no longer embeds egui's fonts
+or renderer. The older inventory and binary linkage measurements below are
+historical. Qt's distribution licensing (including LGPL/GPL/commercial options
+and relinking/source obligations where applicable) must be reviewed for each
+redistributed artifact; the Cargo collection is not a Qt license inventory.
+
 The detailed review below applies to the pre-KWin-picker lockfile with SHA-256
 `210d1cc0deea8a0c78d7c74b05d69ba358e34b7ea81e034c9c5e5d0268b0e035`.
 The KWin cutover removed 25 registry packages and preserved the remaining 406
