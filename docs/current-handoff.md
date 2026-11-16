@@ -1,5 +1,20 @@
 # Swatch Board current handoff
 
+## Containerized test automation — 2026-11-16
+
+Run `testing/container-tests.sh` for an isolated Docker build and the locked
+workspace build and tests, strict Clippy, rustfmt, packaging tests, and Board
+and Settings Qt offscreen control smokes. Set `SWATCH_TEST_ARTIFACTS` to retain
+JSON results and client screenshots. See [testing.md](testing.md) for setup,
+network requirements, and coverage limits.
+
+The full command passed in this environment with artifact export: workspace
+tests had one existing ignored test; packaging had one Arch-only skipped test;
+both UI result files reported no failures. D-Bus logged an fd-limit warning
+and Qt used its offscreen platform. These checks do not replace physical Plasma,
+Wayland, tray, or accessibility acceptance. The image's temporary workspace and
+XDG directories are separate from host data.
+
 ## UI improvements continuation — 2026-11-16
 
 The generator now previews lock-aware generated colors without changing the
