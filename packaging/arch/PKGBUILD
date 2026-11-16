@@ -1,19 +1,18 @@
 # Maintainer: Swatch Board contributors
 pkgname=swatch-board
 pkgver=0.1.0
-pkgrel=4
+pkgrel=5
 pkgdesc='KDE Plasma Wayland color picker, palette editor, and theme exporter'
 arch=('x86_64' 'aarch64')
 url='https://github.com/Apartment38/Swatch_Board_App'
 license=('MIT' 'GPL-2.0-or-later')
 # GCC bytecode from bundled SQLite cannot be linked by Rust's LLVM linker.
 options=('!lto')
-depends=('gcc-libs' 'glibc' 'hicolor-icon-theme' 'kwin' 'libglvnd')
+depends=('gcc-libs' 'glibc' 'hicolor-icon-theme' 'kwin' 'qt6-base' 'qt6-wayland' 'plasma-integration' 'breeze')
 makedepends=('cargo' 'cmake' 'extra-cmake-modules' 'git' 'libxkbcommon' 'pkgconf' 'rust' 'vulkan-headers' 'wayland')
-optdepends=('xdg-desktop-portal-kde: global shortcut portal backend'
-            'kscreen: primary-output fallback when the pointer output is unavailable')
+optdepends=('xdg-desktop-portal-kde: global shortcut portal backend')
 # Rebuild the native effect against the distribution's matching KWin headers.
-_commit=bd3b66726bf78047cf0491ae1d62f16386f36c93
+_commit=5419ab023f1eba73ce9aa8da57f4e679546ae11c
 source=("swatch-board::git+https://github.com/Apartment38/Swatch_Board_App.git#commit=${_commit}")
 sha256sums=('SKIP')
 

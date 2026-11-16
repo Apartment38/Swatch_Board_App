@@ -25,7 +25,8 @@ class ArchRecipeTests(unittest.TestCase):
             capture_output=True, text=True, check=True,
         )
         dependencies = set(result.stdout.splitlines())
-        self.assertTrue({"hicolor-icon-theme", "kwin"} <= dependencies, dependencies)
+        self.assertTrue({"hicolor-icon-theme", "kwin", "qt6-base", "qt6-wayland",
+                         "plasma-integration", "breeze"} <= dependencies, dependencies)
         self.assertNotIn("pipewire", dependencies)
 
     def test_cross_language_objects_do_not_use_gcc_lto(self):
@@ -43,7 +44,7 @@ class ArchRecipeTests(unittest.TestCase):
                                 capture_output=True, text=True, check=True)
         self.assertEqual(result.stdout, (directory / ".SRCINFO").read_text())
 
-    def test_pinned_source_contains_native_effect_payload(self):
+    def test_pinned_source_contains_native_frontend_and_effect_payload(self):
         result = subprocess.run(
             ["bash", "-c", 'source "$1"; printf "%s" "$_commit"',
              "bash", str(ROOT / "packaging/arch/PKGBUILD")],
@@ -52,7 +53,9 @@ class ArchRecipeTests(unittest.TestCase):
         commit = result.stdout
         self.assertRegex(commit, r"^[0-9a-f]{40}$")
         for path in ("kwin/CMakeLists.txt", "kwin/picker.cpp",
-                     "kwin/swatchboardpicker.json", "kwin/LICENSE", "packaging/install.sh"):
+                     "kwin/swatchboardpicker.json", "kwin/LICENSE", "packaging/install.sh",
+                     "rust/qt/Cargo.toml", "rust/qt/build.rs",
+                     "rust/qt/src/lib.rs", "rust/qt/src/frontend.cpp"):
             subprocess.run(["git", "cat-file", "-e", f"{commit}:{path}"], cwd=ROOT, check=True)
 
 

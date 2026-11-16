@@ -2,8 +2,8 @@
 
 ## Arch Linux first
 
-`packaging/arch/PKGBUILD` is the initial distro recipe. The `0.1.0-4` recipe pins
-the local custom-effect source checkpoint `bd3b66726bf78047cf0491ae1d62f16386f36c93`.
+`packaging/arch/PKGBUILD` is the initial distro recipe. The `0.1.0-5` recipe pins
+the native Qt source checkpoint `5419ab023f1eba73ce9aa8da57f4e679546ae11c`.
 The recipe fetches Rust dependencies according to `Cargo.lock`;
 the build system supplies the compiler and platform libraries. This is a locked
 source build, not a claim of bit-for-bit reproducibility.
@@ -64,7 +64,7 @@ other notices or obligations. The retained `r-efi` record is marked unavailable;
 reassess target/feature selection before redistribution. Qt/KDE native library
 licenses are separate from Cargo's inventory. See
 `docs/third-party-license-review.md`; recollect/review whenever dependencies change.
-The `0.1.0-4` source checkpoint includes the custom effect and its GPL license.
+The `0.1.0-5` source checkpoint includes both the Qt frontend and KWin effect.
 The source has not been pushed and this package revision has not been built or
 release-qualified.
 
