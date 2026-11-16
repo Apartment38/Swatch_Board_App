@@ -14,6 +14,13 @@
   running and that the tray has access to the graphical session's D-Bus.
   Authorization dialogs are manual. Do not restart KWin or change desktop
   grants from a script to work around denial.
+- **Host app registration reports an unknown application:** check that
+  `org.apartment38.SwatchBoard.Tray.desktop` is installed in an XDG applications
+  directory visible to the portal's graphical session. The package installs it;
+  [development setup](../README.md#run-the-tray) explains how to add it for an
+  uninstalled build without overwriting an existing user entry. Restart the
+  tray after correcting the entry. Other portal errors, including authorization
+  denials, can have different causes; inspect the original error as well.
 - **Global shortcuts show unavailable or revoked:** open KDE System Settings'
   Shortcuts page, approve/assign the existing Swatch Board actions, then use
   Settings status and retry. Saved preferences are suggestions until KDE has

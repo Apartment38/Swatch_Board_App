@@ -1,5 +1,25 @@
 # Swatch Board current handoff
 
+## Settings portal registration diagnosis — 2026-11-16
+
+The user-supplied transcript reports an earlier interpretation that the desktop
+portal could not find the tray application ID; the screenshot and literal error
+are not included. The tray registers `org.apartment38.SwatchBoard.Tray`, and
+its installer supplies the matching desktop entry. The documented uninstalled
+development workflow had omitted that entry. Registry failures now preserve the
+original portal error and explain how to check the desktop entry; README and
+troubleshooting describe the development setup and session visibility. Explicit
+permission denials keep their existing no-automatic-retry behavior.
+
+Verification: all nine tray tests passed, including registration error detail
+and denial handling; strict tray Clippy and workspace formatting passed. The
+12 packaging tests passed with the existing Arch-only skip; the installer test
+checks the installed tray entry and executable path. An isolated temporary XDG
+check verified that the documented entry step creates a missing entry and
+preserves an existing one. No user desktop entry was installed and no live KDE
+portal or shortcut permission was changed. Confirm the literal error and test
+the target session before marking the original report resolved.
+
 ## Responsive layout and automated verification — 2026-11-16
 
 The Board now reaches 540×360 in the Qt control smoke while keeping its pinned

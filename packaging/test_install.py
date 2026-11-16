@@ -55,6 +55,8 @@ class InstallerTests(unittest.TestCase):
         entries = list((prefix / "share/applications").glob("*.desktop"))
         self.assertEqual(len(entries), 5)
         self.assertFalse(any("theme-worker" in p.read_text() for p in entries))
+        tray = prefix / "share/applications/org.apartment38.SwatchBoard.Tray.desktop"
+        self.assertIn('Exec="/usr/local/bin/swatch-board-tray"', tray.read_text())
         metainfo = prefix / "share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml"
         self.assertTrue(metainfo.is_file())
         self.assertIn("<id>org.apartment38.SwatchBoard.Board</id>", metainfo.read_text())
