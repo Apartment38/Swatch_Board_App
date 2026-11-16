@@ -1,0 +1,62 @@
+{
+  "requested_output": [
+    960,
+    640
+  ],
+  "trace": [
+    {
+      "screenshot": "initial"
+    },
+    {
+      "click": "Add current color",
+      "x": 190,
+      "y": 542
+    },
+    {
+      "screenshot": "after-add"
+    },
+    {
+      "click": "Lock selected",
+      "x": 166,
+      "y": 562
+    },
+    {
+      "screenshot": "after-lock"
+    },
+    {
+      "click": "Delete locked",
+      "x": 250,
+      "y": 562
+    },
+    {
+      "screenshot": "after-refusal"
+    },
+    {
+      "click": "Palette Editor tab",
+      "x": 120,
+      "y": 70
+    },
+    {
+      "screenshot": "after-tab"
+    }
+  ],
+  "cleanup": [
+    [
+      "bus",
+      0
+    ],
+    [
+      "kwin",
+      15
+    ],
+    [
+      "input-holder",
+      -15
+    ],
+    [
+      "board",
+      -15
+    ]
+  ],
+  "client_geometry": "unverified; see board Wayland log"
+}

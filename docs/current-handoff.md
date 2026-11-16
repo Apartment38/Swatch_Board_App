@@ -1,5 +1,94 @@
 # Swatch Board current handoff
 
+## Native Qt frontend cutover
+
+Board, Settings, and the history popup now use Qt 6 Widgets through the shared
+`rust/qt` crate. Rust retains the color/generation models, SQLite/config formats,
+plugin discovery/render worker/export, tray/D-Bus services, and KWin picker.
+The egui frontend, custom history renderer, their dependencies and obsolete
+renderer tests were removed. Qt uses its system platform theme rather than
+application stylesheets or bundled fonts. Arch dependencies now explicitly
+include Qt Base/Wayland, Plasma integration, and Breeze.
+
+The Board retains its three tabs, collapsible history sidebar, bottom shared
+palette, drag/drop, lock-aware editing/reordering, saved palettes/generations,
+named theme links, project drafts, preview navigation and export. Geometry and
+splitters use QSettings. Settings keeps load-error protection and asynchronous
+tray/shortcut calls. The history popup uses native Qt focus/dismissal rather
+than custom fullscreen Wayland shields.
+
+Verification: workspace debug build; four targeted model tests; strict Clippy
+for the four changed frontend packages; twelve packaging tests passed. Native
+Qt 6.12 control-driven smoke verified HEX Apply, RGB alpha preservation,
+Undo/Redo, palette lock refusal/unlock/edit/save/reopen, and invalid Settings
+save leaving disk unchanged. Mixer, palette, theme and Settings client snapshots
+were inspected under ignored `target/qt-cutover-final/`; they are
+`QWidget::grab` images, not compositor/desktop captures. The smoke uses isolated
+XDG directories and invokes real application models and native controls.
+
+A separate native history smoke loaded four synthetic captures from the real
+tray on an isolated session bus with a minimal StatusNotifierWatcher fixture.
+The four correctly colored/labeled tiles were inspected; no color was copied.
+The fixture bus had no portal services, so no shortcut permissions were
+requested. Throwaway fixture scripts were removed.
+
+These checks are not physical frontend acceptance. The desktop capture backend
+reported unavailable Wayland capture; its AT-SPI listing did not expose the
+launched Settings window. Keyboard-only/screen-reader acceptance, runtime KDE
+theme/font changes, mixed output scales, popup grabs/outside dismissal, Board
+activation and hide/pick restoration still require target-desktop validation.
+Earlier frontend acceptance below applies to the replaced implementation.
+No live KWin restart, system install, shortcut authorization, or push occurred.
+
+## KWin picker cutover
+
+The picker now targets a required custom KWin effect: crosshair with a square
+around the current pixel, live swatch and HEX, and integer `picker_zoom` 1–32
+(default 4; Settings or CLI `--zoom`). It uses no ScreenCast portal or fallback;
+the tray still uses GlobalShortcuts. Build against the installed KWin ABI and
+rebuild after KWin changes. Verify in an isolated KWin first; system plugin
+installation/loading requires user confirmation. Never restart live KWin.
+
+Verification on KWin 6.8.2: the effect built and loaded in an isolated two-output
+virtual compositor. Actual framebuffer/input tests covered live swatch/HEX,
+the one-physical-pixel cursor square, 1×/4×/8×/32× selection, both outputs, Escape,
+right-click, client death, caller-scoped cancellation, no click-through, and
+restored application input. A separate 1.5× scale scenario verified the physical
+pixel square and Enter selection; removing the active output cancelled cleanly.
+The actual Settings UI showed 4× by default, saved 8×, and a picker with no CLI
+override loaded that saved value. Durable synthetic-scene evidence:
+`docs/evidence/kwin-picker/integration.json` and adjacent screenshots.
+
+Workspace debug build, 17 targeted Rust tests, 12 packaging tests, targeted strict
+Clippy and formatting passed. Staged installation used the real effect and all
+six executables, with matching Arch Rust toolchain notices. Vulkan headers were
+downloaded into ignored build storage; the Arch recipe now declares them.
+
+After explicit user approval and interactive administrator authentication, the
+effect and its GPL license were installed into the system Qt plugin/license
+directories, and the effect loaded into the live KWin without restarting it.
+A live 4× overlay screenshot was inspected; automatic cancellation left `active`
+false. The updated tray and Board are running for user testing. The live image
+is ignored `target/custom-picker-live-desktop.png`, not committed desktop content.
+All private test processes were stopped and throwaway driver/scripts removed.
+
+Screen-lock, HDR and transformed-output acceptance remain untested. Broader
+physical selection/multioutput acceptance and release qualification remain open.
+Earlier picker and magnifier evidence below is historical.
+
+
+## UX gauntlet — stopped at user boundary
+
+The final authorized revision and native re-review are complete; no further iteration is authorized. This is **not UX acceptance or release qualification**. All six gauntlet cards are done (task completion, not product acceptance).
+
+- Final critic: `docs/evidence/ux-gauntlet/critic-layout-revision/verdict.md`. Independently built/native execution, not blind. Pointer Add/Lock/locked Delete and one tab transition have narrow native evidence. Small-output lower details remain cut off; titlebar/output versus actual visible client geometry and scroll reachability are unresolved, not a confirmed exact-client scrolling defect.
+- Native keyboard, font14 expanded multi-swatch reachability, HEX Apply/Undo/Redo/error recovery, locked edit/history refusal, AT-SPI names/roles, native theme/scaling integration remain untested.
+- Builder report: `docs/evidence/ux-gauntlet/layout-revision/report.md`; reports build/strict Clippy/fmt pass and 201 tests passed, 0 failed, 1 ignored after staging the built theme worker beside test executables. Not a theme.rs repair or native acceptance. Integrated headless regressions cover expanded height and mixer Apply scroll reachability.
+- Lead verified board has no active gauntlet cards; final `/proc` scan of both critic-owned private runtime roots was empty. Forced teardown is not normal-close evidence.
+- At final inspection HEAD was `03cf60e` (`First Gauntlet Run`), with staged evidence and `rust/board/src/layout_tests.rs`. This differs from the workers' recorded `195cb9f` provenance; lead did not create, amend, revert or push that checkpoint. Preserve the existing index/worktree. No additional checkpoint made at closeout.
+- Progress: `docs/ux-gauntlet-progress.html`. Remaining defects and release/license/reproducibility gates stay open.
+
+
 ## Repository state
 
 - Project: `/home/erick/Projects/Swatch_Board_App`

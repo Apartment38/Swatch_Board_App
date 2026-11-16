@@ -1,5 +1,8 @@
 # Phase 1A live validation and blocking findings
 
+> **Historical:** This evidence concerns earlier picker implementations, not
+> acceptance of the current KWin picker. See the [current handoff](current-handoff.md).
+
 **Current gate status: PASSED.** This document preserves the earlier KWin-backed
 validation and blocker evidence. The Rust-owned presented-sample picker that
 resolved those blockers is documented in

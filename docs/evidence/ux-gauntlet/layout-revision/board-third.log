@@ -1,0 +1,82 @@
+   Compiling swatch-board v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/board)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.22s
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board/bb0b50b96af84716/out/swatch_board-bb0b50b96af84716)
+
+running 40 tests
+test layout_tests::integrated_minimum_client_font14_mixer_apply_reachable_above_expanded_palette ... ok
+test layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal ... FAILED
+test layout_tests::integrated_palette_preserves_expanded_height ... ok
+test mixer::tests::actual_apply_undo_redo_work_with_pointer_and_keyboard_for_changed_color ... ok
+test mixer::tests::adding_different_colors_appends_to_draft ... ok
+test mixer::tests::editing_non_alpha_formats_preserves_alpha_and_supports_undo_redo ... ok
+test mixer::tests::invalid_apply_has_visible_feedback_in_default_board_layout ... ok
+test mixer::tests::invalid_edit_preserves_selection_and_undo ... ok
+test mixer::tests::spectrum_click_changes_hue_and_saturation_without_changing_value ... ok
+test mixer::tests::zero_weight_mix_does_not_replace_current_color ... ok
+test palette::tests::a_keyboard_focused_action_button_has_a_visible_focus_ring ... ok
+test palette::tests::hex_editing_still_applies_a_changed_color_and_supports_undo ... ok
+test palette::tests::keyboard_can_delete_an_unlocked_swatch ... ok
+test palette::tests::keyboard_can_reorder_a_swatch_without_dragging ... ok
+test palette::tests::keyboard_space_activates_the_lock_button ... ok
+test palette::tests::later_button_reorders_and_keeps_lock_with_its_swatch ... ok
+test palette::tests::locked_generation_save_reopen_and_mixer_share_active_colors ... ok
+test palette::tests::locked_state_and_order_survive_save_and_reopen ... ok
+test palette::tests::locked_swatch_keeps_name_and_color_through_generation ... ok
+test palette::tests::locked_swatch_refuses_delete_and_explains_why ... ok
+test palette::tests::locked_swatch_refuses_history_replacement_and_explains_why ... ok
+test palette::tests::pointer_lock_button_locks_and_unlocks_the_selected_swatch ... ok
+test palette::tests::swatch_actions_are_always_painted_at_minimum_size ... ok
+test palette::tests::swatch_actions_are_not_clipped_by_the_pinned_panel_at_minimum_size ... ok
+test palette::tests::swatch_actions_remain_visible_in_a_540x360_window_with_more_swatches ... ok
+test palette::tests::the_edit_action_focuses_the_hex_field_for_keyboard_editing ... ok
+test palette::tests::the_selected_swatch_has_a_visible_selection_outline ... ok
+test palette::tests::typing_in_a_swatch_name_field_is_not_stolen_by_a_button ... ok
+test palette::tests::undo_and_redo_restore_the_lock_state ... ok
+test theme::tests::correcting_invalid_role_text_clears_error_and_persists_override ... ok
+test theme::tests::export_preview_remains_reachable_above_pinned_palette_in_short_window ... ok
+test theme::tests::external_plugin_hidden_scene_text_role_accepts_selection_and_drop ... ok
+test theme::tests::linked_swatch_rename_and_removal_fail_closed_without_losing_assignment ... ok
+test theme::tests::links_require_saved_source_identity_and_explicit_palette_rebinding_is_undoable ... ok
+test theme::tests::named_palette_link_propagates_and_survives_theme_undo_redo_and_reopen ... ok
+test theme::tests::new_project_clears_previous_role_selection_after_discard_confirmation ... ok
+test theme::tests::override_remains_independent_of_source_changes_and_source_deletion ... ok
+test theme::tests::palette_payload_is_not_consumed_by_history_type_probe ... ok
+test theme::tests::pinned_palette_starts_real_drag_into_theme_preview ... ok
+test theme::tests::runtime_png_asset_is_painted_and_reload_recovers_from_corrupt_asset ... ok
+
+failures:
+
+---- layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal stdout ----
+
+running 1 test
+test layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal ... client=[540.0 360.0]; requested panel height=130; all swatch details reached: {0, 1, 2, 3, 4, 5, 6, 7}; refusal=Some(([[8.0 226.8] - [492.2 260.8]], [[0.0 203.8] - [540.0 360.0]]))
+client=[540.0 360.0]; requested panel height=145; all swatch details reached: {0, 1, 2, 3, 4, 5, 6, 7}; refusal=Some(([[8.0 226.8] - [492.2 260.8]], [[0.0 203.8] - [540.0 360.0]]))
+client=[540.0 360.0]; requested panel height=220; all swatch details reached: {0, 1, 2, 3}; refusal=Some(([[8.0 163.0] - [492.2 197.0]], [[0.0 140.0] - [540.0 360.0]]))
+FAILED
+
+failures:
+
+failures:
+    layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 39 filtered out; finished in 1.29s
+
+
+
+thread 'layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal' (87884) panicked at rust/board/src/layout_tests.rs:26:5:
+
+thread 'layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal' (87886) panicked at rust/board/src/layout_tests.rs:164:5:
+assertion `left == right` failed: all names and HEX values reachable horizontally
+  left: 4
+ right: 8
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal
+
+test result: FAILED. 39 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.66s
+
+error: test failed, to rerun pass `-p swatch-board --bin swatch-board`

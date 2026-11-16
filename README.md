@@ -2,12 +2,13 @@
 
 Build beautiful palettes with swatches.
 
-Swatch Board is a Rust-only KDE Plasma Wayland color utility. The picker,
-tray, history, settings, Board shell, Color Mixer, and Palette Editor have passed
-target-desktop acceptance. The Theme Generator's runtime-authored external-plugin
-workflow has passed native KDE Wayland acceptance with user-operated interactions
-and database/export verification. This does not establish physical testing of
-every bundled target plugin. See the [current handoff](docs/current-handoff.md).
+Swatch Board is a KDE Plasma Wayland color utility with native Qt 6 Widgets
+interfaces, Rust application services, and a GPL-2.0-or-later C++ KWin effect.
+The Board, Settings, and history popup use the desktop Qt platform theme: KDE
+palette, fonts, widget style, icons, and scaling rather than a custom UI theme.
+Install Plasma's Qt platform integration and Breeze alongside Qt's Wayland plugin.
+Earlier frontend acceptance does not qualify this rewrite; see the
+[current handoff](docs/current-handoff.md) for verification and remaining gates.
 
 ## Build and test
 
@@ -16,11 +17,16 @@ cargo build --offline --workspace --locked
 cargo test --offline --workspace --locked
 cargo fmt --all -- --check
 cargo clippy --offline --workspace --all-targets --locked -- -D warnings
+cmake -S kwin -B target/kwin -DCMAKE_BUILD_TYPE=Release
+cmake --build target/kwin
 ```
 
-Offline commands require the pinned dependencies to be cached already. A first
-build on a fresh machine needs network access and the native PipeWire/SPA and
-Wayland development packages, plus the libclang tooling used by their bindings.
+Offline commands require cached Rust dependencies. A fresh build needs network
+access, a C++17 compiler, `ar`, `pkg-config`, Qt 6 Widgets development metadata,
+CMake, extra-cmake-modules, matching KWin development headers/libraries, Vulkan
+headers, and Wayland development packages. Cargo builds the Qt frontend through
+the shared `rust/qt` crate; no separate UI build or generated bindings are needed.
+KWin's effect ABI depends on the installed KWin version: rebuild after KWin changes.
 
 ## Run the tray
 
@@ -31,11 +37,6 @@ cargo build --locked --workspace
 ./target/debug/swatch-board-tray
 ```
 
-The picker also requires `share/applications/org.apartment38.SwatchBoard.desktop`
-to be installed in an XDG applications directory. For an uninstalled development
-build, copy that entry to `~/.local/share/applications/` and change its `Exec`
-to the absolute path of the built `swatch-board-picker`; the portal rejects an
-entry whose executable it cannot find. Remove the development entry when done.
 
 Left-click the tray icon or select **Pick Color**. Successful captures are
 saved to `${XDG_DATA_HOME:-$HOME/.local/share}/swatch-board/library.sqlite3`,
@@ -47,10 +48,9 @@ click outside to close without copying. **Configure** opens a separate settings
 window; closing it exits that process. **Open Board** launches the separate Board
 window. See the [D-Bus API](docs/ipc.md).
 
-When the pointer's output cannot be determined, the popup queries KDE's
-`kscreen-doctor` for the configured primary output. That executable must be
-installed for this fallback; an unavailable or ambiguous configuration produces
-an error instead of silently choosing another display.
+The history popup uses Qt's native popup dismissal and keyboard navigation.
+It opens on Qt's pointer screen, falling back to Qt's primary screen when the
+platform does not expose the pointer location.
 
 To run the picker directly from a KDE Plasma Wayland desktop session:
 
@@ -58,13 +58,12 @@ To run the picker directly from a KDE Plasma Wayland desktop session:
 cargo run --offline --locked -p swatch-board-picker
 ```
 
-The picker requests screen-capture authorization through KDE's portal. Left
-release confirms the exact center sample from a genuinely presented magnifier
-commit; right release or Escape cancels. Diagnostics go to stderr and the
-selected `#RRGGBB` value to stdout. When moving between outputs, the picker waits
-for fresh target video and for the reported presentation time before using a
-sample; timeouts and output loss fail closed. When run directly the picker does
-not update history or clipboard; use the tray for those actions.
+The required KWin effect displays a crosshair with a square around the current
+pixel, a live color swatch and `#RRGGBB`. Configure integer `picker_zoom` in
+Settings (1–32, default 4), or use `--zoom` for a direct pick. There is no
+ScreenCast prompt, screen-capture portal, or fallback picker. The selected
+`#RRGGBB` goes to stdout; direct picking does not update history or clipboard.
+The tray's GlobalShortcuts integration still uses the desktop portal.
 
 Inspect the CLI without opening a capture session:
 
@@ -73,9 +72,8 @@ Inspect the CLI without opening a capture session:
 ./target/debug/swatch-board-picker --version
 ```
 
-The executable requires access to the desktop's session D-Bus and Wayland socket.
-If launched outside the desktop environment, ensure `WAYLAND_DISPLAY` points to
-the actual compositor socket; do not assume a particular socket name.
+The picker requires the installed matching KWin plugin and KDE session D-Bus.
+The other desktop components also require the Wayland session.
 
 ## History and clipboard settings
 
@@ -88,10 +86,9 @@ history_columns = 4
 history_rows = 3
 auto_copy = true
 clipboard_format = "hex"
-magnifier_radius = 7
-magnifier_zoom = 10
 pick_shortcut = "Meta+Shift+C"
 history_shortcut = "Meta+Shift+H"
+picker_zoom = 4
 hide_board_while_picking = false
 autostart = false
 version = 1
@@ -107,9 +104,8 @@ control; the tray must remain running unless a clipboard manager retains the
 selection. Invalid settings or incompatible databases produce an error rather
 than silently discarding data.
 
-Configure validates settings and applies changes to the running tray. Magnifier
-radius is 0–31 and zoom is 4–32. Global shortcuts require desktop portal
-authorization. On KDE, Save requests assignment of the saved shortcuts to the
+Configure validates settings and applies changes to the running tray. Global
+shortcuts require desktop portal authorization. On KDE, Save requests assignment of the saved shortcuts to the
 existing portal actions; both actions must already be assigned. Unassigned or
 revoked shortcuts must first be enabled in KDE System Settings. Conflicting
 shortcuts are rejected; use a free intermediate binding to swap two shortcuts.
@@ -119,8 +115,13 @@ conflict check. KDE's system shortcut settings also provide an explicit fallback
 when the portal is unavailable. Autostart uses one per-user XDG desktop entry.
 The Board applies the hide preference to picks started from its own window.
 
-For a staged installation, build release binaries and use
-`PREFIX=/usr DESTDIR=/tmp/swatch-board-stage bash packaging/install.sh`.
+Build the effect as above and first verify it in an isolated KWin session. System
+plugin installation and loading require user confirmation; never restart live
+KWin. For staging use `PREFIX=/usr DESTDIR=/tmp/swatch-board-stage
+bash packaging/install.sh`. The installer requires the built effect and installs
+it under Qt's plugin root; `QT_PLUGIN_DIR` overrides discovery and `EFFECT_LIB`
+overrides its build path. Set `RUST_LICENSE_DIR` to the build toolchain's
+`share/doc/rust` if it is no longer active. See `docs/release.md`.
 
 ## Run the Board
 
@@ -138,11 +139,10 @@ color or a mix source. Edit HEX, RGB, RGBA, HSL, or HSV values and apply them;
 editing a format without alpha preserves the current alpha. CMYK is approximate
 and unprofiled. Copy uses the configured clipboard format.
 
-Click or drag the spectrum to set hue and saturation; the adjacent vertical bar
-sets HSV brightness. The full spectrum stays above the scrolling details.
-Edit individual HSV (degrees/percent), RGB, and alpha (0–255) values by dragging
-their numbers or double-clicking to type. These controls update the current
-color immediately and participate in undo/redo.
+Click or drag the saturation/value spectrum, or edit hue with the native numeric
+control. HSV values use degrees/percent; RGB and alpha use 0–255. Format fields
+have explicit Apply buttons and support Enter. Color edits participate in
+undo/redo; the channel controls use the desktop's native spin boxes.
 
 Mix two or more sources with normalized weights in encoded sRGB or OKLCH.
 OKLCH averages hue along the shortest arc relative to the first chromatic source,
@@ -208,17 +208,18 @@ and atomically renamed individually; an error in a multi-file export can leave
 earlier files written. Export never applies a theme to the desktop.
 
 **Pick Color** requires the tray; **Settings** also works without it. When
-`hide_board_while_picking` is enabled, the Board closes its native window before
-requesting a pick and recreates it after selection, cancellation, or failure.
-It does not activate a window during the pick. Reopening preserves the selected
-tab and saved window geometry. Normal close exits the Board process; tray Quit
-does not close the Board. A second launch activates the existing Board instance.
+`hide_board_while_picking` is enabled, the Board hides and synchronizes its Qt
+window before requesting a pick, then restores it after selection, cancellation,
+or failure. The model stays alive while hidden. Tab, geometry, and splitter
+positions use Qt settings; existing library/config files are unchanged.
+Normal close exits Board; tray Quit does not close it. A second launch requests
+activation of the existing Board instance, subject to compositor focus policy.
 
 ## Project references
 
 - [Implementation plan](swatch-board-agent-implementation-plan.md)
-- [Phase 1A status](docs/phase-1a-status.md)
-- [Live validation and blockers](docs/phase-1a-live-validation.md)
+- [Phase 1A status (historical)](docs/phase-1a-status.md)
+- [Live validation and blockers (historical)](docs/phase-1a-live-validation.md)
 - [Current developer handoff](docs/current-handoff.md)
 - [Known-color fixture](docs/phase-1a-color-fixture.html)
 - [Historical conversation export](colorboard-conversation-export.md) — preserved
@@ -234,8 +235,7 @@ supported.
 The Arch-first PKGBUILD, locked source-build notes, staged installation and
 installed theme-worker smoke check are in [release documentation](docs/release.md).
 The local release smoke is `packaging/verify-release.sh`; it builds all six
-release executables, stages them under a temporary prefix, and verifies a real
-installed-helper render against `plugins/example-terminal/`. It does not start
-desktop applications. See the [test matrix](docs/testing.md) for verified KDE
-coverage and outstanding distro/physical gates, and the
+release executables and the effect, stages them, and verifies installed payload
+and helper rendering. It does not start desktop applications. See the
+[test matrix](docs/testing.md) for coverage and outstanding gates, and the
 [troubleshooting guide](docs/troubleshooting.md) for recovery steps.

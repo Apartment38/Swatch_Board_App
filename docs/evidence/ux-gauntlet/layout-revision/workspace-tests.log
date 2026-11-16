@@ -1,0 +1,345 @@
+$ cargo test --offline --locked --workspace --all-targets --no-fail-fast -- --test-threads=1
+   Compiling swatch-board-picker v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/picker)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.92s
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board/26f9818bb608929c/out/swatch_board-26f9818bb608929c)
+
+running 40 tests
+test layout_tests::integrated_minimum_client_font14_mixer_apply_reachable_above_expanded_palette ... ok
+test layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal ... ok
+test layout_tests::integrated_palette_preserves_expanded_height ... ok
+test mixer::tests::actual_apply_undo_redo_work_with_pointer_and_keyboard_for_changed_color ... ok
+test mixer::tests::adding_different_colors_appends_to_draft ... ok
+test mixer::tests::editing_non_alpha_formats_preserves_alpha_and_supports_undo_redo ... ok
+test mixer::tests::invalid_apply_has_visible_feedback_in_default_board_layout ... ok
+test mixer::tests::invalid_edit_preserves_selection_and_undo ... ok
+test mixer::tests::spectrum_click_changes_hue_and_saturation_without_changing_value ... ok
+test mixer::tests::zero_weight_mix_does_not_replace_current_color ... ok
+test palette::tests::a_keyboard_focused_action_button_has_a_visible_focus_ring ... ok
+test palette::tests::hex_editing_still_applies_a_changed_color_and_supports_undo ... ok
+test palette::tests::keyboard_can_delete_an_unlocked_swatch ... ok
+test palette::tests::keyboard_can_reorder_a_swatch_without_dragging ... ok
+test palette::tests::keyboard_space_activates_the_lock_button ... ok
+test palette::tests::later_button_reorders_and_keeps_lock_with_its_swatch ... ok
+test palette::tests::locked_generation_save_reopen_and_mixer_share_active_colors ... ok
+test palette::tests::locked_state_and_order_survive_save_and_reopen ... ok
+test palette::tests::locked_swatch_keeps_name_and_color_through_generation ... ok
+test palette::tests::locked_swatch_refuses_delete_and_explains_why ... ok
+test palette::tests::locked_swatch_refuses_history_replacement_and_explains_why ... ok
+test palette::tests::pointer_lock_button_locks_and_unlocks_the_selected_swatch ... ok
+test palette::tests::swatch_actions_are_always_painted_at_minimum_size ... ok
+test palette::tests::swatch_actions_are_not_clipped_by_the_pinned_panel_at_minimum_size ... ok
+test palette::tests::swatch_actions_remain_visible_in_a_540x360_window_with_more_swatches ... ok
+test palette::tests::the_edit_action_focuses_the_hex_field_for_keyboard_editing ... ok
+test palette::tests::the_selected_swatch_has_a_visible_selection_outline ... ok
+test palette::tests::typing_in_a_swatch_name_field_is_not_stolen_by_a_button ... ok
+test palette::tests::undo_and_redo_restore_the_lock_state ... ok
+test theme::tests::correcting_invalid_role_text_clears_error_and_persists_override ... ok
+test theme::tests::export_preview_remains_reachable_above_pinned_palette_in_short_window ... ok
+test theme::tests::external_plugin_hidden_scene_text_role_accepts_selection_and_drop ... ok
+test theme::tests::linked_swatch_rename_and_removal_fail_closed_without_losing_assignment ... ok
+test theme::tests::links_require_saved_source_identity_and_explicit_palette_rebinding_is_undoable ... ok
+test theme::tests::named_palette_link_propagates_and_survives_theme_undo_redo_and_reopen ... ok
+test theme::tests::new_project_clears_previous_role_selection_after_discard_confirmation ... ok
+test theme::tests::override_remains_independent_of_source_changes_and_source_deletion ... ok
+test theme::tests::palette_payload_is_not_consumed_by_history_type_probe ... ok
+test theme::tests::pinned_palette_starts_real_drag_into_theme_preview ... ok
+test theme::tests::runtime_png_asset_is_painted_and_reload_recovers_from_corrupt_asset ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.03s
+
+     Running unittests src/lib.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-clipboard/9b9a1c59824a49e7/out/swatch_board_clipboard-9b9a1c59824a49e7)
+
+running 3 tests
+test tests::ownership_and_errors_are_reported_with_distinct_ids ... ok
+test tests::preparation_failure_is_returned_without_an_event ... ok
+test tests::serving_panic_is_reported ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-color/2aa61afdb3a2746d/out/swatch_board_color-2aa61afdb3a2746d)
+
+running 9 tests
+test generation::tests::contrast_is_checked_after_mapping ... ok
+test generation::tests::modes_are_deterministic_and_produce_requested_count ... ok
+test generation::tests::validates_bounds_and_impossible_contrast ... ok
+test mixing::tests::achromatic_sources_do_not_change_hue ... ok
+test mixing::tests::hue_wrap_uses_short_arc ... ok
+test mixing::tests::oklch_differs_from_encoded_srgb ... ok
+test mixing::tests::rejects_invalid_sources_and_weights ... ok
+test mixing::tests::srgb_averages_encoded_channels_and_straight_alpha ... ok
+test mixing::tests::zero_weights_preserve_endpoints ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/color.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-color/f9c151fb498fb6d4/out/color-f9c151fb498fb6d4)
+
+running 6 tests
+test achromatic_and_primary_golden_values ... ok
+test formatted_samples_round_trip ... ok
+test golden_formats ... ok
+test parsing_converts_and_rounds_to_canonical_rgba ... ok
+test rejects_invalid_values_and_syntax ... ok
+test supported_format_names ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-config/1fd5c30d585a3af7/out/swatch_board_config-1fd5c30d585a3af7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-config-core/aa68f0167f8d5b83/out/swatch_board_config_core-aa68f0167f8d5b83)
+
+running 2 tests
+test tests::legacy_flat_settings_and_round_trip ... ok
+test tests::validates_shortcuts_and_magnifier ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-history/0642d01ec9abe2d0/out/swatch_board_history-0642d01ec9abe2d0)
+
+running 1 test
+test tests::primary_output_uses_enabled_priority_one_and_rejects_ambiguity ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-ipc/8e50c961be0b244e/out/swatch_board_ipc-8e50c961be0b244e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-picker/3262dbfe2181601d/out/swatch_board_picker-3262dbfe2181601d)
+
+running 42 tests
+test capture::tests::cursor_metadata_requires_valid_id_and_frame_bounds_not_hotspot ... ok
+test capture::tests::cursor_only_update_reuses_image_without_refreshing_video_age ... ok
+test capture::tests::decodes_all_negotiated_channel_orders_and_alpha ... ok
+test capture::tests::decodes_consecutive_frames_without_reusing_previous_pixels ... ok
+test capture::tests::feed_only_accepts_authorized_streams_during_capture ... ok
+test capture::tests::feed_replaces_backlog_with_latest_frame_per_stream ... ok
+test capture::tests::feed_wait_wakes_for_publication_and_close ... ok
+test capture::tests::image_throttle_decodes_first_frame_and_frames_at_the_interval ... ok
+test capture::tests::rejects_malformed_dimensions_strides_and_buffers ... ok
+test capture::tests::rejects_unnegotiated_pixel_formats ... ok
+test capture::tests::skips_stride_padding_between_rows ... ok
+test capture::tests::stop_request_or_dropped_sender_ends_capture ... ok
+test capture::tests::terminal_stream_states_report_failure_without_initial_disconnect_false_alarm ... ok
+test native::authority_tests::changed_empty_or_ambiguous_escape_assignment_fails_closed ... ok
+test native::authority_tests::future_feedback_does_not_authorize_a_sample_before_its_timestamp ... ok
+test native::authority_tests::future_hide_feedback_cannot_clear_contamination_early ... ok
+test native::authority_tests::left_without_presented_sample_is_error_not_cancelled_success ... ok
+test native::authority_tests::paired_right_release_cancels_but_waits_for_every_other_observed_button ... ok
+test native::authority_tests::stale_target_waits_only_during_clean_frame_transition ... ok
+test native::authority_tests::timeout_with_observed_buttons_held_never_returns_a_successful_decision ... ok
+test native::authority_tests::unpaired_release_cannot_confirm_or_cancel ... ok
+test native::closure_tests::startup_denial_still_closes_shortcut_session_and_reports_both_errors ... ok
+test native::routing_tests::lens_geometry_uses_actual_target_frame_at_fractional_scales ... ok
+test native::routing_tests::pointer_output_routes_by_authorized_origin_not_sorted_stream_id ... ok
+test native::routing_tests::portal_geometry_difference_uses_wayland_geometry ... ok
+test native::routing_tests::protected_neighborhood_and_pixels_use_target_scale_with_negative_origin ... ok
+test native::routing_tests::rapid_output_retarget_preserves_hide_ticket_and_latest_target_barrier ... ok
+test native_guard::tests::hide_invalidates_late_feedback_and_requires_strict_post_receipt_video ... ok
+test native_guard::tests::history_never_evicts_unpresented_rectangles_at_bound ... ok
+test native_guard::tests::only_genuine_presented_commit_authorizes_exact_sample_identity ... ok
+test native_guard::tests::output_switch_requires_target_stream_video_not_other_stream_or_metadata ... ok
+test native_guard::tests::repeated_identical_footprint_does_not_exhaust_history ... ok
+test native_guard::tests::retarget_cannot_reauthorize_old_stream_feedback_even_before_hide_submission ... ok
+test options::tests::defaults_and_adjustable_magnifier_options ... ok
+test options::tests::informational_options_must_stand_alone ... ok
+test options::tests::magnifier_bounds_are_enforced ... ok
+test options::tests::rejects_non_utf8_without_panicking ... ok
+test options::tests::rejects_removed_duplicate_and_invalid_options ... ok
+test portal::tests::empty_streams_are_rejected ... ok
+test portal::tests::missing_session_object_is_already_closed ... ok
+test portal::tests::setup_failure_closes_once_and_preserves_original_error ... ok
+test portal::tests::successful_setup_does_not_close_session ... ok
+
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/branding.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-picker/653939e37bb2126c/out/branding-653939e37bb2126c)
+
+running 4 tests
+test cargo_packages_use_swatch_board_names ... ok
+test help_identifies_swatch_board_without_starting_capture ... ok
+test unknown_arguments_fail_without_starting_capture ... ok
+test version_identifies_swatch_board_without_starting_capture ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests ../../spikes/001-native-cancel/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-picker/f42d69d522ebf44d/out/phase1a_cancel_probe-f42d69d522ebf44d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests ../../spikes/003-clean-overlay/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-picker/793f776ffee76182/out/phase1a_clean_overlay_probe-793f776ffee76182)
+
+running 23 tests
+test capture::tests::cursor_metadata_requires_valid_id_and_frame_bounds_not_hotspot ... ok
+test capture::tests::cursor_only_update_reuses_image_without_refreshing_video_age ... ok
+test capture::tests::decodes_all_negotiated_channel_orders_and_alpha ... ok
+test capture::tests::decodes_consecutive_frames_without_reusing_previous_pixels ... ok
+test capture::tests::feed_only_accepts_authorized_streams_during_capture ... ok
+test capture::tests::feed_replaces_backlog_with_latest_frame_per_stream ... ok
+test capture::tests::feed_wait_wakes_for_publication_and_close ... ok
+test capture::tests::image_throttle_decodes_first_frame_and_frames_at_the_interval ... ok
+test capture::tests::rejects_malformed_dimensions_strides_and_buffers ... ok
+test capture::tests::rejects_unnegotiated_pixel_formats ... ok
+test capture::tests::skips_stride_padding_between_rows ... ok
+test capture::tests::stop_request_or_dropped_sender_ends_capture ... ok
+test capture::tests::terminal_stream_states_report_failure_without_initial_disconnect_false_alarm ... ok
+test clock_tests::native_clock_read_is_positive_and_nondecreasing ... ok
+test guard::tests::every_submitted_rectangle_remains_contaminating ... ok
+test guard::tests::hidden_barrier_requires_presented_hide_then_strictly_new_video ... ok
+test guard::tests::history_exhaustion_never_evicts_old_contamination ... ok
+test guard::tests::missing_pts_is_fail_closed ... ok
+test guard::tests::receipt_cutoff_rejects_video_queued_after_presentation_but_before_receipt ... ok
+test portal::tests::empty_streams_are_rejected ... ok
+test portal::tests::missing_session_object_is_already_closed ... ok
+test portal::tests::setup_failure_closes_once_and_preserves_original_error ... ok
+test portal::tests::successful_setup_does_not_close_session ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests examples/phase1a_fixture.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-picker/f73eb9d129807f5d/out/phase1a_fixture-f73eb9d129807f5d)
+
+running 1 test
+test fixture_cli_tests::fullscreen_output_is_explicit_and_preserves_exact_name ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/phase1a_input.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-picker/07c75832ad7b1fc9/out/phase1a_input-07c75832ad7b1fc9)
+
+running 1 test
+test tests::persistent_test_device_duration_is_bounded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests ../../spikes/002-native-shield/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-picker/fa94d88bb62e0578/out/phase1a_shield_probe-fa94d88bb62e0578)
+
+running 20 tests
+test capture::tests::cursor_metadata_requires_valid_id_and_frame_bounds_not_hotspot ... ok
+test capture::tests::cursor_only_update_reuses_image_without_refreshing_video_age ... ok
+test capture::tests::decodes_all_negotiated_channel_orders_and_alpha ... ok
+test capture::tests::decodes_consecutive_frames_without_reusing_previous_pixels ... ok
+test capture::tests::feed_only_accepts_authorized_streams_during_capture ... ok
+test capture::tests::feed_replaces_backlog_with_latest_frame_per_stream ... ok
+test capture::tests::feed_wait_wakes_for_publication_and_close ... ok
+test capture::tests::image_throttle_decodes_first_frame_and_frames_at_the_interval ... ok
+test capture::tests::rejects_malformed_dimensions_strides_and_buffers ... ok
+test capture::tests::rejects_unnegotiated_pixel_formats ... ok
+test capture::tests::skips_stride_padding_between_rows ... ok
+test capture::tests::stop_request_or_dropped_sender_ends_capture ... ok
+test capture::tests::terminal_stream_states_report_failure_without_initial_disconnect_false_alarm ... ok
+test portal::tests::empty_streams_are_rejected ... ok
+test portal::tests::missing_session_object_is_already_closed ... ok
+test portal::tests::setup_failure_closes_once_and_preserves_original_error ... ok
+test portal::tests::successful_setup_does_not_close_session ... ok
+test tests::large_cursor_buffer_preserves_sentinel_coordinates ... ok
+test tests::mapping_uses_wayland_fractional_geometry ... ok
+test tests::sentinel_center_magenta_and_outside_transparent ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-picker-core/689ac50c5f61fde6/out/swatch_board_picker_core-689ac50c5f61fde6)
+
+running 9 tests
+test tests::magnifier_expands_source_pixels_without_interpolation ... ok
+test tests::maps_all_output_transforms_with_negative_origin ... ok
+test tests::maps_negative_origin_and_fractional_scale ... ok
+test tests::maps_required_display_scales_to_exact_source_pixels ... ok
+test tests::maps_rotated_stream_geometry ... ok
+test tests::rejects_invalid_geometry_and_frame_coordinates ... ok
+test tests::rejects_non_finite_desktop_coordinates ... ok
+test tests::rejects_non_finite_output_geometry ... ok
+test tests::samples_checkerboard_and_gradient_without_interpolation ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/lens_placement.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-picker-core/2e913cfca6eb1caa/out/lens_placement-2e913cfca6eb1caa)
+
+running 3 tests
+test lens_keeps_entire_source_neighborhood_clear_at_edges_and_corners ... ok
+test narrow_output_uses_vertical_space ... ok
+test no_safe_placement_is_reported_instead_of_capturing_the_lens ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-storage/5b67b687fadc98f8/out/swatch_board_storage-5b67b687fadc98f8)
+
+running 9 tests
+test palettes::tests::failed_update_rolls_back ... ok
+test palettes::tests::migration_preserves_history_and_settings ... ok
+test palettes::tests::save_update_reopen_delete_and_generation_order ... ok
+test tests::connection_enables_foreign_keys_and_busy_timeout ... ok
+test tests::xdg_paths_require_absolute_values_and_fall_back_to_home ... ok
+test themes::tests::assignment_index_updates_atomically_with_project_payload ... ok
+test themes::tests::failed_v3_migration_rolls_back_without_losing_data ... ok
+test themes::tests::migration_from_v2_preserves_palette_and_initializes_names ... ok
+test themes::tests::projects_and_draft_roundtrip_independently ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/history.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-storage/e3888f5d72f18d14/out/history-e3888f5d72f18d14)
+
+running 7 tests
+test captures_survive_reopen_and_duplicates_are_distinct ... ok
+test concurrent_open_and_write_serializes ... ok
+test default_and_custom_retention_remove_oldest_only ... ok
+test failed_pruning_rolls_back_insert ... ok
+test independent_connections_observe_commits_and_required_pragmas ... ok
+test invalid_rows_are_reported_without_panicking ... ok
+test rejects_newer_unversioned_and_malformed_databases ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running unittests src/lib.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-theme-core/9f81de56ac3fce10/out/swatch_board_theme_core-9f81de56ac3fce10)
+
+running 15 tests
+test isolation::tests::malformed_and_mismatched_results_are_rejected ... ok
+test isolation::tests::missing_executable_fails_closed ... ok
+test isolation::tests::oversized_response_is_bounded_and_reaped ... ok
+test isolation::tests::per_file_and_aggregate_output_caps_are_enforced ... ok
+test isolation::tests::pipe_fixture ... ignored
+test isolation::tests::simultaneous_large_request_and_response_do_not_deadlock ... ok
+test isolation::tests::stalled_request_writer_times_out_and_reaps ... ok
+test tests::bundled_package_golden_outputs ... ok
+test tests::export_preserves_outputs_named_like_staging_files ... ok
+test tests::export_protects_existing_and_rejects_traversal ... ok
+test tests::intermediate_allocation_is_contained_and_next_render_succeeds ... ok
+test tests::loader_rejects_nul_in_declared_output_path ... ok
+test tests::rejects_bad_references_and_symlinked_templates ... ok
+test tests::rejects_unbounded_templates_and_invalid_output ... ok
+test tests::resolves_and_renders_strictly ... ok
+
+test result: ok. 14 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.81s
+
+     Running unittests src/bin/swatch-board-theme-worker.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-theme-core/4b5bcc6c76968d56/out/swatch_board_theme_worker-4b5bcc6c76968d56)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/worker_protocol.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-theme-core/2cb79d739abde010/out/worker_protocol-2cb79d739abde010)
+
+running 2 tests
+test limits_are_active_before_reading_request ... ok
+test oversized_and_malformed_requests_fail_without_protocol_output ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board-tray/9690f64dd6419b12/out/swatch_board_tray-9690f64dd6419b12)
+
+running 5 tests
+test config::tests::validates_history_and_clipboard_settings ... ok
+test config::tests::validates_popup_geometry_and_display_limits ... ok
+test shortcuts::kde::tests::converts_portal_triggers_to_qt_key_sequences ... ok
+test tests::distinguishes_selection_cancellation_crash_and_invalid_output ... ok
+test tests::timeout_and_shutdown_reap_picker ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+
+EXIT=0

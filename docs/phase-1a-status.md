@@ -1,5 +1,8 @@
 # Phase 1A implementation status
 
+> **Historical:** This records the former custom picker, now replaced by KWin
+> ColorPicker. See the [current handoff](current-handoff.md).
+
 **Status: PASSED on the actual KDE Plasma Wayland target and the private multi-output fault-injection lab.**
 
 ## Decision

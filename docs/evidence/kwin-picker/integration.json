@@ -1,0 +1,63 @@
+{
+  "kwin_version": "6.8.2",
+  "environment": "isolated virtual KWin, private session bus and runtime, two 960x640 outputs; actual GL rendering and native input interception",
+  "scenarios": [
+    {
+      "stdout": "#E06C75",
+      "stderr": "",
+      "zoom": 1
+    },
+    {
+      "stdout": "#E06C75",
+      "stderr": "",
+      "zoom": 4
+    },
+    {
+      "stdout": "#E06C75",
+      "stderr": "",
+      "zoom": 8
+    },
+    {
+      "stdout": "#E06C75",
+      "stderr": "",
+      "zoom": 32
+    },
+    {
+      "cleanup": "escape",
+      "passed": true
+    },
+    {
+      "cleanup": "right-click",
+      "passed": true
+    },
+    {
+      "cleanup": "disconnect",
+      "passed": true
+    },
+    {
+      "no_click_through": true,
+      "application_input_restored": true,
+      "baseline_cursor_hidden": "b false"
+    }
+  ],
+  "additional_observations": [
+    "Settings showed a 4\u00d7 default; edited to 8\u00d7 through native mouse/keyboard input and Save; isolated TOML readback picker_zoom = 8",
+    "Standalone picker with no CLI zoom override used the saved 8\u00d7 setting",
+    "Removing the active output cancelled selection and released keyboard/cursor ownership",
+    "At 1.5\u00d7 output scale, the square surrounded exactly one physical source pixel; Enter returned #247AC3",
+    "Staged installer copied the real effect module, all six debug executables and licenses without modifying the system"
+  ],
+  "limitations": [
+    "This is isolated compositor evidence, not physical-desktop acceptance",
+    "Screen-lock handling is implemented but was not physically exercised",
+    "A private tray startup attempt failed because the private session had no StatusNotifierWatcher; no tray-mediated native acceptance is claimed",
+    "HDR and non-normal output transforms were not exercised"
+  ],
+  "live_desktop": {
+    "installation": "explicitly approved; administrator-authenticated install of effect and GPL license",
+    "compositor_restart": false,
+    "observed": "native live overlay at zoom 4; screenshot inspected; automatic cancellation left active=false",
+    "capture": "target/custom-picker-live-desktop.png (ignored; not committed desktop content)",
+    "app": "updated tray and Board launched"
+  }
+}

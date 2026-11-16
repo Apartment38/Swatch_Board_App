@@ -1,5 +1,8 @@
 # Phase 1A handoff
 
+> **Historical:** The custom picker described here has since been replaced by
+> KWin ColorPicker. See the [current handoff](current-handoff.md).
+
 > **Historical checkpoint.** Phase 1A later passed and the Rust-owned picker
 > replaced the KWin-backed path. The authoritative current status is
 > [the resumed-work handoff](phase-1a-resume-handoff.md). The older checkpoints

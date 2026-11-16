@@ -1,0 +1,99 @@
+   Compiling swatch-board v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/board)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.83s
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board/bb0b50b96af84716/out/swatch_board-bb0b50b96af84716)
+
+running 40 tests
+test layout_tests::integrated_minimum_client_font14_mixer_apply_reachable_above_expanded_palette ... ok
+test layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal ... ok
+test layout_tests::integrated_palette_preserves_expanded_height ... ok
+test mixer::tests::actual_apply_undo_redo_work_with_pointer_and_keyboard_for_changed_color ... ok
+test mixer::tests::adding_different_colors_appends_to_draft ... ok
+test mixer::tests::editing_non_alpha_formats_preserves_alpha_and_supports_undo_redo ... ok
+test mixer::tests::invalid_apply_has_visible_feedback_in_default_board_layout ... ok
+test mixer::tests::invalid_edit_preserves_selection_and_undo ... ok
+test mixer::tests::spectrum_click_changes_hue_and_saturation_without_changing_value ... ok
+test mixer::tests::zero_weight_mix_does_not_replace_current_color ... ok
+test palette::tests::a_keyboard_focused_action_button_has_a_visible_focus_ring ... ok
+test palette::tests::hex_editing_still_applies_a_changed_color_and_supports_undo ... ok
+test palette::tests::keyboard_can_delete_an_unlocked_swatch ... ok
+test palette::tests::keyboard_can_reorder_a_swatch_without_dragging ... ok
+test palette::tests::keyboard_space_activates_the_lock_button ... ok
+test palette::tests::later_button_reorders_and_keeps_lock_with_its_swatch ... ok
+test palette::tests::locked_generation_save_reopen_and_mixer_share_active_colors ... ok
+test palette::tests::locked_state_and_order_survive_save_and_reopen ... ok
+test palette::tests::locked_swatch_keeps_name_and_color_through_generation ... ok
+test palette::tests::locked_swatch_refuses_delete_and_explains_why ... ok
+test palette::tests::locked_swatch_refuses_history_replacement_and_explains_why ... ok
+test palette::tests::pointer_lock_button_locks_and_unlocks_the_selected_swatch ... ok
+test palette::tests::swatch_actions_are_always_painted_at_minimum_size ... ok
+test palette::tests::swatch_actions_are_not_clipped_by_the_pinned_panel_at_minimum_size ... ok
+test palette::tests::swatch_actions_remain_visible_in_a_540x360_window_with_more_swatches ... ok
+test palette::tests::the_edit_action_focuses_the_hex_field_for_keyboard_editing ... ok
+test palette::tests::the_selected_swatch_has_a_visible_selection_outline ... ok
+test palette::tests::typing_in_a_swatch_name_field_is_not_stolen_by_a_button ... ok
+test palette::tests::undo_and_redo_restore_the_lock_state ... ok
+test theme::tests::correcting_invalid_role_text_clears_error_and_persists_override ... ok
+test theme::tests::export_preview_remains_reachable_above_pinned_palette_in_short_window ... ok
+test theme::tests::external_plugin_hidden_scene_text_role_accepts_selection_and_drop ... ok
+test theme::tests::linked_swatch_rename_and_removal_fail_closed_without_losing_assignment ... FAILED
+test theme::tests::links_require_saved_source_identity_and_explicit_palette_rebinding_is_undoable ... ok
+test theme::tests::named_palette_link_propagates_and_survives_theme_undo_redo_and_reopen ... ok
+test theme::tests::new_project_clears_previous_role_selection_after_discard_confirmation ... ok
+test theme::tests::override_remains_independent_of_source_changes_and_source_deletion ... FAILED
+test theme::tests::palette_payload_is_not_consumed_by_history_type_probe ... ok
+test theme::tests::pinned_palette_starts_real_drag_into_theme_preview ... ok
+test theme::tests::runtime_png_asset_is_painted_and_reload_recovers_from_corrupt_asset ... ok
+
+failures:
+
+---- theme::tests::linked_swatch_rename_and_removal_fail_closed_without_losing_assignment stdout ----
+
+thread 'theme::tests::linked_swatch_rename_and_removal_fail_closed_without_losing_assignment' (87054) panicked at rust/board/src/theme.rs:800:9:
+
+running 1 test
+test theme::tests::linked_swatch_rename_and_removal_fail_closed_without_losing_assignment ... FAILED
+
+failures:
+
+failures:
+    theme::tests::linked_swatch_rename_and_removal_fail_closed_without_losing_assignment
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 39 filtered out; finished in 0.08s
+
+
+
+thread 'theme::tests::linked_swatch_rename_and_removal_fail_closed_without_losing_assignment' (87056) panicked at rust/board/src/theme.rs:971:36:
+Missing "Accent"; visible: [("1/1 Accent (Unlocked)", [[8.0 1013.0] - [129.9 1031.0]]), ("Lock", [[141.9 1015.0] - [167.1 1029.0]]), ("Edit", [[183.1 1015.0] - [204.9 1029.0]]), ("Delete", [[220.9 1015.0] - [258.8 1029.0]]), ("Earlier", [[274.8 1015.0] - [310.4 1029.0]]), ("Later", [[326.4 1015.0] - [355.1 1029.0]]), ("#ABCDEFFF", [[12.0 1087.0] - [78.5 1101.0]]), ("Palette Editor", [[8.0 8.0] - [118.7 29.0]]), ("Undo", [[130.7 11.5] - [160.0 25.5]]), ("Redo", [[176.0 11.5] - [205.2 25.5]]), ("Name", [[8.0 32.0] - [40.8 50.0]]), ("Named source", [[52.8 34.0] - [132.7 48.0]]), ("New draft", [[348.8 34.2] - [405.7 48.2]]), ("Save palette", [[421.7 34.2] - [489.5 48.2]]), ("Duplicate as draft", [[505.5 34.2] - [603.4 48.2]]), ("Active saved palette (changes are unsaved until Save).", [[8.0 53.4] - [304.1 67.4]]), ("Lock colors added from history", [[26.0 72.4] - [195.9 86.4]]), ("Random", [[12.0 93.4] - [57.8 107.4]]), ("Generator", [[116.0 93.4] - [172.7 107.4]]), ("Colors 5", [[184.7 93.4] - [229.7 107.4]]), ("Seed 0", [[245.7 93.4] - [282.7 107.4]]), ("Generate / regenerate unlocked", [[298.7 93.4] - [477.0 107.4]]), ("Base color", [[26.0 114.4] - [82.7 128.4]]), ("#247AC3", [[94.7 114.4] - [146.7 128.4]]), ("Minimum contrast vs base (or white)", [[224.7 114.6] - [426.5 128.6]]), ("4.5", [[446.0 114.6] - [463.1 128.6]]), ("Hue °", [[8.0 133.8] - [38.0 151.8]]), ("0.0", [[57.5 135.8] - [74.5 149.8]]), ("–", [[8.0 133.8] - [100.2 151.8]]), ("360.0", [[112.7 135.8] - [143.7 149.8]]), ("Lightness", [[8.0 133.8] - [208.3 151.8]]), ("0.000", [[220.8 135.8] - [251.9 149.8]]), ("–", [[8.0 133.8] - [270.5 151.8]]), ("1.000", [[283.0 135.8] - [314.1 149.8]]), ("Chroma", [[8.0 133.8] - [370.3 151.8]]), ("0.0000", [[382.3 135.8] - [420.4 149.8]]), ("–", [[8.0 133.8] - [438.6 151.8]]), ("0.4000", [[450.6 135.8] - [488.6 149.8]]), ("OKLCH colors are mapped to sRGB; locked swatches are preserved on regeneration.", [[8.0 154.8] - [335.2 164.8]]), ("Add swatch", [[12.0 178.8] - [76.1 192.8]]), ("Saved palettes", [[8.0 206.8] - [124.6 227.8]]), ("Search", [[8.0 232.8] - [45.1 246.8]]), ("", [[57.1 232.8] - [57.1 246.8]]), ("Named source", [[12.0 254.1] - [91.8 268.1]]), ("1 colors", [[8.0 252.1] - [147.3 270.1]]), ("Delete", [[159.3 254.1] - [197.2 268.1]]), ("Generation history (drafts)", [[8.0 282.1] - [218.5 303.1]])]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- theme::tests::override_remains_independent_of_source_changes_and_source_deletion stdout ----
+
+thread 'theme::tests::override_remains_independent_of_source_changes_and_source_deletion' (87070) panicked at rust/board/src/theme.rs:800:9:
+
+running 1 test
+test theme::tests::override_remains_independent_of_source_changes_and_source_deletion ... FAILED
+
+failures:
+
+failures:
+    theme::tests::override_remains_independent_of_source_changes_and_source_deletion
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 39 filtered out; finished in 0.12s
+
+
+
+thread 'theme::tests::override_remains_independent_of_source_changes_and_source_deletion' (87072) panicked at rust/board/src/theme.rs:971:36:
+Missing "Accent"; visible: [("1/1 Accent (Unlocked)", [[8.0 1013.0] - [129.9 1031.0]]), ("Lock", [[141.9 1015.0] - [167.1 1029.0]]), ("Edit", [[183.1 1015.0] - [204.9 1029.0]]), ("Delete", [[220.9 1015.0] - [258.8 1029.0]]), ("Earlier", [[274.8 1015.0] - [310.4 1029.0]]), ("Later", [[326.4 1015.0] - [355.1 1029.0]]), ("Swatch 1 color updated.", [[8.0 1013.0] - [501.1 1031.0]]), ("#998877FF", [[12.0 1086.4] - [74.5 1100.4]]), ("Palette Editor", [[8.0 8.0] - [118.7 29.0]]), ("Undo", [[130.7 11.5] - [160.0 25.5]]), ("Redo", [[176.0 11.5] - [205.2 25.5]]), ("Name", [[8.0 32.0] - [40.8 50.0]]), ("Named source", [[52.8 34.0] - [132.7 48.0]]), ("New draft", [[348.8 34.2] - [405.7 48.2]]), ("Save palette", [[421.7 34.2] - [489.5 48.2]]), ("Duplicate as draft", [[505.5 34.2] - [603.4 48.2]]), ("Active saved palette (changes are unsaved until Save).", [[8.0 53.4] - [304.1 67.4]]), ("Lock colors added from history", [[26.0 72.4] - [195.9 86.4]]), ("Random", [[12.0 93.4] - [57.8 107.4]]), ("Generator", [[116.0 93.4] - [172.7 107.4]]), ("Colors 5", [[184.7 93.4] - [229.7 107.4]]), ("Seed 0", [[245.7 93.4] - [282.7 107.4]]), ("Generate / regenerate unlocked", [[298.7 93.4] - [477.0 107.4]]), ("Base color", [[26.0 114.4] - [82.7 128.4]]), ("#247AC3", [[94.7 114.4] - [146.7 128.4]]), ("Minimum contrast vs base (or white)", [[224.7 114.6] - [426.5 128.6]]), ("4.5", [[446.0 114.6] - [463.1 128.6]]), ("Hue °", [[8.0 133.8] - [38.0 151.8]]), ("0.0", [[57.5 135.8] - [74.5 149.8]]), ("–", [[8.0 133.8] - [100.2 151.8]]), ("360.0", [[112.7 135.8] - [143.7 149.8]]), ("Lightness", [[8.0 133.8] - [208.3 151.8]]), ("0.000", [[220.8 135.8] - [251.9 149.8]]), ("–", [[8.0 133.8] - [270.5 151.8]]), ("1.000", [[283.0 135.8] - [314.1 149.8]]), ("Chroma", [[8.0 133.8] - [370.3 151.8]]), ("0.0000", [[382.3 135.8] - [420.4 149.8]]), ("–", [[8.0 133.8] - [438.6 151.8]]), ("0.4000", [[450.6 135.8] - [488.6 149.8]]), ("OKLCH colors are mapped to sRGB; locked swatches are preserved on regeneration.", [[8.0 154.8] - [335.2 164.8]]), ("Add swatch", [[12.0 178.8] - [76.1 192.8]]), ("Saved palettes", [[8.0 206.8] - [124.6 227.8]]), ("Search", [[8.0 232.8] - [45.1 246.8]]), ("", [[57.1 232.8] - [57.1 246.8]]), ("Named source", [[12.0 254.1] - [91.8 268.1]]), ("1 colors", [[8.0 252.1] - [147.3 270.1]]), ("Delete", [[159.3 254.1] - [197.2 268.1]]), ("Generation history (drafts)", [[8.0 282.1] - [218.5 303.1]])]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+
+failures:
+    theme::tests::linked_swatch_rename_and_removal_fail_closed_without_losing_assignment
+    theme::tests::override_remains_independent_of_source_changes_and_source_deletion
+
+test result: FAILED. 38 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.17s
+
+error: test failed, to rerun pass `-p swatch-board --bin swatch-board`

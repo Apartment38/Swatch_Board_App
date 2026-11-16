@@ -1,5 +1,8 @@
 # Phase 1A — native investigation checkpoint
 
+> **Historical:** The custom picker described here has since been replaced by
+> KWin ColorPicker. See the [current handoff](current-handoff.md).
+
 **Historical probe checkpoint. The completed native path now passes Phase 1A and is the only backend.**
 
 ## Autonomous test environment

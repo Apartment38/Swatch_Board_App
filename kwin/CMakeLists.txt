@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.22)
+project(SwatchBoardKWinPicker LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+find_package(ECM 6 REQUIRED NO_MODULE)
+list(APPEND CMAKE_MODULE_PATH ${ECM_MODULE_PATH} ${ECM_KDE_MODULE_DIR})
+include(KDEInstallDirs6)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui DBus OpenGL Widgets)
+find_package(KF6CoreAddons REQUIRED)
+find_package(KWin REQUIRED)
+
+add_library(swatchboardpicker MODULE picker.cpp)
+target_link_libraries(swatchboardpicker PRIVATE KWin::kwin Qt6::Core Qt6::Gui Qt6::DBus Qt6::OpenGL KF6::CoreAddons)
+set_target_properties(swatchboardpicker PROPERTIES PREFIX "" LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+install(TARGETS swatchboardpicker LIBRARY DESTINATION "${KDE_INSTALL_PLUGINDIR}/kwin/effects/plugins")

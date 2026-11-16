@@ -1,0 +1,28 @@
+   Compiling swatch-board v0.1.0 (/home/erick/Projects/Swatch_Board_App/rust/board)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.74s
+     Running unittests src/main.rs (/workspace/kestrel-swatch/target/debug/build/swatch-board/bb0b50b96af84716/out/swatch_board-bb0b50b96af84716)
+
+running 3 tests
+test layout_tests::integrated_minimum_client_font14_mixer_apply_reachable_above_expanded_palette ... 540x360 client, font14, history open: Apply reached=false; bounds=None
+
+thread 'layout_tests::integrated_minimum_client_font14_mixer_apply_reachable_above_expanded_palette' (85605) panicked at rust/board/src/layout_tests.rs:163:5:
+mixer Apply must be reachable by scrolling, not clipped by the unscrollable channel editor above it
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test layout_tests::integrated_minimum_client_font14_palette_details_reachable_with_locked_refusal ... all swatch details reached: {0, 1, 2, 3, 4, 5, 6, 7}
+ok
+test layout_tests::integrated_palette_preserves_expanded_height ... requested palette height=220; actual=[[0.0 219.8] - [540.0 360.0]]
+
+thread 'layout_tests::integrated_palette_preserves_expanded_height' (85607) panicked at rust/board/src/layout_tests.rs:150:5:
+content shrink must not defeat the user's expanded panel
+FAILED
+
+failures:
+
+failures:
+    layout_tests::integrated_minimum_client_font14_mixer_apply_reachable_above_expanded_palette
+    layout_tests::integrated_palette_preserves_expanded_height
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 37 filtered out; finished in 0.92s
+
+error: test failed, to rerun pass `-p swatch-board --bin swatch-board`

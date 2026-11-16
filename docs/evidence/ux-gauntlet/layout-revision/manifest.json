@@ -1,0 +1,103 @@
+{
+  "head": "195cb9f41128cf25c44b802cd20d4858a3a3c0ca",
+  "source_diff_definition": "git diff of main.rs, mixer.rs, palette.rs against HEAD followed by git diff --no-index /dev/null rust/board/src/layout_tests.rs; includes inherited uncommitted swatch-actions work",
+  "candidate_source_diff_sha256": "5930d0ff3949c9754f80f8dad70f6c8ca42eccef2dd87b65967cdda5d770e94d",
+  "workspace_tests": {
+    "passed": 201,
+    "failed": 0,
+    "ignored": 1
+  },
+  "binary": "/workspace/kestrel-swatch/target/debug/swatch-board",
+  "binary_sha256": "b305123d60c4b8b98893747cc00acd4252002d352bbd99ba83939aecab97b9af",
+  "checks": [
+    {
+      "name": "fmt-apply",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "fmt-check",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "build-final",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "regression-green",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "swatch-board",
+        "--bin",
+        "swatch-board",
+        "layout_tests::",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "workspace-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "name": "diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0
+    }
+  ]
+}

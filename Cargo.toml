@@ -1,5 +1,5 @@
 [workspace]
-members = ["rust/board", "rust/theme-core", "rust/clipboard", "rust/color", "rust/config-core", "rust/config", "rust/history", "rust/ipc", "rust/picker-core", "rust/picker", "rust/storage", "rust/tray"]
+members = ["rust/board", "rust/qt", "rust/theme-core", "rust/clipboard", "rust/color", "rust/config-core", "rust/config", "rust/history", "rust/ipc", "rust/picker", "rust/storage", "rust/tray"]
 resolver = "2"
 
 [workspace.package]
@@ -8,8 +8,7 @@ license = "MIT"
 rust-version = "1.85"
 
 [workspace.dependencies]
-ashpd = { version = "=0.13.13", features = ["screencast", "global_shortcuts"] }
-pipewire = "=0.10.1"
+ashpd = { version = "=0.13.13", features = ["global_shortcuts"] }
 tokio = { version = "=1.50.0", features = ["macros", "rt-multi-thread", "sync", "time"] }
 zbus = "=5.19.0"
 ksni = "=0.3.7"

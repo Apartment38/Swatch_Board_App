@@ -2,26 +2,29 @@
 
 ## Arch Linux first
 
-`packaging/arch/PKGBUILD` is the initial distro recipe. It pins the application
-source payload to `efb069a24472e6336eedfe00ba729fc5585a5d8d` (`0.1.0-2`) and fetches Rust dependencies according to
-`Cargo.lock`; the compiler and platform libraries are supplied by the build
-system. This is a locked source build, not a claim of bit-for-bit reproducibility.
+`packaging/arch/PKGBUILD` is the initial distro recipe. The `0.1.0-5` recipe pins
+the native Qt source checkpoint `5419ab023f1eba73ce9aa8da57f4e679546ae11c`.
+The recipe fetches Rust dependencies according to `Cargo.lock`;
+the build system supplies the compiler and platform libraries. This is a locked
+source build, not a claim of bit-for-bit reproducibility.
 The Git source uses `SKIP` because makepkg verifies the fixed commit instead of
 an archive checksum. A release maintainer must set `_commit` to the full commit
 containing the release sources before publishing the recipe, then inspect the
 resulting `.SRCINFO` and source revision. Do not use a moving branch or tag as
 the source pin.
 
-The recipe's native build requirements are Rust/Cargo, Git, Clang/libclang, pkgconf,
-PipeWire, Wayland and libxkbcommon development metadata. Runtime dependencies
-include glibc, GCC runtime, PipeWire, libglvnd, and hicolor-icon-theme. The latter
-is required for the installed icon hierarchy. `options=('!lto')` is deliberate:
-Arch's GCC LTO C objects for bundled SQLite cannot be consumed by Rust's LLVM
-linker. This was reproduced in the isolated build and fixed before packaging.
-KDE's XDG portal is an optional runtime integration, and `kscreen` is only used
-by the documented output-selection fallback.
+The recipe's native build requirements are Rust/Cargo, a C++ compiler, CMake,
+extra-cmake-modules, Qt 6 and matching KWin development headers, Git, pkgconf,
+Vulkan headers, Wayland and libxkbcommon development metadata. Cargo's shared
+`swatch-board-qt` crate additionally compiles C++17 Qt Widgets sources using
+`pkg-config Qt6Widgets` and `ar`. Runtime dependencies include glibc, GCC runtime,
+KWin, Qt 6 Base/Wayland, Plasma Qt integration, Breeze, and hicolor-icon-theme.
+No Qt shared libraries, themes, or fonts are bundled by the installer.
+`options=('!lto')` is deliberate: Arch's GCC LTO C objects for bundled SQLite
+cannot be consumed by Rust's LLVM linker. KDE's XDG portal provides optional
+GlobalShortcuts integration; the picker uses KWin directly, not ScreenCast.
 
-A fresh Arch Docker container built the repaired payload, ran **180 tests**
+Historically, a fresh Arch Docker container built the repaired payload, ran **180 tests**
 (one intentionally ignored) and strict Clippy, produced `0.1.0-2`, installed it
 **inside the container**, and passed installed picker, all four plugin golden,
 complete plugin/schema/license byte-inventory and metadata checks. The physical
@@ -33,7 +36,7 @@ A local Git bundle supplied the unpushed source revision via a makepkg Git URL
 rewrite; this is not a test of public source availability. Push only when
 explicitly authorised before remote package consumers need the source.
 
-Current evidence: `docs/evidence/phase6-packaging/refresh-checks.json` and
+Historical evidence: `docs/evidence/phase6-packaging/refresh-checks.json` and
 `physical-keyboard.json`. `checks.json` describes the earlier `0.1.0-1` baseline,
 which does not contain the Mixer feedback repair and is superseded as a package
 candidate. The unsigned local artifact is under
@@ -49,15 +52,38 @@ makechrootpkg -c -r "$CHROOT"
 namcap PKGBUILD swatch-board-*.pkg.tar.zst
 ```
 
-Review dependency licenses before every release. `Cargo.lock` pins versions
+Review dependency licenses before every release. `THIRD_PARTY_NOTICES.txt`
+contains all 161 registry packages in the Qt cutover lockfile, including
+build-time and non-Linux dependencies. Obsolete renderer/font notice sections
+were removed; retained archive checksums and notices were preserved unchanged.
+It contains license/copyright files from checksum-verified crate archives and,
+where available, the exact upstream Git commit recorded in the crate.
+The installer includes this collection alongside the project license.
+This is not a completed license audit: filename-based collection can miss
+other notices or obligations. The retained `r-efi` record is marked unavailable;
+reassess target/feature selection before redistribution. Qt/KDE native library
+licenses are separate from Cargo's inventory. See
+`docs/third-party-license-review.md`; recollect/review whenever dependencies change.
+The `0.1.0-5` source checkpoint includes both the Qt frontend and KWin effect.
+The source has not been pushed and this package revision has not been built or
+release-qualified.
+
+`Cargo.lock` pins versions
 and checksums, but does not constitute an SPDX/license-notice audit. The recorded
 `dependency-license-inventory.json` enumerates metadata declarations and candidate
 notice-file gaps only; some upstream crate archives omit their own notice files.
 The installed project MIT license is not proof that all bundled code/font
-redistribution obligations are satisfied. Obtain and review the exact-version
-third-party notices before public distribution. **This local artifact is not
-approved for public release.** Neither a legal/notice audit nor an independent
-reproducibility comparison has been completed.
+redistribution obligations are satisfied. **The existing artifact is not
+approved for public release.** Each distribution candidate must have its own
+native-library, toolchain and license review; AppImage and Flatpak artifacts have
+not yet been built or reviewed. An independent reproducibility comparison has
+also not been completed.
+
+The installer includes the Rust standard library copyright inventory and license
+texts from the active toolchain's `share/doc/rust` directory. If the build
+toolchain is no longer active, set `RUST_LICENSE_DIR` to the preserved directory
+from the exact toolchain that built the binaries. Installation fails if that
+documentation is missing. Do not substitute a different toolchain's notices.
 
 ## Local release verification
 
@@ -68,25 +94,32 @@ cargo build --workspace --locked --offline
 cargo test --workspace --all-targets --locked --offline
 cargo clippy --workspace --all-targets --locked --offline -- -D warnings
 cargo fmt --all -- --check
+cmake -S kwin -B target/kwin -DCMAKE_BUILD_TYPE=Release
+cmake --build target/kwin
 packaging/verify-release.sh
 ```
 
-`verify-release.sh` builds the release workspace, runs installer contract tests,
-stages the actual release executables, checks the installed picker help/version,
-and invokes the installed theme worker for all four installed plugin golden
-fixtures. It verifies all installed plugin/schema bytes and the license. It
+`verify-release.sh` builds the release workspace and KWin effect, runs installer
+contract tests, stages the actual payload, checks the installed picker
+help/version, and invokes the installed theme worker for all four plugin golden
+fixtures. It verifies effect, license, and installed plugin/schema bytes. It
 does not launch a GUI, open D-Bus, alter desktop settings, or grant portal
 permissions. Desktop-file and AppStream validators are mandatory: missing tools
 fail the gate before building. This local gate is not a clean-chroot build or
 physical desktop acceptance.
 
-For a distro build, install the six executables beside each other. The theme
-worker is an internal helper and intentionally has no desktop launcher. The
-installer places plugins and schemas under `share/swatch-board`, the icon in
-the hicolor scalable application directory, five launchers in
-`share/applications`, AppStream data in `share/metainfo`, and the MIT license in
-`share/licenses/swatch-board`. Autostart remains opt-in and uses one per-user
-XDG desktop entry; no system service or second autostart mechanism is installed.
+Install the six executables beside each other; the theme worker has no desktop
+launcher. Install the required `target/kwin/lib/swatchboardpicker.so` under the
+Qt plugin root at `kwin/effects/plugins/swatchboardpicker.so`. The installer
+discovers the root using Qt tooling or pkg-config; `QT_PLUGIN_DIR` overrides it,
+`EFFECT_LIB` overrides the built effect, and `DESTDIR` stages absolute paths.
+`PREFIX` controls binaries and data. Missing effects fail installation. The
+payload also includes plugins, schemas, five launchers, icon, AppStream data,
+MIT and `kwin/LICENSE` GPL-2.0-or-later licenses, and Rust notices.
+Test the built plugin in an isolated KWin first. System installation and loading
+require user confirmation; never restart live KWin. KWin's effect ABI is tied to
+the installed version: rebuild against matching development files after upgrades.
+Autostart remains opt-in via one per-user XDG desktop entry.
 
 ## Version policy
 
@@ -108,8 +141,9 @@ XDG desktop entry; no system service or second autostart mechanism is installed.
 
 ## Compatibility targets and release gates
 
-The supported physical target is KDE Plasma 6 on Wayland with a working
-PipeWire ScreenCast portal and GlobalShortcuts portal. Fedora and openSUSE are
+The supported physical target is KDE Plasma 6 on Wayland with the custom KWin effect.
+The tray's global shortcuts require a working GlobalShortcuts portal. Native
+acceptance of the replacement picker is pending. Fedora and openSUSE are
 compatibility targets to evaluate after Arch; their package names, portal
 versions, dependencies, and clean-build results have not been validated.
 Record distro release, kernel, Rust version, Plasma/KWin version, portal

@@ -21,10 +21,9 @@ pub struct Config {
     pub history_display_limit: u32,
     pub history_columns: u32,
     pub history_rows: u32,
+    pub picker_zoom: u32,
     pub auto_copy: bool,
     pub clipboard_format: String,
-    pub magnifier_radius: u32,
-    pub magnifier_zoom: u32,
     pub pick_shortcut: String,
     pub history_shortcut: String,
     pub hide_board_while_picking: bool,
@@ -43,10 +42,9 @@ impl Default for Config {
             history_display_limit: 24,
             history_columns: 4,
             history_rows: 3,
+            picker_zoom: 4,
             auto_copy: true,
             clipboard_format: "hex".into(),
-            magnifier_radius: 7,
-            magnifier_zoom: 10,
             pick_shortcut: "Meta+Shift+C".into(),
             history_shortcut: "Meta+Shift+H".into(),
             hide_board_while_picking: false,
@@ -68,7 +66,20 @@ impl Config {
     }
 
     pub fn parse(text: &str) -> Result<Self, String> {
-        let config: Self = toml::from_str(text).map_err(|e| e.to_string())?;
+        let mut value: toml::Value = toml::from_str(text).map_err(|e| e.to_string())?;
+        if let Some(table) = value.as_table_mut() {
+            // Version 1 files may contain picker settings that no longer exist.
+            if table
+                .get("version")
+                .is_none_or(|version| version.as_integer() == Some(1))
+            {
+                table.remove("magnifier_radius");
+                table.remove("magnifier_zoom");
+            }
+        }
+        let config: Self = value
+            .try_into()
+            .map_err(|e: toml::de::Error| e.to_string())?;
         config.validate()?;
         Ok(config)
     }
@@ -92,11 +103,8 @@ impl Config {
         if !(1..=12).contains(&self.history_rows) {
             return Err("history_rows must be between 1 and 12".into());
         }
-        if self.magnifier_radius > 31 {
-            return Err("magnifier_radius must be between 0 and 31".into());
-        }
-        if !(4..=32).contains(&self.magnifier_zoom) {
-            return Err("magnifier_zoom must be between 4 and 32".into());
+        if !(1..=32).contains(&self.picker_zoom) {
+            return Err("picker_zoom must be between 1 and 32".into());
         }
         self.clipboard_format
             .parse::<Format>()
@@ -247,7 +255,7 @@ mod tests {
         assert_eq!(config.history_limit, 42);
         assert_eq!(config.history_columns, 3);
         assert!(!config.auto_copy);
-        assert_eq!(config.magnifier_radius, 7);
+        assert_eq!(config.picker_zoom, 4);
         assert_eq!(
             Config::parse(&toml::to_string_pretty(&config).unwrap()).unwrap(),
             config
@@ -256,11 +264,8 @@ mod tests {
     }
 
     #[test]
-    fn validates_shortcuts_and_magnifier() {
+    fn validates_shortcuts() {
         for input in [
-            "magnifier_radius = 32",
-            "magnifier_zoom = 3",
-            "magnifier_zoom = 33",
             "pick_shortcut = 'Shift+Shift+C'",
             "pick_shortcut = 'Meta+NoSuchKey'",
             "pick_shortcut = 'C'",
@@ -268,6 +273,36 @@ mod tests {
         ] {
             assert!(Config::parse(input).is_err(), "{input}");
         }
-        assert!(Config::parse("magnifier_radius = 0\nmagnifier_zoom = 32").is_ok());
+    }
+
+    #[test]
+    fn picker_zoom_boundaries_and_round_trip() {
+        assert_eq!(Config::parse("version = 1\n").unwrap().picker_zoom, 4);
+        for zoom in [1, 4, 32] {
+            let config = Config::parse(&format!("version = 1\npicker_zoom = {zoom}\n")).unwrap();
+            assert_eq!(config.picker_zoom, zoom);
+            let saved = toml::to_string_pretty(&config).unwrap();
+            assert_eq!(Config::parse(&saved).unwrap(), config);
+        }
+        for zoom in [0, 33] {
+            assert!(Config::parse(&format!("picker_zoom = {zoom}\n")).is_err());
+        }
+    }
+
+    #[test]
+    fn migrates_legacy_magnifier_settings_without_accepting_unknown_fields() {
+        for prefix in ["", "version = 1\n"] {
+            let text =
+                format!("{prefix}history_limit = 42\nmagnifier_radius = 7\nmagnifier_zoom = 10\n");
+            let config = Config::parse(&text).unwrap();
+            assert_eq!(config.history_limit, 42);
+            assert_eq!(config.picker_zoom, 4);
+            let saved = toml::to_string_pretty(&config).unwrap();
+            assert!(!saved.contains("magnifier_radius"));
+            assert!(!saved.contains("magnifier_zoom"));
+            assert_eq!(Config::parse(&saved).unwrap(), config);
+            assert!(Config::parse(&format!("{text}unknown_setting = 1\n")).is_err());
+        }
+        assert!(Config::parse("version = 2\nmagnifier_radius = 7").is_err());
     }
 }

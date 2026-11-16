@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Swatch Board Native Cancellation Probe
-Comment=Opt-in feasibility test for native color-picker Escape cancellation
-Exec=phase1a_cancel_probe --authorize
-Icon=applications-graphics
-Terminal=false
-NoDisplay=true
-Categories=Graphics;

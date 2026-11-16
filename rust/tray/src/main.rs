@@ -16,6 +16,7 @@ use tokio::{
 use zbus::Connection;
 
 const PICK_TIMEOUT: Duration = Duration::from_secs(300);
+const PICK_CLEANUP_TIMEOUT: Duration = Duration::from_secs(5);
 type HistoryRow = (String, String, String, String);
 
 enum Request {
@@ -207,6 +208,25 @@ async fn close_history(child: &mut tokio::process::Child) -> Result<(), String> 
     }
 }
 
+async fn stop_picker(child: &mut tokio::process::Child) {
+    match child.try_wait() {
+        Ok(Some(_)) => return,
+        Ok(None) => {
+            if let Some(pid) = child.id() {
+                // An unreaped child retains its PID, so it cannot have been reused.
+                unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) };
+            }
+        }
+        Err(_) => {}
+    }
+    if !matches!(
+        tokio::time::timeout(PICK_CLEANUP_TIMEOUT, child.wait()).await,
+        Ok(Ok(_))
+    ) {
+        let _ = child.kill().await;
+    }
+}
+
 async fn supervise(
     mut child: tokio::process::Child,
     mut shutdown: watch::Receiver<bool>,
@@ -230,11 +250,11 @@ async fn supervise(
             }
         } => outcome,
         _ = tokio::time::sleep(timeout) => {
-            let _ = child.kill().await;
+            stop_picker(&mut child).await;
             Outcome::Failed("picker timed out".into())
         },
         _ = shutdown.changed() => {
-            let _ = child.kill().await;
+            stop_picker(&mut child).await;
             Outcome::Shutdown
         },
     };
@@ -453,7 +473,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         history_child = None;
                     }
-                    match Command::new(picker_path()).arg("--radius").arg(config.magnifier_radius.to_string()).arg("--zoom").arg(config.magnifier_zoom.to_string()).stdout(Stdio::piped()).kill_on_drop(true).spawn() {
+                    match Command::new(picker_path()).arg("--zoom").arg(config.picker_zoom.to_string()).stdout(Stdio::piped()).kill_on_drop(true).spawn() {
                         Ok(child) => {
                             let tx = requests.clone();
                             let stop = shutdown_rx.clone();

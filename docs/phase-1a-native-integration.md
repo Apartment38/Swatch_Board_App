@@ -1,5 +1,8 @@
 # Native application integration — resumed acceptance
 
+> **Historical:** This acceptance concerns the former custom picker, not the
+> current KWin picker. See the [current handoff](current-handoff.md).
+
 **Phase 1A PASSED. The Rust-owned picker is the default and only backend.**
 
 The resumed work fixed the backend's remaining known routing and display-transform defects, then exercised the fixes in both a private two-output KWin lab and the actual 2880×1800, 1.75× eDP-1 target. These are real compositor/portal/PipeWire/Wayland integration checks, not unit mocks.

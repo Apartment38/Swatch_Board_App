@@ -14,6 +14,7 @@ swatch-board-clipboard = { path = "../clipboard" }
 swatch-board-config-core = { path = "../config-core" }
 ashpd.workspace = true
 futures-util = "=0.3.34"
+libc = "=0.2.191"
 tokio = { workspace = true, features = ["process", "io-util", "signal"] }
 serde = "=1.0.229"
 zbus.workspace = true

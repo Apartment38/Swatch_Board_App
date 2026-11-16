@@ -12,8 +12,12 @@ stage=$(mktemp -d "${TMPDIR:-/tmp}/swatch-release.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 cd "$root"
 cargo build --release --offline --workspace --locked
+cmake -S kwin -B target/kwin -DCMAKE_BUILD_TYPE=Release
+cmake --build target/kwin
 python3 -m unittest discover -s packaging -p 'test_*.py'
-PREFIX=/usr DESTDIR="$stage" BINDIR="$root/target/release" bash packaging/install.sh
+PREFIX=/usr DESTDIR="$stage" BINDIR="$root/target/release" QT_PLUGIN_DIR=/usr/lib/qt6/plugins bash packaging/install.sh
+cmp "$root/target/kwin/lib/swatchboardpicker.so" "$stage/usr/lib/qt6/plugins/kwin/effects/plugins/swatchboardpicker.so"
+cmp "$root/kwin/LICENSE" "$stage/usr/share/licenses/swatch-board/KWIN-LICENSE"
 bin="$stage/usr/bin"
 for name in swatch-board-picker swatch-board-tray swatch-board-history \
             swatch-board-config swatch-board swatch-board-theme-worker; do
@@ -21,7 +25,8 @@ for name in swatch-board-picker swatch-board-tray swatch-board-history \
 done
 "$bin/swatch-board-picker" --version | grep -Fx "Swatch Board Picker 0.1.0"
 "$bin/swatch-board-picker" --help >/dev/null
-python3 - "$stage" "$root" <<'PY'
+rust_license_dir=${RUST_LICENSE_DIR:-"$(rustc --print sysroot)/share/doc/rust"}
+python3 - "$stage" "$root" "$rust_license_dir" <<'PY'
 import json
 from pathlib import Path
 import subprocess
@@ -29,6 +34,7 @@ import sys
 
 prefix = Path(sys.argv[1]) / "usr"
 source = Path(sys.argv[2])
+rust_source = Path(sys.argv[3])
 # Check all shipped plugin/schema bytes, not merely their directory names.
 for category in ("plugins", "schemas"):
     original = source / category
@@ -42,6 +48,14 @@ for category in ("plugins", "schemas"):
             raise RuntimeError(f"{category}/{relative}: installed bytes differ")
 if (prefix / "share/licenses/swatch-board/LICENSE").read_bytes() != (source / "LICENSE").read_bytes():
     raise RuntimeError("installed license differs")
+if (prefix / "share/licenses/swatch-board/THIRD_PARTY_NOTICES.txt").read_bytes() != (source / "THIRD_PARTY_NOTICES.txt").read_bytes():
+    raise RuntimeError("installed third-party notices differ")
+rust_installed = prefix / "share/licenses/swatch-board/rust-standard-library"
+for relative in [Path("COPYRIGHT-library.html"), *(
+    p.relative_to(rust_source) for p in (rust_source / "licenses").rglob("*") if p.is_file()
+)]:
+    if (rust_installed / relative).read_bytes() != (rust_source / relative).read_bytes():
+        raise RuntimeError(f"installed Rust notice differs: {relative}")
 for name in ("ghostty", "zed", "kde", "example-terminal"):
     plugin = prefix / "share/swatch-board/plugins" / name
     manifest = json.loads((plugin / "manifest.json").read_text())

@@ -1,0 +1,8 @@
+{
+  "sha256": "bc165cfb5999fa347017ea04b4773734cc1e3dfd3bc565054b9aa55bb36a2030",
+  "destinations": [
+    "/workspace/kestrel-swatch/target/debug/build/swatch-board-theme-core/9f81de56ac3fce10/out/swatch-board-theme-worker",
+    "/workspace/kestrel-swatch/target/debug/build/swatch-board/bb0b50b96af84716/out/swatch-board-theme-worker",
+    "/workspace/kestrel-swatch/target/debug/build/swatch-board/26f9818bb608929c/out/swatch-board-theme-worker"
+  ]
+}
