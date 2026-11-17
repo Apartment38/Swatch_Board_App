@@ -765,8 +765,6 @@ class Frontend : public QWidget {
       });
       labelToggle->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
       layout->addWidget(toolbar);
-      connectionStatus = new QLabel(outer);
-      layout->addWidget(connectionStatus);
       splitter = new QSplitter(Qt::Horizontal, outer);
       historyBox = new QGroupBox("History");
       historyLayout = new QVBoxLayout(historyBox);
@@ -819,7 +817,13 @@ class Frontend : public QWidget {
       layout->addWidget(verticalSplitter, 1);
       status = new QLabel(outer);
       status->setWordWrap(true);
-      layout->addWidget(status);
+      status->setAccessibleName("Board message");
+      connectionStatus = new QLabel(outer);
+      connectionStatus->setAccessibleName("Connection status");
+      auto statusRow = new QHBoxLayout;
+      statusRow->addWidget(status, 1);
+      statusRow->addWidget(connectionStatus, 0, Qt::AlignBottom);
+      layout->addLayout(statusRow);
       replace(outer);
     } else {
       int current = tabs->currentIndex();
