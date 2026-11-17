@@ -1759,16 +1759,22 @@ QWidget *Frontend::themePage(Scene *reuse) {
   connect(scene, &QComboBox::activated, this, [this, scene](int) {
     send({{"op", "theme_scene"}, {"id", scene->currentData().toString()}});
   });
-  outerLayout->addWidget(scene);
+  auto previewLayout = new QHBoxLayout;
+  previewLayout->addWidget(scene, 0, Qt::AlignTop);
   if (t.value("scene").isObject()) {
+    Scene *preview;
     if (reuse) {
       reuse->setParent(outer);
-      outerLayout->addWidget(reuse);
+      preview = reuse;
     } else {
-      outerLayout->addWidget(new Scene(
-          t.value("scene").toObject(), [this](QJsonObject o) { send(o); }, outer));
+      preview = new Scene(
+          t.value("scene").toObject(), [this](QJsonObject o) { send(o); }, outer);
     }
+    preview->setMaximumHeight(preview->fontMetrics().height() * 8);
+    preview->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+    previewLayout->addWidget(preview, 1);
   }
+  outerLayout->addLayout(previewLayout, 1);
   auto roles = new QGroupBox("Theme roles", w);
   auto rl = new QVBoxLayout(roles);
   for (auto value : array(t, "roles")) {
@@ -1859,7 +1865,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
   auto controlsScroll = scroll(w);
   controlsScroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
   controlsScroll->setMinimumHeight(48);
-  outerLayout->addWidget(controlsScroll, 1);
+  outerLayout->addWidget(controlsScroll, 3);
   return outer;
 }
 
