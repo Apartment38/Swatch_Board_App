@@ -951,25 +951,34 @@ class Frontend : public QWidget {
          ss = decimal("Saturation", s, 0, 100, hbox),
          vv = decimal("Value", v, 0, 100, hbox);
     for (auto x : {hh, ss, vv}) {
-      x->setDecimals(6);
+      x->setDecimals(1);
       x->setValue(x == hh ? h : x == ss ? s : v);
       x->setSingleStep(.1);
+      x->setSuffix(x == hh ? QString::fromUtf8("°") : "%");
       x->setMaximumWidth(x->sizeHint().width());
+      auto label = new QLabel(x == hh ? "H" : x == ss ? "S" : "V", hbox);
+      label->setBuddy(x);
+      hl->addWidget(label);
       hl->addWidget(x);
+    }
+    const double displayedH = hh->value(), displayedS = ss->value(),
+                 displayedV = vv->value();
+    for (auto x : {hh, ss, vv}) {
       connect(x, &QDoubleSpinBox::editingFinished, this,
-              [this, hh, ss, vv, h, s, v] {
-                if (qAbs(hh->value() - h) < 0.00000051 &&
-                    qAbs(ss->value() - s) < 0.00000051 &&
-                    qAbs(vv->value() - v) < 0.00000051)
+              [this, hh, ss, vv, h, s, v, displayedH, displayedS, displayedV] {
+                bool changedH = hh->value() != displayedH;
+                bool changedS = ss->value() != displayedS;
+                bool changedV = vv->value() != displayedV;
+                if (!changedH && !changedS && !changedV)
                   return;
                 send({{"op", "mixer_hsv"},
-                      {"h", hh->value()},
-                      {"s", ss->value()},
-                      {"v", vv->value()}});
+                      {"h", changedH ? hh->value() : h},
+                      {"s", changedS ? ss->value() : s},
+                      {"v", changedV ? vv->value() : v}});
               });
     }
     hl->addStretch();
-    form->addRow("Hue / saturation / value", hbox);
+    form->addRow("HSV", hbox);
     auto rw = new QWidget(w);
     auto rl = new QHBoxLayout(rw);
     rl->setContentsMargins(0, 0, 0, 0);
@@ -979,6 +988,9 @@ class Frontend : public QWidget {
       auto x = spin(names[i], rgba[i].toInt(), 0, 255, rw);
       x->setMaximumWidth(x->sizeHint().width());
       channels << x;
+      auto label = new QLabel(QString(names[i]).left(1), rw);
+      label->setBuddy(x);
+      rl->addWidget(label);
       rl->addWidget(x);
     }
     rl->addStretch();
@@ -990,7 +1002,7 @@ class Frontend : public QWidget {
               {"b", channels[2]->value()},
               {"a", channels[3]->value()}});
       });
-    form->addRow("Red / green / blue / alpha", rw);
+    form->addRow("RGBA", rw);
     auto fields = array(m, "fields");
     const char *labels[] = {"HEX", "RGB", "RGBA", "HSL", "HSV"};
     for (int i = 0; i < 5; i++) {
@@ -1213,6 +1225,28 @@ public:
         click(tabs->widget(0), "Redo");
         check(str(object(state.value("mixer")), "current") == "#04050642",
               "Redo");
+        send({{"op", "mixer_hsv"}, {"h", 123.456}, {"s", 67.891}, {"v", 42.345}});
+        auto hsvBefore = array(object(state.value("mixer")), "hsv");
+        auto findHsv = [&](const QString &name) -> QDoubleSpinBox * {
+          for (auto control : tabs->widget(0)->findChildren<QDoubleSpinBox *>())
+            if (control->accessibleName() == name)
+              return control;
+          return nullptr;
+        };
+        auto hue = findHsv("Hue");
+        check(hue, "Hue spinbox available");
+        if (hue) {
+          QMetaObject::invokeMethod(hue, "editingFinished");
+          auto hsvAfter = array(object(state.value("mixer")), "hsv");
+          check(hsvBefore == hsvAfter, "Unchanged HSV focus preserves precision");
+          hue->setValue(124.5);
+          QMetaObject::invokeMethod(hue, "editingFinished");
+          hsvAfter = array(object(state.value("mixer")), "hsv");
+          check(qAbs(hsvAfter[0].toDouble() - 124.5) < .001 &&
+                    qAbs(hsvAfter[1].toDouble() - hsvBefore[1].toDouble()) < .0001 &&
+                    qAbs(hsvAfter[2].toDouble() - hsvBefore[2].toDouble()) < .0001,
+                "Fractional HSV edit preserves untouched channels");
+        }
         send({{"op", "mixer_hsv"}, {"h", 0}, {"s", 100}, {"v", 100}});
         check(mixerWheel && mixerSpectrum, "Mixer wheel and gradient available");
         if (mixerWheel && mixerSpectrum) {
@@ -1285,7 +1319,19 @@ public:
           historyToggle->setChecked(true);
           check(historyScroll->isVisible(), "History expands");
         }
+        QSize mixerSize = size();
+        resize(900, 700);
         shot("mixer");
+        resize(540, 360);
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        if (auto control = findHsv("Hue"))
+          for (auto parent = control->parentWidget(); parent; parent = parent->parentWidget())
+            if (auto scroll = qobject_cast<QScrollArea *>(parent)) {
+              scroll->ensureWidgetVisible(control);
+              break;
+            }
+        shot("mixer-small");
+        resize(mixerSize);
         auto activation = state;
         activation["show_palette"] = true;
         updateState(activation);
