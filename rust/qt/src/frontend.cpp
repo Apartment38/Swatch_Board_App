@@ -464,6 +464,7 @@ class Frontend : public QWidget {
   QPointer<MixerWheel> mixerWheel;
   QJsonObject configDraft, generationDraft, themeDraft;
   bool themePreviewVisible = true, themePreviewOverride = false;
+  bool themeProjectVisible = false;
   bool configInitialized = false;
   QJsonValue request(QJsonObject req) {
     auto bytes = QJsonDocument(req).toJson(QJsonDocument::Compact);
@@ -1344,7 +1345,30 @@ public:
         check(!array(object(state.value("theme")), "plugins").isEmpty(),
               "Theme plugin available");
         if (!array(object(state.value("theme")), "plugins").isEmpty()) {
+          click(tabs->widget(2), "Project");
+          auto dialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
+          check(dialog && dialog->isVisible(), "Theme project opens without a project");
           click(tabs->widget(2), "New theme");
+          check(!array(object(state.value("theme")), "roles").isEmpty(), "New theme from project dialog");
+          dialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
+          check(dialog && dialog->isVisible(), "Theme project remains open after new theme");
+          if (dialog) {
+            auto name = dialog->findChild<QLineEdit *>();
+            check(name && name->accessibleName() == "Theme name", "Theme project name available");
+            if (name) {
+              name->setText("Smoke theme");
+              QMetaObject::invokeMethod(name, "editingFinished");
+              check(str(object(object(state.value("theme")).value("project")), "name") == "Smoke theme",
+                    "Theme project name updated");
+            }
+          }
+          dialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
+          if (dialog) {
+            QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+            check(dialog->grab().save(dir + "/theme-project.png"), "Screenshot theme project");
+            dialog->reject();
+            check(!dialog->isVisible(), "Theme project closes");
+          }
           check(!pinnedCurrent->isVisible(), "Mixer current color hidden on Theme");
           for (auto b : boardContent->parentWidget()->findChildren<QPushButton *>())
             if (b->accessibleName().startsWith("Current color"))
@@ -1374,10 +1398,34 @@ public:
             break;
           }
           check(roleFieldFound, "Theme role color field available");
+          click(tabs->widget(2), "Save");
+          click(tabs->widget(2), "Project");
+          auto projectDialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
+          QComboBox *savedThemes = nullptr;
+          if (projectDialog)
+            for (auto combo : projectDialog->findChildren<QComboBox *>())
+              if (combo->accessibleName() == "Saved themes") savedThemes = combo;
+          check(savedThemes && savedThemes->count() > 0, "Saved theme available in project dialog");
+          if (savedThemes && savedThemes->count() > 0) {
+            savedThemes->setCurrentIndex(0);
+            click(tabs->widget(2), "Open theme");
+            check(str(object(object(state.value("theme")).value("project")), "name") == "Smoke theme",
+                  "Open saved theme from project dialog");
+          }
+          projectDialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
+          if (projectDialog) projectDialog->reject();
         }
         shot("theme");
         resize(540, 360);
         shot("theme-small");
+        click(tabs->widget(2), "Project");
+        if (auto dialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog")) {
+          QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          check(dialog->isVisible() && dialog->size().width() <= width() && dialog->size().height() <= height(),
+                "Theme project fits at small size");
+          check(dialog->grab().save(dir + "/theme-project-small.png"), "Screenshot small theme project");
+          dialog->reject();
+        } else check(false, "Theme project dialog available at small size");
         check(size() == QSize(540, 360), "Board reaches 540x360");
         auto visibleInWindow = [this](QWidget *widget) {
           if (!widget || !widget->isVisible()) return false;
@@ -1419,6 +1467,8 @@ public:
           check(insideViewport(role) && insideViewport(save),
                 "Theme role and Save visible at small size");
           if (exportButton && save) {
+            activateWindow();
+            QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
             save->setFocus(Qt::TabFocusReason);
             for (int i = 0; i < 100 && !exportButton->hasFocus(); ++i) {
               auto focused = QApplication::focusWidget();
@@ -1752,6 +1802,10 @@ QWidget *Frontend::themePage(Scene *reuse) {
   outer->installEventFilter(this);
   auto outerLayout = new QVBoxLayout(outer);
   outerLayout->setContentsMargins(5, 5, 5, 5);
+  auto projectDialog = new QDialog(outer);
+  projectDialog->setObjectName("themeProjectDialog");
+  projectDialog->setWindowTitle("Theme project");
+  auto projectLayout = new QVBoxLayout(projectDialog);
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
   auto selection = new QFormLayout;
@@ -1802,6 +1856,12 @@ QWidget *Frontend::themePage(Scene *reuse) {
   connect(name, &QLineEdit::editingFinished, this, [this, name] {
     send({{"op", "theme_name"}, {"name", name->text()}});
   });
+  selection->addRow("Name", name);
+  projectLayout->addLayout(selection);
+  auto closeProject = new QDialogButtonBox(QDialogButtonBox::Close, projectDialog);
+  connect(closeProject, &QDialogButtonBox::rejected, projectDialog, &QDialog::reject);
+  connect(projectDialog, &QDialog::finished, this, [this] { themeProjectVisible = false; });
+  projectLayout->addWidget(closeProject);
   auto actions = new QToolBar(w);
   actions->setMovable(false);
   for (auto pair : QList<QPair<QString, QString>>{
@@ -1856,6 +1916,14 @@ QWidget *Frontend::themePage(Scene *reuse) {
     previewContainer->setVisible(visible);
   });
   actions->insertWidget(actions->actions().first(), previewToggle);
+  auto projectButton = toolButton("Project", "document-properties", w, [this, projectDialog] {
+    themeProjectVisible = true;
+    projectDialog->show();
+    projectDialog->raise();
+    projectDialog->activateWindow();
+  });
+  actions->insertWidget(actions->actions().first(), projectButton);
+  if (themeProjectVisible) projectDialog->show();
   outerLayout->addWidget(previewContainer, 1);
   auto roles = new QGroupBox("Theme roles", w);
   auto rl = new QVBoxLayout(roles);
@@ -1903,8 +1971,6 @@ QWidget *Frontend::themePage(Scene *reuse) {
     rl->addWidget(row);
   }
   l->addWidget(roles);
-  l->addLayout(selection);
-  l->addWidget(name);
   for (auto value : array(t, "preview")) {
     auto o = value.toObject();
     auto group = new QGroupBox(str(o, "path"), w);
