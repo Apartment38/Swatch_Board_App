@@ -1114,6 +1114,19 @@ protected:
   bool eventFilter(QObject *watched, QEvent *event) override {
     if (event->type() == QEvent::Resize) {
       auto page = qobject_cast<QWidget *>(watched);
+      if (page && page->objectName() == "paletteGenerator") {
+        auto columns = qobject_cast<QBoxLayout *>(page->layout());
+        auto parameters = page->findChild<QWidget *>("paletteParameters", Qt::FindDirectChildrenOnly);
+        auto selector = page->findChild<QWidget *>("paletteSelector", Qt::FindDirectChildrenOnly);
+        if (columns && parameters && selector) {
+          const bool compact = page->width() < 620;
+          columns->setDirection(compact ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+          columns->removeWidget(parameters);
+          columns->removeWidget(selector);
+          columns->addWidget(compact ? selector : parameters, 0, Qt::AlignTop);
+          columns->addWidget(compact ? parameters : selector, 0, Qt::AlignTop);
+        }
+      }
       if (page && page->objectName() == "themePage") {
         sizePinnedPalette();
         auto preview = page->findChild<QWidget *>("themePreviewContainer");
@@ -1380,6 +1393,28 @@ public:
               "Palette swatch selects mixer color");
         tabs->setCurrentIndex(1);
         shot("palette");
+        resize(540, 360);
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        auto generator = tabs->widget(1)->findChild<QWidget *>("paletteGenerator");
+        auto generate = generator ? generator->findChild<QPushButton *>(QString(), Qt::FindChildrenRecursively) : nullptr;
+        if (generator) {
+          for (auto b : generator->findChildren<QPushButton *>())
+            if (b->text() == "Generate") generate = b;
+        }
+        check(generate && generate->text() == "Generate", "Generate control available");
+        if (generate) {
+          for (auto parent = generate->parentWidget(); parent; parent = parent->parentWidget())
+            if (auto scroll = qobject_cast<QScrollArea *>(parent)) {
+              scroll->ensureWidgetVisible(generate);
+              break;
+            }
+          shot("palette-small");
+          generate->click();
+          check(array(object(state.value("palette")), "swatches").size() == 5,
+                "Generate palette at compact size");
+        }
+        resize(900, 700);
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
         auto edits = tabs->widget(1)->findChildren<QLineEdit *>();
         for (auto e : edits)
           if (e->accessibleName() == "Palette name") {
@@ -1659,7 +1694,20 @@ QWidget *Frontend::palettePage() {
   }));
   l->addWidget(library);
   auto gen = new QGroupBox("Generate palette", w);
-  auto f = new QFormLayout(gen);
+  gen->setObjectName("paletteGenerator");
+  gen->installEventFilter(this);
+  auto columns = new QBoxLayout(QBoxLayout::LeftToRight, gen);
+  auto parameters = new QWidget(gen);
+  parameters->setObjectName("paletteParameters");
+  auto f = new QFormLayout(parameters);
+  f->setContentsMargins(0, 0, 0, 0);
+  auto selector = new QWidget(gen);
+  selector->setObjectName("paletteSelector");
+  auto selectorLayout = new QVBoxLayout(selector);
+  selectorLayout->setContentsMargins(0, 0, 0, 0);
+  selectorLayout->setSpacing(3);
+  columns->addWidget(parameters, 0, Qt::AlignTop);
+  columns->addWidget(selector, 0, Qt::AlignTop);
   auto generations = combo("Palette generations", array(p, "generations"), gen);
   int generationIndex =
       generations->findData(generationDraft.value("generation").toString());
@@ -1719,7 +1767,8 @@ QWidget *Frontend::palettePage() {
   connect(base, &QLineEdit::textChanged, wheel, [wheel](const QString &text) {
     wheel->setColor(color(text));
   });
-  f->addRow("Choose base", wheel);
+  wheel->setFixedSize(140, 140);
+  selectorLayout->addWidget(wheel, 0, Qt::AlignLeft);
   auto hmin = decimal("Minimum hue", generationDraft.value("hmin").toDouble(0),
                       0, 360, gen),
        hmax = decimal("Maximum hue",
@@ -1763,13 +1812,14 @@ QWidget *Frontend::palettePage() {
   previewLayout->setSpacing(0);
   auto previewScroll = new QScrollArea(gen);
   previewScroll->setWidgetResizable(true);
-  previewScroll->setFixedHeight(76);
+  previewScroll->setFixedHeight(38);
   previewScroll->setWidget(preview);
   previewScroll->setAccessibleName("Generated palette preview");
-  f->addRow("Preview", previewScroll);
+  selectorLayout->addWidget(previewScroll);
   auto previewError = new QLabel(gen);
   previewError->setWordWrap(true);
-  f->addRow(previewError);
+  previewError->hide();
+  selectorLayout->addWidget(previewError);
   auto makeRequest = [=, this](const QString &op) -> QJsonObject {
     bool ok = false;
     qulonglong sv = seed->text().toULongLong(&ok);
@@ -1800,6 +1850,7 @@ QWidget *Frontend::palettePage() {
     QJsonObject result = req.isEmpty() ? QJsonObject{{"error", "Enter a valid seed and contrast."}}
                                        : request(req).toObject();
     previewError->setText(str(result, "error"));
+    previewError->setVisible(!previewError->text().isEmpty());
     while (auto item = previewLayout->takeAt(0)) {
       if (item->widget()) item->widget()->deleteLater();
       delete item;
@@ -1829,7 +1880,7 @@ QWidget *Frontend::palettePage() {
   for (auto control : {hmin, hmax, lmin, lmax, cmin, cmax})
     connect(control, &QDoubleSpinBox::valueChanged, gen, schedulePreview);
   previewTimer->start(0);
-  f->addRow(button("Generate", gen, [=, this] {
+  selectorLayout->addWidget(button("Generate", gen, [=, this] {
     auto req = makeRequest("palette_generate");
     if (req.isEmpty()) {
       QMessageBox::warning(this, "Invalid generation settings",
