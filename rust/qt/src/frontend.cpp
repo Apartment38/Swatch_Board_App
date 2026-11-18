@@ -193,7 +193,7 @@ public:
   Spectrum(double hue, double sat, double val,
            std::function<void(double, double, double, bool)> f, QWidget *parent)
       : QWidget(parent), h(hue), s(sat), v(val), changed(f) {
-    setMinimumSize(180, 120);
+    setFixedSize(156, 156);
     setFocusPolicy(Qt::StrongFocus);
     setAccessibleName("Saturation and value spectrum; arrow keys adjust");
   }
@@ -269,8 +269,7 @@ public:
              std::function<void(double, double, double, bool)> callback,
              QWidget *parent)
       : QWidget(parent), h(hue), s(sat), v(val), changed(callback) {
-    setMinimumSize(120, 120);
-    setMaximumSize(240, 240);
+    setFixedSize(120, 120);
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     setFocusPolicy(Qt::StrongFocus);
     setAccessibleName("Mixer color wheel; arrow keys adjust hue and saturation");
@@ -546,25 +545,28 @@ class Frontend : public QWidget {
       s = str(state, "message");
     return s;
   }
-  bool compactPaletteShelf = false;
+  bool compactShelf = false;
   int normalPaletteShelfHeight = 110;
   void sizePinnedPalette() {
     if (!pinnedScroll || !tabs) return;
     auto page = tabs->widget(2);
     bool compact = tabs->currentIndex() == 2 && page &&
                    page->height() < page->fontMetrics().height() * 22;
-    bool compactPalette = tabs->currentIndex() == 1 &&
-                          height() < fontMetrics().height() * 24;
-    if (verticalSplitter && compactPalette != compactPaletteShelf) {
+    const bool mixerEmptyShelf = tabs->currentIndex() == 0 &&
+                                 array(object(state.value("palette")), "swatches").isEmpty();
+    const int shelfThreshold = fontMetrics().height() * 24;
+    const bool shrinkShelf = (tabs->currentIndex() == 1 && height() < shelfThreshold) ||
+                             (mixerEmptyShelf && height() <= qMax(360, shelfThreshold));
+    if (verticalSplitter && shrinkShelf != compactShelf) {
       auto sizes = verticalSplitter->sizes();
       if (sizes.size() == 2) {
-        if (compactPalette)
+        if (shrinkShelf)
           normalPaletteShelfHeight = sizes[1];
         verticalSplitter->setSizes({verticalSplitter->height(),
-                                    compactPalette ? pinnedScroll->minimumHeight()
-                                                   : normalPaletteShelfHeight});
+                                    shrinkShelf ? pinnedScroll->minimumHeight()
+                                                : normalPaletteShelfHeight});
       }
-      compactPaletteShelf = compactPalette;
+      compactShelf = shrinkShelf;
     }
     pinnedScroll->setMaximumHeight(compact ? page->fontMetrics().height() * 3
                                           : QWIDGETSIZE_MAX);
@@ -684,6 +686,8 @@ class Frontend : public QWidget {
     auto s = new QScrollArea;
     s->setWidgetResizable(true);
     s->setWidget(content);
+    if (content->objectName() == "mixerPage")
+      s->viewport()->installEventFilter(this);
     return s;
   }
   QWidget *pinnedPalette() {
@@ -998,9 +1002,12 @@ class Frontend : public QWidget {
   QWidget *mixer() {
     auto m = object(state.value("mixer"));
     auto w = new QWidget;
+    w->setObjectName("mixerPage");
     auto l = new QVBoxLayout(w);
     auto hsv = array(m, "hsv"), rgba = array(m, "rgba");
     double h = hsv[0].toDouble(), s = hsv[1].toDouble(), v = hsv[2].toDouble();
+    auto columns = new QVBoxLayout;
+    columns->setObjectName("mixerColumns");
     auto controls = new QHBoxLayout;
     auto changed = [this](double h, double s, double v, bool final) {
           spectrumDragging = true;
@@ -1014,10 +1021,13 @@ class Frontend : public QWidget {
         };
     mixerWheel = new MixerWheel(h, s, v, changed, w);
     mixerSpectrum = new Spectrum(h, s, v, changed, w);
-    controls->addWidget(mixerWheel);
-    controls->addWidget(mixerSpectrum, 1);
-    l->addLayout(controls);
-    auto form = new QFormLayout;
+    controls->addWidget(mixerSpectrum, 0, Qt::AlignTop);
+    controls->addWidget(mixerWheel, 0, Qt::AlignTop);
+    columns->addLayout(controls);
+    l->addLayout(columns);
+    auto inputs = new QWidget(w);
+    auto form = new QFormLayout(inputs);
+    form->setContentsMargins(0, 0, 0, 0);
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
     auto hbox = new QWidget(w);
@@ -1107,7 +1117,8 @@ class Frontend : public QWidget {
     form->addRow(formatLabel, formatRow);
     form->addRow("CMYK", new QLabel(str(m, "cmyk"), w));
     form->addRow("Output", new QLabel(str(m, "output"), w));
-    l->addLayout(form);
+    columns->addWidget(inputs, 1, Qt::AlignTop);
+    setTabOrder(mixerSpectrum, mixerWheel);
     auto actions = new QToolBar(w);
     actions->setMovable(false);
     actions->setProperty("boardAction", true);
@@ -1199,6 +1210,24 @@ protected:
   bool eventFilter(QObject *watched, QEvent *event) override {
     if (event->type() == QEvent::Resize) {
       auto page = qobject_cast<QWidget *>(watched);
+      auto scroll = page ? qobject_cast<QScrollArea *>(page->parentWidget()) : nullptr;
+      if (scroll && page == scroll->viewport() && scroll->widget() &&
+          scroll->widget()->objectName() == "mixerPage") {
+        auto mixer = scroll->widget();
+        auto columns = mixer->findChild<QBoxLayout *>("mixerColumns");
+        auto selectors = columns->itemAt(0)->layout();
+        auto spectrum = selectors->itemAt(0)->widget();
+        auto wheel = selectors->itemAt(1)->widget();
+        auto inputs = columns->itemAt(1)->widget();
+        const auto margins = mixer->layout()->contentsMargins();
+        const int widePlane = 208;
+        const int width = static_cast<QResizeEvent *>(event)->size().width();
+        const bool wide = width >= margins.left() + margins.right() + widePlane +
+                                      wheel->width() + inputs->sizeHint().width() +
+                                      selectors->spacing() + columns->spacing();
+        columns->setDirection(wide ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
+        spectrum->setFixedSize(wide ? widePlane : 156, wide ? widePlane : 156);
+      }
       if (page && page->objectName() == "paletteGenerator") {
         auto columns = qobject_cast<QBoxLayout *>(page->layout());
         auto parameters = page->findChild<QWidget *>("paletteParameters", Qt::FindDirectChildrenOnly);
@@ -1472,6 +1501,15 @@ public:
           QMouseEvent gradientRelease(QEvent::MouseButtonRelease, point, Qt::LeftButton,
                                       Qt::NoButton, Qt::NoModifier);
           QApplication::sendEvent(mixerSpectrum, &gradientRelease);
+          const auto beforeKeys = array(object(state.value("mixer")), "hsv");
+          key(mixerSpectrum, Qt::Key_Right, Qt::NoModifier);
+          key(mixerSpectrum, Qt::Key_Up, Qt::NoModifier);
+          hsv = array(object(state.value("mixer")), "hsv");
+          check(qAbs(hsv[0].toDouble() - beforeKeys[0].toDouble()) < .001 &&
+                    qAbs(hsv[1].toDouble() - beforeKeys[1].toDouble() - 1) < .001 &&
+                    qAbs(hsv[2].toDouble() - beforeKeys[2].toDouble() - 1) < .001 &&
+                    str(object(state.value("mixer")), "current").endsWith("80"),
+                "Spectrum arrow keys adjust saturation and value without changing hue or alpha");
           send({{"op", "mixer_hsv"}, {"h", 210}, {"s", 80}, {"v", 0}});
           QPointF right(mixerWheel->width() - 8.0, mixerWheel->height() / 2.0);
           QMouseEvent blackPress(QEvent::MouseButtonPress, right, Qt::LeftButton,
@@ -1514,15 +1552,32 @@ public:
         resize(900, 700);
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
         auto mixerScroll = qobject_cast<QScrollArea *>(tabs->widget(0));
+        auto boundsInMixer = [mixerScroll](QWidget *widget) {
+          return QRect(widget->mapTo(mixerScroll->viewport(), QPoint()), widget->size());
+        };
+        auto inMixerViewport = [&](QWidget *widget) {
+          return mixerScroll->viewport()->rect().contains(boundsInMixer(widget));
+        };
+        auto hueInput = findHsv("Hue");
+        check(mixerSpectrum->width() == mixerSpectrum->height() &&
+                  inMixerViewport(mixerSpectrum) && inMixerViewport(mixerWheel) &&
+                  hueInput && inMixerViewport(hueInput) &&
+                  boundsInMixer(mixerSpectrum).right() < boundsInMixer(mixerWheel).left() &&
+                  boundsInMixer(mixerWheel).right() < boundsInMixer(hueInput).left(),
+              "Wide Mixer shows a square spectrum, wheel, and inputs in one row");
         for (auto b : tabs->widget(0)->findChildren<QAbstractButton *>())
           if (b->accessibleName() == "Copy" || b->accessibleName() == "Add to palette") {
-            QRect bounds(b->mapTo(mixerScroll->viewport(), QPoint()), b->size());
-            check(mixerScroll->viewport()->rect().contains(bounds),
+            check(inMixerViewport(b),
                   b->accessibleName() + " visible in initial Mixer viewport");
           }
         shot("mixer");
         resize(540, 360);
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        check(mixerSpectrum->width() == mixerSpectrum->height() &&
+                  inMixerViewport(mixerSpectrum) && inMixerViewport(mixerWheel) &&
+                  hueInput && boundsInMixer(hueInput).top() > boundsInMixer(mixerSpectrum).bottom() &&
+                  mixerScroll->horizontalScrollBar()->maximum() == 0,
+              "Compact Mixer shows both selectors and stacks inputs in a vertical scroll");
         shot("mixer-small");
         for (auto field : mixerScroll->findChildren<QLineEdit *>())
           if (field->accessibleName() == "Color value") {
