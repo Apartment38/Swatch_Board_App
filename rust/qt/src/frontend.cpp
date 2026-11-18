@@ -1219,13 +1219,16 @@ public:
         if (!ok)
           failures.append(what);
       };
-      auto shot = [&](const QString &name) {
+      auto settleLayout = [&] {
         if (layout())
           layout()->activate();
         QCoreApplication::sendPostedEvents(nullptr, QEvent::LayoutRequest);
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
         if (layout())
           layout()->activate();
+      };
+      auto shot = [&](const QString &name) {
+        settleLayout();
         check(grab().save(dir + "/" + name + ".png"), "Screenshot " + name);
       };
       auto click = [&](QWidget *root, const QString &name) {
@@ -1412,8 +1415,11 @@ public:
               "Palette swatch selects mixer color");
         tabs->setCurrentIndex(1);
         shot("palette");
+        const int normalShelfHeight = pinnedScroll->height();
         resize(540, 360);
-        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        shot("palette-small-library");
+        check(pinnedScroll->height() < normalShelfHeight,
+              "Palette shelf shrinks at compact size");
         auto generator = tabs->widget(1)->findChild<QWidget *>("paletteGenerator");
         auto generate = generator ? generator->findChild<QPushButton *>(QString(), Qt::FindChildrenRecursively) : nullptr;
         if (generator) {
@@ -1442,8 +1448,31 @@ public:
           check(array(object(state.value("palette")), "swatches").size() == 5,
                 "Generate palette at compact size");
         }
+        auto captureSavedGenerations = [&](const QString &name) {
+          settleLayout();
+          auto scroll = qobject_cast<QScrollArea *>(tabs->widget(1));
+          auto row = scroll->findChild<QWidget *>("savedGenerationRow");
+          auto label = scroll->findChild<QLabel *>("savedGenerationLabel");
+          check(row && label, "Saved generation controls available");
+          if (!row || !label)
+            return;
+          const int top = label->mapTo(scroll->widget(), QPoint()).y();
+          scroll->verticalScrollBar()->setValue(top - 32);
+          shot(name);
+          auto viewport = scroll->viewport();
+          const QRect rowBounds(row->mapTo(viewport, QPoint()), row->size());
+          const QRect labelBounds(label->mapTo(viewport, QPoint()), label->size());
+          check(viewport->rect().contains(rowBounds.united(labelBounds)),
+                "Full saved generation row visible in " + name);
+        };
+        captureSavedGenerations("palette-small-generations");
         resize(900, 700);
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        captureSavedGenerations("palette-generations");
+        click(tabs->widget(1), "New draft");
+        click(tabs->widget(1), "Load generation");
+        check(array(object(state.value("palette")), "swatches").size() == 5,
+              "Load saved generation");
         auto edits = tabs->widget(1)->findChildren<QLineEdit *>();
         for (auto e : edits)
           if (e->accessibleName() == "Palette name") {
@@ -1680,9 +1709,13 @@ QWidget *Frontend::palettePage() {
   auto p = object(state.value("palette"));
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
-  auto name = line("Palette name", str(p, "name"), w);
+  auto palette = new QGroupBox("Palette", w);
+  auto paletteLayout = new QVBoxLayout(palette);
+  auto nameRow = new QFormLayout;
+  auto name = line("Palette name", str(p, "name"), palette);
   name->setMaximumWidth(260);
-  l->addWidget(name);
+  nameRow->addRow("Name", name);
+  paletteLayout->addLayout(nameRow);
   connect(name, &QLineEdit::editingFinished, this, [this, name] {
     send({{"op", "palette_name"}, {"name", name->text()}});
   });
@@ -1692,16 +1725,19 @@ QWidget *Frontend::palettePage() {
                                       {"Save", "palette_save"},
                                       {"Duplicate", "palette_duplicate"}}) {
     auto b =
-        toolButton(pair.first, actionIcon(pair.second), w, [this, pair] { send({{"op", pair.second}}); });
+        toolButton(pair.first, actionIcon(pair.second), palette,
+                   [this, pair] { send({{"op", pair.second}}); });
     actions->addWidget(b);
   }
-  l->addLayout(actions);
-  auto historyLock = new QCheckBox("Lock history additions", w);
+  actions->addStretch();
+  paletteLayout->addLayout(actions);
+  l->addWidget(palette);
+  auto historyLock = new QCheckBox("Lock history additions", palette);
   historyLock->setChecked(p.value("lock_history").toBool());
   connect(historyLock, &QCheckBox::toggled, this, [this](bool b) {
     send({{"op", "palette_lock_history"}, {"locked", b}});
   });
-  l->addWidget(historyLock);
+  paletteLayout->addWidget(historyLock);
   auto library = new QGroupBox("Palette library", w);
   auto lib = new QHBoxLayout(library);
   auto saved =
@@ -1711,11 +1747,13 @@ QWidget *Frontend::palettePage() {
   saved->lineEdit()->setPlaceholderText("Search saved palettes");
   saved->completer()->setFilterMode(Qt::MatchContains);
   saved->completer()->setCompletionMode(QCompleter::PopupCompletion);
-  lib->addWidget(saved);
+  saved->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+  saved->setMinimumContentsLength(18);
+  lib->addWidget(saved, 1);
   lib->addWidget(toolButton("Open", "document-open", library, [this, saved] {
     send({{"op", "palette_open"}, {"id", saved->currentData().toString()}});
   }));
-  lib->addWidget(button("Delete", library, [this, saved] {
+  lib->addWidget(toolButton("Delete", "edit-delete", library, [this, saved] {
     if (QMessageBox::question(this, "Delete palette",
                               "Delete the selected saved palette?") ==
         QMessageBox::Yes)
@@ -1730,6 +1768,7 @@ QWidget *Frontend::palettePage() {
   parameters->setObjectName("paletteParameters");
   auto f = new QFormLayout(parameters);
   f->setContentsMargins(0, 0, 0, 0);
+  f->setRowWrapPolicy(QFormLayout::WrapLongRows);
   auto selector = new QWidget(gen);
   selector->setObjectName("paletteSelector");
   auto selectorLayout = new QVBoxLayout(selector);
@@ -1738,6 +1777,8 @@ QWidget *Frontend::palettePage() {
   columns->addWidget(parameters, 0, Qt::AlignTop);
   columns->addWidget(selector, 0, Qt::AlignTop);
   auto generations = combo("Palette generations", array(p, "generations"), gen);
+  generations->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+  generations->setMinimumContentsLength(20);
   int generationIndex =
       generations->findData(generationDraft.value("generation").toString());
   if (generationIndex >= 0)
@@ -1750,7 +1791,20 @@ QWidget *Frontend::palettePage() {
     send({{"op", "palette_generation"},
           {"id", generations->currentData().toString()}});
   });
-  f->addRow(generations, load);
+  bool hasGenerations = generations->count() > 0;
+  if (!hasGenerations) {
+    generations->addItem("No saved generations");
+    generations->setEnabled(false);
+  }
+  load->setEnabled(hasGenerations);
+  auto generationRow = new QWidget(gen);
+  generationRow->setObjectName("savedGenerationRow");
+  auto generationLayout = new QHBoxLayout(generationRow);
+  generationLayout->setContentsMargins(0, 0, 0, 0);
+  generationLayout->addWidget(generations, 1);
+  generationLayout->addWidget(load);
+  f->addRow("Saved generations", generationRow);
+  f->labelForField(generationRow)->setObjectName("savedGenerationLabel");
   auto mode = new QComboBox(gen);
   mode->setAccessibleName("Generation mode");
   for (auto entry : QList<QPair<QString, QString>>{
