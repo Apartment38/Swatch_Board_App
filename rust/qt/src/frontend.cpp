@@ -1644,6 +1644,19 @@ public:
           const QRect labelBounds(label->mapTo(viewport, QPoint()), label->size());
           check(viewport->rect().contains(rowBounds.united(labelBounds)),
                 "Full saved generation row visible in " + name);
+          auto selector = row->findChild<QComboBox *>();
+          check(selector && !selector->currentText().isEmpty(),
+                "Saved generation description available in " + name);
+          if (selector) {
+            QStyleOptionComboBox option;
+            option.initFrom(selector);
+            const auto textBounds = selector->style()->subControlRect(
+                QStyle::CC_ComboBox, &option, QStyle::SC_ComboBoxEditField,
+                selector);
+            check(selector->fontMetrics().horizontalAdvance(selector->currentText()) <=
+                      textBounds.width(),
+                  "Saved generation description fits in " + name);
+          }
         };
         captureSavedGenerations("palette-small-generations");
         resize(900, 700);
@@ -2002,6 +2015,9 @@ QWidget *Frontend::palettePage() {
   auto generations = combo("Palette generations", array(p, "generations"), gen);
   generations->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
   generations->setMinimumContentsLength(20);
+  // Compact layouts can shrink the selector while wider layouts fit its text.
+  generations->setMinimumWidth(generations->minimumSizeHint().width());
+  generations->setSizeAdjustPolicy(QComboBox::AdjustToContents);
   int generationIndex =
       generations->findData(generationDraft.value("generation").toString());
   if (generationIndex >= 0)
