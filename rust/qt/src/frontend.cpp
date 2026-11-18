@@ -457,7 +457,9 @@ class Frontend : public QWidget {
   QWidget *pinnedScroll = nullptr, *pinnedCurrent = nullptr;
   QVBoxLayout *boardContent = nullptr;
   QPushButton *configSave = nullptr, *configRebind = nullptr;
-  QLabel *configStatus = nullptr, *shortcutStatus = nullptr;
+  QLabel *configStatus = nullptr, *shortcutStatus = nullptr, *limitError = nullptr;
+  QLineEdit *configLimit = nullptr;
+  QScrollArea *configScroll = nullptr;
   QList<QPushButton *> historyButtons;
   bool hiddenForPick = false, spectrumDragging = false;
   QPointer<Spectrum> mixerSpectrum;
@@ -2074,9 +2076,15 @@ void Frontend::renderConfig() {
     configSave->setEnabled(state.value("load_error").isNull() &&
                            !state.value("busy").toBool());
     configRebind->setEnabled(!state.value("busy").toBool());
-    configStatus->setText(message());
+    configStatus->setText(str(state, "validation_field").isEmpty() ? message() : QString());
     configStatus->setVisible(!configStatus->text().isEmpty());
+    configStatus->setToolTip(str(state, "message_detail"));
+    configStatus->setAccessibleDescription(str(state, "message_detail"));
     shortcutStatus->setText(str(state, "shortcut_status"));
+    shortcutStatus->setToolTip(str(state, "shortcut_status_detail"));
+    shortcutStatus->setAccessibleDescription(str(state, "shortcut_status_detail"));
+    limitError->setText(str(state, "message"));
+    limitError->setVisible(str(state, "validation_field") == "history_limit");
     shortcutStatus->setVisible(!shortcutStatus->text().isEmpty());
     return;
   }
@@ -2094,7 +2102,13 @@ void Frontend::renderConfig() {
   limit->setMaximumWidth(limit->fontMetrics().horizontalAdvance(QString(20, QLatin1Char('0'))) + 24);
   limit->setValidator(new QRegularExpressionValidator(
       QRegularExpression("[0-9]{1,20}"), limit));
+  configLimit = limit;
   f->addRow("Stored history limit", limit);
+  limitError = new QLabel("Stored history limit must be greater than zero.", w);
+  limitError->setWordWrap(true);
+  limitError->setStyleSheet("color: palette(link);");
+  limitError->setVisible(false);
+  f->addRow(QString(), limitError);
   connect(limit, &QLineEdit::textChanged, this,
           [this](const QString &v) { configDraft["history_limit"] = v; });
   auto number = [&](const char *key, const QString &label, int min, int max) {
@@ -2142,6 +2156,10 @@ void Frontend::renderConfig() {
   auto row = new QHBoxLayout;
   configSave = button("Save settings", w, [this] {
     send({{"op", "save"}, {"config", configDraft}});
+    if (str(state, "validation_field") == "history_limit") {
+      configLimit->setFocus();
+      configScroll->ensureWidgetVisible(configLimit);
+    }
   });
   configSave->setEnabled(state.value("load_error").isNull() &&
                          !state.value("busy").toBool());
@@ -2164,13 +2182,16 @@ void Frontend::renderConfig() {
   configStatus->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
   l->addWidget(configStatus);
   shortcutStatus = new QLabel(str(state, "shortcut_status"), w);
+  shortcutStatus->setToolTip(str(state, "shortcut_status_detail"));
+  shortcutStatus->setAccessibleDescription(str(state, "shortcut_status_detail"));
   shortcutStatus->setWordWrap(true);
   shortcutStatus->setTextFormat(Qt::PlainText);
   shortcutStatus->setVisible(!shortcutStatus->text().isEmpty());
   shortcutStatus->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
   l->addWidget(shortcutStatus);
   l->addStretch();
-  replace(scroll(w));
+  configScroll = static_cast<QScrollArea *>(scroll(w));
+  replace(configScroll);
 }
 void Frontend::renderHistory() {
   historyButtons.clear();

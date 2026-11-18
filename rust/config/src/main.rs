@@ -16,7 +16,10 @@ struct Settings {
     config: Config,
     load_error: Option<String>,
     message: String,
+    message_detail: String,
     shortcut_status: String,
+    shortcut_status_detail: String,
+    validation_field: Option<String>,
     busy: bool,
     status_in_flight: bool,
     next_status: Instant,
@@ -43,7 +46,10 @@ impl Settings {
             config,
             load_error,
             message: String::new(),
+            message_detail: String::new(),
             shortcut_status: "Checking shortcut status…".into(),
+            shortcut_status_detail: String::new(),
+            validation_field: None,
             busy: false,
             status_in_flight: false,
             next_status: Instant::now(),
@@ -57,7 +63,9 @@ impl Settings {
         config["history_limit"] = json!(self.config.history_limit.to_string());
         json!({
             "config": config, "load_error": self.load_error,
-            "message": self.message, "shortcut_status": self.shortcut_status,
+            "message": self.message, "message_detail": self.message_detail, "shortcut_status": self.shortcut_status,
+            "shortcut_status_detail": self.shortcut_status_detail,
+            "validation_field": self.validation_field,
             "busy": self.busy,
         })
     }
@@ -69,20 +77,31 @@ impl Settings {
             match reply {
                 Reply::Status(result) => {
                     self.status_in_flight = false;
-                    self.shortcut_status =
-                        result.unwrap_or_else(|e| format!("Shortcut status unavailable: {e}"));
+                    match result {
+                        Ok(status) => {
+                            self.shortcut_status = status;
+                            self.shortcut_status_detail.clear();
+                        }
+                        Err(error) => {
+                            self.shortcut_status = "Shortcut status unavailable.".into();
+                            self.shortcut_status_detail = error;
+                        }
+                    }
                 }
                 Reply::Applied(result) => {
                     self.busy = false;
                     self.next_status = Instant::now();
+                    self.message_detail.clear();
                     self.message = match result {
                         Ok(status) => format!("Settings saved and tray reload requested: {status}"),
-                        Err(error) => format!(
-                            "Settings were saved, but applying them failed: {error}. The tray may still use previous settings; retry Save."
-                        ),
+                        Err(error) => {
+                            self.message_detail = error;
+                            "Settings saved, but the tray could not apply them; retry Save.".into()
+                        }
                     };
                 }
                 Reply::Rebound(result) => {
+                    self.message_detail.clear();
                     self.busy = false;
                     self.next_status = Instant::now();
                     self.message = result
@@ -103,12 +122,21 @@ impl Settings {
             "poll" if !changed => return Value::Null,
             "poll" | "init" => {}
             "save" if self.load_error.is_none() && !self.busy => {
+                self.validation_field = None;
+                self.message_detail.clear();
                 let mut value = request["config"].clone();
                 if let Some(text) = value["history_limit"].as_str() {
                     match text.parse::<usize>() {
-                        Ok(limit) => value["history_limit"] = json!(limit),
+                        Ok(limit) if limit > 0 => value["history_limit"] = json!(limit),
+                        Ok(_) => {
+                            self.validation_field = Some("history_limit".into());
+                            self.message = "Stored history limit must be greater than zero.".into();
+                            return self.snapshot();
+                        }
                         Err(_) => {
-                            self.message = "Invalid retained history limit.".into();
+                            self.validation_field = Some("history_limit".into());
+                            self.message =
+                                "Enter a valid whole number for the stored history limit.".into();
                             return self.snapshot();
                         }
                     }
@@ -133,6 +161,8 @@ impl Settings {
                 }
             }
             "rebind" if !self.busy => {
+                self.validation_field = None;
+                self.message_detail.clear();
                 self.busy = true;
                 self.message = "Requesting shortcut reassignment…".into();
                 let sender = self.tx.clone();
@@ -141,10 +171,14 @@ impl Settings {
                 });
             }
             "save" | "rebind" => {
+                self.message_detail.clear();
                 self.message =
                     "Settings are busy or could not be loaded; saving is disabled.".into();
             }
-            _ => self.message = "Unknown settings operation.".into(),
+            _ => {
+                self.message_detail.clear();
+                self.message = "Unknown settings operation.".into();
+            }
         };
         self.snapshot()
     }
@@ -218,7 +252,36 @@ mod tests {
 
         let mut settings = Settings::new();
         settings.request(json!({"op": "init"}));
-        await_status(&mut settings, "Shortcut status unavailable:");
+        let mut draft = settings.snapshot()["config"].clone();
+        draft["history_limit"] = json!("0");
+        let invalid = settings.request(json!({"op": "save", "config": draft}));
+        assert_eq!(invalid["validation_field"], "history_limit");
+        assert_eq!(
+            invalid["message"],
+            "Stored history limit must be greater than zero."
+        );
+        assert_eq!(settings.config.history_limit, 100);
+        draft["history_limit"] = json!("99999999999999999999");
+        let overflow = settings.request(json!({"op": "save", "config": draft}));
+        assert_eq!(overflow["validation_field"], "history_limit");
+        assert_eq!(
+            overflow["message"],
+            "Enter a valid whole number for the stored history limit."
+        );
+        draft["history_limit"] = json!("101");
+        let valid = settings.request(json!({"op": "save", "config": draft}));
+        assert!(valid["validation_field"].is_null());
+        assert_eq!(Config::load().unwrap().history_limit, 101);
+        await_status(&mut settings, "Shortcut status unavailable");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while settings.busy && Instant::now() < deadline {
+            settings.request(json!({"op": "poll"}));
+            thread::sleep(Duration::from_millis(20));
+        }
+        assert!(!settings.message_detail.is_empty());
+        settings.request(json!({"op": "rebind"}));
+        assert!(settings.message_detail.is_empty());
+        assert!(settings.validation_field.is_none());
         let _tray = zbus::blocking::connection::Builder::session()
             .unwrap()
             .name(SERVICE)
