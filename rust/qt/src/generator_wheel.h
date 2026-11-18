@@ -43,7 +43,7 @@ class GeneratorWheel : public QWidget {
       s = qBound(0.0, selected.hsvSaturationF() + next.y() - old.y(), 1.0);
     }
     lastDrag = point;
-    selected.setHsvF(h, s, selected.value() == 0 ? 1.0 : selected.valueF(), selected.alphaF());
+    selected.setHsvF(h, s, selected.valueF(), selected.alphaF());
     update();
     changed(selected);
   }
@@ -54,15 +54,15 @@ public:
     setMaximumSize(280, 280);
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     setFocusPolicy(Qt::StrongFocus);
-    setAccessibleName("Palette harmony wheel; arrow keys adjust base hue and saturation");
-    setToolTip("Drag a generated color to rotate the harmony; arrow keys adjust the base color.");
+    setAccessibleName("Palette hue and saturation wheel; arrow keys adjust base hue and saturation");
+    setToolTip("Hue and saturation map at full brightness. Drag a generated color to rotate the harmony; arrow keys adjust the base color.");
   }
   void setColor(QColor value) { if (value.isValid()) { selected = value; update(); } }
   void setColors(const QList<QColor> &values) { colors = values; update(); }
   void setHarmonyHandles(bool enabled) {
     harmonyHandles = enabled;
-    setToolTip(enabled ? "Drag a generated color to rotate the harmony; arrow keys adjust the base color."
-                       : "Choose a base color with the wheel or arrow keys. This mode has no fixed harmony handles.");
+    setToolTip(enabled ? "Hue and saturation map at full brightness. Drag a generated color to rotate the harmony; arrow keys adjust the base color."
+                       : "Hue and saturation map at full brightness. Choose a base hue and saturation with the wheel or arrow keys. This mode has no fixed harmony handles.");
   }
 protected:
   void paintEvent(QPaintEvent *) override {
@@ -77,7 +77,8 @@ protected:
       if (sat <= 1.0) {
         double hue = std::atan2(-dy, dx) / (2 * M_PI);
         if (hue < 0) hue += 1;
-        image.setPixelColor(x, y, QColor::fromHsvF(hue, sat, selected.value() == 0 ? 1.0 : selected.valueF()));
+        // This is a hue/saturation map; value and alpha remain in the base color.
+        image.setPixelColor(x, y, QColor::fromHsvF(hue, sat, 1.0));
       }
     }
     QPainter p(this);
@@ -115,6 +116,6 @@ protected:
     else if (e->key() == Qt::Key_Up) s = qMin(255, s + 3);
     else if (e->key() == Qt::Key_Down) s = qMax(0, s - 3);
     else { QWidget::keyPressEvent(e); return; }
-    selected.setHsv(h, s, selected.value() == 0 ? 255 : selected.value(), selected.alpha()); update(); changed(selected);
+    selected.setHsv(h, s, selected.value(), selected.alpha()); update(); changed(selected);
   }
 };
