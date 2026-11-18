@@ -159,7 +159,7 @@ public:
       : QLabel("Drop a history color here to add it", parent), append(f) {
     setAcceptDrops(true);
     setAccessibleName("Drop a history color to add it to the palette");
-    setMinimumHeight(32);
+    setMinimumHeight(sizeHint().height());
   }
 
 protected:
@@ -474,6 +474,7 @@ class Frontend : public QWidget {
   int mixerFormat = 0;
   QPointer<Spectrum> mixerSpectrum;
   QPointer<MixerWheel> mixerWheel;
+  QPointer<QLabel> mixerReadout;
   QJsonObject configDraft, generationDraft, themeDraft;
   bool compactThemePreview = false;
   bool themeProjectVisible = false;
@@ -547,38 +548,40 @@ class Frontend : public QWidget {
   }
   bool compactShelf = false;
   int normalPaletteShelfHeight = 110;
+  bool shortMixer() const {
+    return height() <= qMax(360, fontMetrics().height() * 24);
+  }
   void sizePinnedPalette() {
     if (!pinnedScroll || !tabs) return;
     auto page = tabs->widget(2);
     bool compact = tabs->currentIndex() == 2 && page &&
                    page->height() < page->fontMetrics().height() * 22;
-    const bool mixerEmptyShelf = tabs->currentIndex() == 0 &&
+    const bool mixerEmptyShelf = tabs->currentIndex() == 0 && shortMixer() &&
                                  array(object(state.value("palette")), "swatches").isEmpty();
     const int shelfThreshold = fontMetrics().height() * 24;
     const bool shrinkShelf = (tabs->currentIndex() == 1 && height() < shelfThreshold) ||
-                             (mixerEmptyShelf && height() <= qMax(360, shelfThreshold));
+                             mixerEmptyShelf;
+    const int dropHeight = fontMetrics().height() + 8;
+    if (verticalSplitter && shrinkShelf && !compactShelf)
+      normalPaletteShelfHeight = verticalSplitter->sizes().value(1, 110);
+    pinnedScroll->setMinimumHeight(mixerEmptyShelf ? dropHeight : 38);
+    pinnedScroll->setMaximumHeight(mixerEmptyShelf ? dropHeight :
+                                   compact ? page->fontMetrics().height() * 3 : QWIDGETSIZE_MAX);
     if (verticalSplitter && shrinkShelf != compactShelf) {
-      auto sizes = verticalSplitter->sizes();
-      if (sizes.size() == 2) {
-        if (shrinkShelf)
-          normalPaletteShelfHeight = sizes[1];
-        verticalSplitter->setSizes({verticalSplitter->height(),
-                                    shrinkShelf ? pinnedScroll->minimumHeight()
-                                                : normalPaletteShelfHeight});
-      }
+      verticalSplitter->setSizes({verticalSplitter->height(),
+                                  shrinkShelf ? pinnedScroll->minimumHeight()
+                                              : normalPaletteShelfHeight});
       compactShelf = shrinkShelf;
     }
-    pinnedScroll->setMaximumHeight(compact ? page->fontMetrics().height() * 3
-                                          : QWIDGETSIZE_MAX);
     if (compact && verticalSplitter)
       verticalSplitter->setSizes({verticalSplitter->height(), page->fontMetrics().height() * 3});
   }
   void preserveView(QWidget *old, QWidget *replacement) {
     auto oldScroll = qobject_cast<QScrollArea *>(old),
          newScroll = qobject_cast<QScrollArea *>(replacement);
-    if (!oldScroll && old->objectName() == "themePage")
+    if (!oldScroll && (old->objectName() == "themePage" || old->objectName() == "mixerPage"))
       oldScroll = old->findChild<QScrollArea *>();
-    if (!newScroll && replacement->objectName() == "themePage")
+    if (!newScroll && (replacement->objectName() == "themePage" || replacement->objectName() == "mixerPage"))
       newScroll = replacement->findChild<QScrollArea *>();
     int vertical = oldScroll ? oldScroll->verticalScrollBar()->value() : 0,
         horizontal = oldScroll ? oldScroll->horizontalScrollBar()->value() : 0;
@@ -686,7 +689,7 @@ class Frontend : public QWidget {
     auto s = new QScrollArea;
     s->setWidgetResizable(true);
     s->setWidget(content);
-    if (content->objectName() == "mixerPage")
+    if (content->objectName() == "mixerContent")
       s->viewport()->installEventFilter(this);
     return s;
   }
@@ -842,7 +845,7 @@ class Frontend : public QWidget {
       connect(redoShortcut, &QShortcut::activated, this, [this] {
         send({{"op", activeEditor() + "_redo"}});
       });
-      tabs->addTab(scroll(mixer()), "Mixer");
+      tabs->addTab(mixerPage(), "Mixer");
       tabs->addTab(scroll(palettePage()), "Palette");
       tabs->addTab(themePage(), "Theme");
       tabs->setCurrentIndex(
@@ -902,7 +905,7 @@ class Frontend : public QWidget {
       QSignalBlocker blocker(tabs);
       auto refresh = [this](int index, QWidget *page, const QString &title) {
         auto old = tabs->widget(index);
-        auto replacement = index == 2 ? page : scroll(page);
+        auto replacement = index == 1 ? scroll(page) : page;
         preserveView(old, replacement);
         tabs->removeTab(index);
         tabs->insertTab(index, replacement, title);
@@ -914,9 +917,11 @@ class Frontend : public QWidget {
           if (hsv.size() == 3) {
             if (mixerSpectrum) mixerSpectrum->setHsv(hsv[0].toDouble(), hsv[1].toDouble(), hsv[2].toDouble());
             if (mixerWheel) mixerWheel->setHsv(hsv[0].toDouble(), hsv[1].toDouble(), hsv[2].toDouble());
+            if (mixerReadout)
+              mixerReadout->setText(mixerHsvReadout(hsv[0].toDouble(), hsv[1].toDouble(), hsv[2].toDouble()));
           }
         } else
-          refresh(0, mixer(), "Mixer");
+          refresh(0, mixerPage(), "Mixer");
       }
       if (previous.value("palette") != state.value("palette") ||
           (generationDraft.value("base").toString().isEmpty() &&
@@ -999,10 +1004,38 @@ class Frontend : public QWidget {
     });
     return current;
   }
+  QWidget *mixerPage() {
+    auto page = new QWidget;
+    page->setObjectName("mixerPage");
+    auto layout = new QVBoxLayout(page);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(scroll(mixer()));
+    layoutMixerActions(page);
+    page->installEventFilter(this);
+    return page;
+  }
+  void layoutMixerActions(QWidget *page) {
+    if (!page || page->objectName() != "mixerPage") return;
+    auto actions = page->findChild<QToolBar *>("mixerActions");
+    auto viewport = page->findChild<QScrollArea *>();
+    auto content = viewport->widget();
+    const bool pinned = shortMixer();
+    auto parent = pinned ? page : content;
+    if (actions->parentWidget() == parent) return;
+    auto layout = qobject_cast<QBoxLayout *>(parent->layout());
+    // Move the same toolbar so each command has one button and one connection.
+    layout->insertWidget(pinned ? 0 : 1, actions);
+  }
+  QString mixerHsvReadout(double hue, double saturation, double value) const {
+    return QStringLiteral("H %1°   S %2%   V %3%")
+        .arg(locale().toString(hue, 'f', 1), locale().toString(saturation, 'f', 1),
+             locale().toString(value, 'f', 1));
+  }
   QWidget *mixer() {
     auto m = object(state.value("mixer"));
     auto w = new QWidget;
-    w->setObjectName("mixerPage");
+    w->setObjectName("mixerContent");
     auto l = new QVBoxLayout(w);
     auto hsv = array(m, "hsv"), rgba = array(m, "rgba");
     double h = hsv[0].toDouble(), s = hsv[1].toDouble(), v = hsv[2].toDouble();
@@ -1019,10 +1052,19 @@ class Frontend : public QWidget {
             renderBoard(previous);
           }
         };
-    mixerWheel = new MixerWheel(h, s, v, changed, w);
+    auto wheelArea = new QWidget(w);
+    auto wheelLayout = new QVBoxLayout(wheelArea);
+    wheelLayout->setContentsMargins(0, 0, 0, 0);
+    wheelLayout->setSpacing(0);
+    mixerWheel = new MixerWheel(h, s, v, changed, wheelArea);
+    mixerReadout = new QLabel(mixerHsvReadout(h, s, v), wheelArea);
+    mixerReadout->setObjectName("mixerHsvReadout");
+    mixerReadout->setVisible(shortMixer());
+    wheelLayout->addWidget(mixerWheel, 0, Qt::AlignHCenter);
+    wheelLayout->addWidget(mixerReadout, 0, Qt::AlignHCenter);
     mixerSpectrum = new Spectrum(h, s, v, changed, w);
     controls->addWidget(mixerSpectrum, 0, Qt::AlignTop);
-    controls->addWidget(mixerWheel, 0, Qt::AlignTop);
+    controls->addWidget(wheelArea, 0, Qt::AlignTop);
     columns->addLayout(controls);
     l->addLayout(columns);
     auto inputs = new QWidget(w);
@@ -1120,6 +1162,7 @@ class Frontend : public QWidget {
     columns->addWidget(inputs, 1, Qt::AlignTop);
     setTabOrder(mixerSpectrum, mixerWheel);
     auto actions = new QToolBar(w);
+    actions->setObjectName("mixerActions");
     actions->setMovable(false);
     actions->setProperty("boardAction", true);
     actions->setToolButtonStyle(settings.value("board/toolbarLabels", true).toBool()
@@ -1206,27 +1249,37 @@ protected:
   void resizeEvent(QResizeEvent *event) override {
     QWidget::resizeEvent(event);
     sizePinnedPalette();
+    if (tabs)
+      layoutMixerActions(tabs->widget(0));
   }
   bool eventFilter(QObject *watched, QEvent *event) override {
     if (event->type() == QEvent::Resize) {
       auto page = qobject_cast<QWidget *>(watched);
+      if (page && page->objectName() == "mixerPage")
+        layoutMixerActions(page);
       auto scroll = page ? qobject_cast<QScrollArea *>(page->parentWidget()) : nullptr;
       if (scroll && page == scroll->viewport() && scroll->widget() &&
-          scroll->widget()->objectName() == "mixerPage") {
+          scroll->widget()->objectName() == "mixerContent") {
         auto mixer = scroll->widget();
         auto columns = mixer->findChild<QBoxLayout *>("mixerColumns");
         auto selectors = columns->itemAt(0)->layout();
         auto spectrum = selectors->itemAt(0)->widget();
-        auto wheel = selectors->itemAt(1)->widget();
         auto inputs = columns->itemAt(1)->widget();
+        auto wheelArea = selectors->itemAt(1)->widget();
         const auto margins = mixer->layout()->contentsMargins();
         const int widePlane = 208;
+        const int wideWheel = 120;
+        const bool shortView = shortMixer();
+        wheelArea->layout()->itemAt(0)->widget()->setFixedSize(shortView ? 112 : wideWheel,
+                                                            shortView ? 112 : wideWheel);
+        wheelArea->findChild<QLabel *>("mixerHsvReadout")->setVisible(shortView);
         const int width = static_cast<QResizeEvent *>(event)->size().width();
         const bool wide = width >= margins.left() + margins.right() + widePlane +
-                                      wheel->width() + inputs->sizeHint().width() +
+                                      wideWheel + inputs->sizeHint().width() +
                                       selectors->spacing() + columns->spacing();
         columns->setDirection(wide ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
-        spectrum->setFixedSize(wide ? widePlane : 156, wide ? widePlane : 156);
+        const int side = shortView ? 132 : wide ? widePlane : 156;
+        spectrum->setFixedSize(side, side);
       }
       if (page && page->objectName() == "paletteGenerator") {
         auto columns = qobject_cast<QBoxLayout *>(page->layout());
@@ -1551,7 +1604,8 @@ public:
         QSize mixerSize = size();
         resize(900, 700);
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-        auto mixerScroll = qobject_cast<QScrollArea *>(tabs->widget(0));
+        auto mixerPage = tabs->widget(0);
+        auto mixerScroll = mixerPage->findChild<QScrollArea *>();
         auto boundsInMixer = [mixerScroll](QWidget *widget) {
           return QRect(widget->mapTo(mixerScroll->viewport(), QPoint()), widget->size());
         };
@@ -1578,6 +1632,25 @@ public:
                   hueInput && boundsInMixer(hueInput).top() > boundsInMixer(mixerSpectrum).bottom() &&
                   mixerScroll->horizontalScrollBar()->maximum() == 0,
               "Compact Mixer shows both selectors and stacks inputs in a vertical scroll");
+        auto actions = mixerPage->findChild<QToolBar *>("mixerActions");
+        check(actions->parentWidget() == mixerPage && actions->isVisible() &&
+                  !mixerScroll->widget()->findChild<QToolBar *>("mixerActions"),
+              "Compact Mixer pins its only toolbar above the scroll");
+        for (const auto &name : {QString("Copy"), QString("Add to palette")}) {
+          auto matches = mixerPage->findChildren<QAbstractButton *>();
+          matches.removeIf([&](QAbstractButton *b) { return b->accessibleName() != name; });
+          check(matches.size() == 1 && matches.first()->isVisible() &&
+                    mixerPage->rect().contains(QRect(matches.first()->mapTo(mixerPage, QPoint()),
+                                                      matches.first()->size())),
+                name + " is directly visible in the initial compact Mixer");
+        }
+        auto emptyDrop = pinnedScroll->findChild<QLabel *>();
+        check(emptyDrop && emptyDrop->acceptDrops() && emptyDrop->isVisible() &&
+                  pinnedScroll->height() <= fontMetrics().height() + 8,
+              "Compact Mixer retains a one-line empty palette drop target");
+        check(mixerReadout && mixerReadout->isVisible() && inMixerViewport(mixerReadout) &&
+                  mixerReadout->text() == mixerHsvReadout(210.0, 100.0 / 3, 600.0 / 255),
+              "Compact Mixer displays current HSV values without scrolling");
         shot("mixer-small");
         for (auto field : mixerScroll->findChildren<QLineEdit *>())
           if (field->accessibleName() == "Color value") {
@@ -1586,7 +1659,6 @@ public:
             shot("mixer-small-format");
             break;
           }
-        auto actions = mixerScroll->findChild<QToolBar *>();
         auto overflow = actions->findChild<QToolButton *>("qt_toolbar_ext_button");
         check(overflow && overflow->isVisible(), "Compact mixer toolbar has overflow");
         if (overflow && overflow->isVisible()) {
@@ -1608,6 +1680,27 @@ public:
             overflow->showMenu();
           }
         }
+        click(mixerPage, "Copy");
+        check(QApplication::clipboard()->text() == "#040506", "Pinned Copy copies the Mixer output");
+        if (emptyDrop) {
+          QMimeData mime;
+          mime.setText("#04050642");
+          QDragEnterEvent enter(QPoint(1, 1), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+          QApplication::sendEvent(emptyDrop, &enter);
+          QDropEvent drop(QPointF(1, 1), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+          QApplication::sendEvent(emptyDrop, &drop);
+          check(enter.isAccepted() && drop.isAccepted() &&
+                    array(object(state.value("palette")), "swatches").size() == 1,
+                "Compact empty palette accepts a color drop");
+          send({{"op", "palette_undo"}});
+        }
+        click(mixerPage, "Add to palette");
+        check(!array(object(state.value("palette")), "swatches").isEmpty(),
+              "Pinned Add to palette adds the selected color");
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        auto populated = pinnedScroll->findChildren<QPushButton *>();
+        check(!populated.isEmpty() && populated.first()->isVisible(),
+              "Compact Mixer still displays populated palette swatches");
         resize(mixerSize);
         auto activation = state;
         activation["show_palette"] = true;
