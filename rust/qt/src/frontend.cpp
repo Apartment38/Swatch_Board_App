@@ -524,11 +524,26 @@ class Frontend : public QWidget {
       s = str(state, "message");
     return s;
   }
+  bool compactPaletteShelf = false;
+  int normalPaletteShelfHeight = 110;
   void sizePinnedPalette() {
     if (!pinnedScroll || !tabs) return;
     auto page = tabs->widget(2);
     bool compact = tabs->currentIndex() == 2 && page &&
                    page->height() < page->fontMetrics().height() * 22;
+    bool compactPalette = tabs->currentIndex() == 1 &&
+                          height() < fontMetrics().height() * 24;
+    if (verticalSplitter && compactPalette != compactPaletteShelf) {
+      auto sizes = verticalSplitter->sizes();
+      if (sizes.size() == 2) {
+        if (compactPalette)
+          normalPaletteShelfHeight = sizes[1];
+        verticalSplitter->setSizes({verticalSplitter->height(),
+                                    compactPalette ? pinnedScroll->minimumHeight()
+                                                   : normalPaletteShelfHeight});
+      }
+      compactPaletteShelf = compactPalette;
+    }
     pinnedScroll->setMaximumHeight(compact ? page->fontMetrics().height() * 3
                                           : QWIDGETSIZE_MAX);
     if (compact && verticalSplitter)
@@ -1111,6 +1126,10 @@ class Frontend : public QWidget {
   void renderHistory();
 
 protected:
+  void resizeEvent(QResizeEvent *event) override {
+    QWidget::resizeEvent(event);
+    sizePinnedPalette();
+  }
   bool eventFilter(QObject *watched, QEvent *event) override {
     if (event->type() == QEvent::Resize) {
       auto page = qobject_cast<QWidget *>(watched);
@@ -1408,6 +1427,16 @@ public:
               scroll->ensureWidgetVisible(generate);
               break;
             }
+          GeneratorWheel *wheel = nullptr;
+          for (auto widget : generator->findChildren<QWidget *>())
+            if ((wheel = dynamic_cast<GeneratorWheel *>(widget))) break;
+          auto paletteScroll = qobject_cast<QScrollArea *>(tabs->widget(1));
+          if (wheel) paletteScroll->ensureWidgetVisible(wheel, 0, 0);
+          QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          auto viewport = paletteScroll->viewport();
+          check(wheel && viewport->rect().contains(QRect(wheel->mapTo(viewport, QPoint()), wheel->size())) &&
+                    viewport->rect().contains(QRect(generate->mapTo(viewport, QPoint()), generate->size())),
+                "Compact palette shows complete wheel and Generate together");
           shot("palette-small");
           generate->click();
           check(array(object(state.value("palette")), "swatches").size() == 5,
