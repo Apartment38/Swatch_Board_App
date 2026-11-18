@@ -327,15 +327,20 @@ class Scene : public QWidget {
   QJsonObject scene;
   QVector<QImage> images;
   std::function<void(QJsonObject)> send;
+  bool topAligned = false;
+
+public:
   QRectF targetRect() const {
     double w = scene.value("width").toDouble(1),
            h = scene.value("height").toDouble(1);
     if (w <= 0 || h <= 0)
       return {};
     double scale = qMin(width() / w, height() / h);
-    return QRectF((width() - w * scale) / 2, (height() - h * scale) / 2,
+    return QRectF((width() - w * scale) / 2, topAligned ? 0 : (height() - h * scale) / 2,
                   w * scale, h * scale);
   }
+
+private:
   QJsonObject hit(QPoint point) const {
     auto r = targetRect();
     if (!r.contains(point))
@@ -378,6 +383,10 @@ public:
     }
   }
   QSize sizeHint() const override { return QSize(300, 180); }
+  void setTopAligned(bool aligned) {
+    topAligned = aligned;
+    update();
+  }
 
 protected:
   void paintEvent(QPaintEvent *) override {
@@ -467,7 +476,7 @@ class Frontend : public QWidget {
   QPointer<Spectrum> mixerSpectrum;
   QPointer<MixerWheel> mixerWheel;
   QJsonObject configDraft, generationDraft, themeDraft;
-  bool themePreviewVisible = true, themePreviewOverride = false;
+  bool compactThemePreview = false;
   bool themeProjectVisible = false;
   bool configInitialized = false;
   QJsonValue request(QJsonObject req) {
@@ -917,7 +926,19 @@ class Frontend : public QWidget {
             if ((reused = dynamic_cast<Scene *>(widget)))
               break;
         }
-        refresh(2, themePage(reused), "Theme");
+        auto replacement = themePage(reused);
+        refresh(2, replacement, "Theme");
+        if (object(previous.value("theme")).value("selected") !=
+            object(state.value("theme")).value("selected")) {
+          QPointer<QWidget> guarded(replacement);
+          QTimer::singleShot(0, this, [guarded] {
+            if (!guarded) return;
+            auto inspector = guarded->findChild<QScrollArea *>("themeInspector");
+            auto role = guarded->findChild<QWidget *>("selectedThemeRole");
+            if (inspector && role)
+              inspector->ensureWidgetVisible(role, 0, 0);
+          });
+        }
       }
       if (previous.value("palette") != state.value("palette")) {
         auto replacement = scroll(pinnedPalette());
@@ -1166,6 +1187,7 @@ class Frontend : public QWidget {
   }
   QWidget *palettePage();
   QWidget *themePage(Scene *reuse = nullptr);
+  void layoutThemePage(QWidget *page, int width, bool initialize = false);
   void renderConfig();
   void renderHistory();
 
@@ -1192,14 +1214,7 @@ protected:
       }
       if (page && page->objectName() == "themePage") {
         sizePinnedPalette();
-        auto preview = page->findChild<QWidget *>("themePreviewContainer");
-        auto toggle = page->findChild<QToolButton *>("themePreviewToggle");
-        if (preview && toggle && !themePreviewOverride) {
-          themePreviewVisible = page->height() >= page->fontMetrics().height() * 22;
-          QSignalBlocker blocker(toggle);
-          toggle->setChecked(themePreviewVisible);
-          preview->setVisible(themePreviewVisible);
-        }
+        layoutThemePage(page, static_cast<QResizeEvent *>(event)->size().width());
       }
     }
     if (mode == "history" && event->type() == QEvent::KeyPress) {
@@ -1753,7 +1768,7 @@ public:
           if (scenePreview && scenePreview->isVisible()) {
             QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
             // The example terminal's center falls on its background.
-            const QPoint position(scenePreview->width() / 2, scenePreview->height() / 2);
+            const QPoint position = scenePreview->targetRect().center().toPoint();
             QMimeData mime;
             mime.setText("#142638FF");
             QDragEnterEvent enter(position, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
@@ -1782,7 +1797,53 @@ public:
           projectDialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
           if (projectDialog) projectDialog->reject();
         }
+        auto themePanes = [&] { return tabs->widget(2)->findChild<QSplitter *>("themePanes"); };
+        auto widePanes = themePanes();
+        auto wideScene = static_cast<Scene *>(tabs->widget(2)->findChild<QWidget *>("themeScene"));
+        QList<int> adjustedSizes;
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        check(widePanes && widePanes->orientation() == Qt::Horizontal,
+              "Theme preview and inspector sit beside each other at normal size");
+        if (wideScene) {
+          check(wideScene->targetRect().width() >= 350,
+                "Theme scene has room to render at normal size");
+          const auto point = wideScene->targetRect().center().toPoint();
+          QMouseEvent press(QEvent::MouseButtonPress, point, wideScene->mapToGlobal(point),
+                            Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+          QApplication::sendEvent(wideScene, &press);
+          QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          auto selected = tabs->widget(2)->findChild<QWidget *>("selectedThemeRole");
+          auto inspector = tabs->widget(2)->findChild<QScrollArea *>("themeInspector");
+          check(selected && inspector && str(object(state.value("theme")), "selected") == "background" &&
+                    inspector->viewport()->rect().contains(
+                        QRect(selected->mapTo(inspector->viewport(), QPoint()), selected->size())),
+                "Clicking the scene shows its selected role in the inspector");
+          check(inspector && inspector->horizontalScrollBar()->maximum() == 0,
+                "Theme inspector fits at normal size without horizontal scrolling");
+        }
         shot("theme");
+        widePanes = themePanes();
+        if (widePanes && widePanes->orientation() == Qt::Horizontal) {
+          auto handle = widePanes->handle(1);
+          const auto before = widePanes->sizes();
+          const auto point = handle->rect().center();
+          const auto global = handle->mapToGlobal(point);
+          const auto target = global - QPoint(35, 0);
+          QMouseEvent press(QEvent::MouseButtonPress, point, global,
+                            Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+          QApplication::sendEvent(handle, &press);
+          QMouseEvent move(QEvent::MouseMove, handle->mapFromGlobal(target), target,
+                           Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+          QApplication::sendEvent(handle, &move);
+          QMouseEvent release(QEvent::MouseButtonRelease, handle->mapFromGlobal(target), target,
+                              Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+          QApplication::sendEvent(handle, &release);
+          adjustedSizes = widePanes->sizes();
+          check(adjustedSizes != before &&
+                    settings.value("board/themeSplitter").toList() ==
+                        QVariantList{adjustedSizes[0], adjustedSizes[1]},
+                "Dragging the Theme divider saves its pane sizes");
+        }
         resize(540, 360);
         shot("theme-small");
         click(tabs->widget(2), "Project");
@@ -1818,6 +1879,15 @@ public:
                     sceneSelector->accessibleName() == "Preview scene",
                 "Theme scene selector stays with the expanded preview");
           shot("theme-small-preview");
+          auto inspector = tabs->widget(2)->findChild<QScrollArea *>("themeInspector");
+          auto firstRole = tabs->widget(2)->findChild<QWidget *>("selectedThemeRole");
+          auto roleValue = firstRole
+              ? firstRole->findChild<QLineEdit *>(QString(), Qt::FindDirectChildrenOnly)
+              : nullptr;
+          check(inspector && roleValue &&
+                    inspector->viewport()->rect().contains(
+                        QRect(roleValue->mapTo(inspector->viewport(), QPoint()), roleValue->size())),
+                "First role editor remains visible with compact preview expanded");
           previewToggle->click();
           check(!scene->isVisible(), "Theme preview can be collapsed");
           QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
@@ -1837,7 +1907,7 @@ public:
             if (b->accessibleName() == "Save") save = b;
             if (b->accessibleName() == "Export") exportButton = b;
           }
-          check(insideViewport(role) && insideViewport(save),
+          check(insideViewport(role) && visibleInWindow(save),
                 "Theme role and Save visible at small size");
           if (exportButton && save) {
             activateWindow();
@@ -1862,6 +1932,15 @@ public:
           check(visibleInWindow(tabs->widget(page)),
                 page == 0 ? "Mixer visible at small size" : "Palette page visible at small size");
           check(visibleInWindow(pinnedScroll), "Shared palette remains visible at small size");
+        }
+        if (!adjustedSizes.isEmpty()) {
+          resize(900, 700);
+          tabs->setCurrentIndex(2);
+          QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          auto restoredPanes = themePanes();
+          check(restoredPanes && restoredPanes->orientation() == Qt::Horizontal &&
+                    qAbs(restoredPanes->sizes()[0] - adjustedSizes[0]) <= 2,
+                "Theme divider position survives compact mode and page refreshes");
         }
       } else if (mode == "config") {
         auto path = qEnvironmentVariable("XDG_CONFIG_HOME") +
@@ -2220,12 +2299,48 @@ QWidget *Frontend::palettePage() {
   return w;
 }
 
+void Frontend::layoutThemePage(QWidget *page, int width, bool initialize) {
+  auto panes = page->findChild<QSplitter *>("themePanes");
+  if (!panes)
+    return;
+  auto preview = panes->widget(0);
+  auto inspector = panes->widget(1);
+  auto canvas = static_cast<Scene *>(preview->findChild<QWidget *>("themeScene"));
+  auto toggle = page->findChild<QAction *>("themePreviewAction");
+  const bool compact = width < 680;
+  const auto orientation = compact ? Qt::Vertical : Qt::Horizontal;
+  toggle->setVisible(compact && canvas);
+  preview->setVisible(canvas && (!compact || compactThemePreview));
+  if (!initialize && panes->orientation() == orientation)
+    return;
+
+  panes->setOrientation(orientation);
+  panes->setHandleWidth(compact ? 0 : style()->pixelMetric(QStyle::PM_SplitterWidth));
+  panes->handle(1)->setEnabled(!compact);
+  inspector->setMinimumWidth(compact ? 0 : 200);
+  auto previewLayout = static_cast<QBoxLayout *>(preview->layout());
+  previewLayout->setDirection(compact ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
+  preview->setMaximumHeight(compact ? page->fontMetrics().height() * 6 : QWIDGETSIZE_MAX);
+  if (canvas) {
+    canvas->setMaximumWidth(compact ? page->fontMetrics().height() * 16 : QWIDGETSIZE_MAX);
+    canvas->setTopAligned(!compact);
+  }
+  if (compact) {
+    panes->setSizes({0, page->height()});
+  } else {
+    const auto saved = settings.value("board/themeSplitter").toList();
+    panes->setSizes(saved.size() == 2 ? QList<int>{saved[0].toInt(), saved[1].toInt()}
+                                      : QList<int>{440, 340});
+  }
+}
+
 QWidget *Frontend::themePage(Scene *reuse) {
   auto t = object(state.value("theme")), project = object(t.value("project"));
   auto outer = new QWidget;
   outer->setObjectName("themePage");
   outer->installEventFilter(this);
   auto outerLayout = new QVBoxLayout(outer);
+  outerLayout->setSpacing(4);
   outerLayout->setContentsMargins(5, 5, 5, 5);
   auto projectDialog = new QDialog(outer);
   projectDialog->setObjectName("themeProjectDialog");
@@ -2233,6 +2348,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
   auto projectLayout = new QVBoxLayout(projectDialog);
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
+  l->setContentsMargins(0, 0, 0, 0);
   auto selection = new QFormLayout;
   selection->setRowWrapPolicy(QFormLayout::WrapLongRows);
   auto plugins =
@@ -2287,7 +2403,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
   connect(closeProject, &QDialogButtonBox::rejected, projectDialog, &QDialog::reject);
   connect(projectDialog, &QDialog::finished, this, [this] { themeProjectVisible = false; });
   projectLayout->addWidget(closeProject);
-  auto actions = new QToolBar(w);
+  auto actions = new QToolBar(outer);
   actions->setMovable(false);
   for (auto pair : QList<QPair<QString, QString>>{
            {"Save", "theme_save"},
@@ -2295,28 +2411,30 @@ QWidget *Frontend::themePage(Scene *reuse) {
            {"Redo", "theme_redo"},
            {"Use active palette", "theme_palette_bind"}}) {
     auto b =
-        toolButton(pair.first, actionIcon(pair.second), w, [this, pair] { send({{"op", pair.second}}); });
+        toolButton(pair.first, actionIcon(pair.second), actions, [this, pair] { send({{"op", pair.second}}); });
     if (pair.second == "theme_undo")
       b->setEnabled(t.value("can_undo").toBool());
     if (pair.second == "theme_redo")
       b->setEnabled(t.value("can_redo").toBool());
     actions->addWidget(b);
   }
-  l->addWidget(actions);
+  outerLayout->addWidget(actions);
+  auto panes = new QSplitter(Qt::Vertical, outer);
+  panes->setObjectName("themePanes");
+  panes->setChildrenCollapsible(false);
+  auto previewContainer = new QWidget(panes);
+  previewContainer->setObjectName("themePreviewContainer");
+  auto previewLayout = new QBoxLayout(QBoxLayout::TopToBottom, previewContainer);
+  previewLayout->setContentsMargins(0, 0, 0, 0);
   auto scene =
-      combo("Preview scene", array(t, "scenes"), w, str(project, "scene"));
+      combo("Preview scene", array(t, "scenes"), previewContainer, str(project, "scene"));
   scene->setSizeAdjustPolicy(QComboBox::AdjustToContents);
   scene->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
   connect(scene, &QComboBox::activated, this, [this, scene](int) {
     send({{"op", "theme_scene"}, {"id", scene->currentData().toString()}});
   });
-  auto previewContainer = new QWidget(outer);
-  previewContainer->setObjectName("themePreviewContainer");
-  auto previewLayout = new QHBoxLayout(previewContainer);
-  previewLayout->setContentsMargins(0, 0, 0, 0);
   auto sceneSelector = new QWidget(previewContainer);
-  sceneSelector->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
-  auto sceneControls = new QVBoxLayout(sceneSelector);
+  auto sceneControls = new QHBoxLayout(sceneSelector);
   sceneControls->setContentsMargins(0, 0, 0, 0);
   auto sceneLabel = new QLabel("Preview scene", sceneSelector);
   sceneLabel->setBuddy(scene);
@@ -2327,38 +2445,27 @@ QWidget *Frontend::themePage(Scene *reuse) {
   if (t.value("scene").isObject()) {
     Scene *preview;
     if (reuse) {
-      reuse->setParent(outer);
+      reuse->setParent(previewContainer);
       preview = reuse;
     } else {
       preview = new Scene(
-          t.value("scene").toObject(), [this](QJsonObject o) { send(o); }, outer);
+          t.value("scene").toObject(), [this](QJsonObject o) { send(o); }, previewContainer);
     }
-    const auto sceneData = t.value("scene").toObject();
-    const int previewHeight = preview->fontMetrics().height() * 8;
-    const double aspect = sceneData.value("width").toDouble(1) /
-                          qMax(1.0, sceneData.value("height").toDouble(1));
-    const int previewWidth = qRound(qBound(double(preview->minimumWidth()),
-                                           previewHeight * aspect,
-                                           double(QWIDGETSIZE_MAX)));
-    preview->setMaximumSize(previewWidth, previewHeight);
-    preview->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Ignored);
-    previewLayout->addWidget(preview);
+    preview->setObjectName("themeScene");
+    previewLayout->addWidget(preview, 1);
   }
-  previewLayout->addStretch(1);
-  previewContainer->setVisible(themePreviewVisible);
   auto previewToggle = new QToolButton(actions);
   previewToggle->setObjectName("themePreviewToggle");
   previewToggle->setText("Show preview");
   previewToggle->setAccessibleName("Show preview");
   previewToggle->setCheckable(true);
-  previewToggle->setChecked(themePreviewVisible);
+  previewToggle->setChecked(compactThemePreview);
   connect(previewToggle, &QToolButton::toggled, this, [this, previewContainer](bool visible) {
-    themePreviewOverride = true;
-    themePreviewVisible = visible;
+    compactThemePreview = visible;
     previewContainer->setVisible(visible);
   });
-  actions->insertWidget(actions->actions().first(), previewToggle);
-  auto projectButton = toolButton("Project", "document-properties", w, [this, projectDialog] {
+  actions->insertWidget(actions->actions().first(), previewToggle)->setObjectName("themePreviewAction");
+  auto projectButton = toolButton("Project", "document-properties", actions, [this, projectDialog] {
     themeProjectVisible = true;
     projectDialog->show();
     projectDialog->raise();
@@ -2366,41 +2473,46 @@ QWidget *Frontend::themePage(Scene *reuse) {
   });
   actions->insertWidget(actions->actions().first(), projectButton);
   if (themeProjectVisible) projectDialog->show();
-  outerLayout->addWidget(previewContainer, 1);
   auto roles = new QGroupBox("Theme roles", w);
   auto rl = new QVBoxLayout(roles);
   for (auto value : array(t, "roles")) {
     auto o = value.toObject();
     auto id = str(o, "id");
     auto row = new QWidget(roles);
+    const bool selected = str(t, "selected") == id;
+    if (selected)
+      row->setObjectName("selectedThemeRole");
     auto r = new QGridLayout(row);
     r->setContentsMargins(0, 0, 0, 0);
-    auto sw = new Swatch(
-        color(str(o, "color")),
-        str(o, "name") + (str(t, "selected") == id ? " (selected)" : ""), row);
-    r->addWidget(sw, 0, 0);
+    auto sw = new Swatch(color(str(o, "color")), str(o, "name"), row);
+    sw->setCheckable(true);
+    sw->setChecked(selected);
+    r->addWidget(sw, 0, 0, 1, 2, Qt::AlignLeft);
     connect(sw, &QPushButton::clicked, this,
-            [this, id] { send({{"op", "theme_select"}, {"role", id}}); });
+            [this, id, sw, selected] {
+              sw->setChecked(selected);
+              send({{"op", "theme_select"}, {"role", id}});
+            });
     auto edit = new ColorLineEdit(str(o, "value"), row);
     edit->setMaximumWidth(edit->fontMetrics().horizontalAdvance(QString(12, QLatin1Char('M'))) + 20);
-    r->addWidget(edit, 0, 1);
+    r->addWidget(edit, 0, 2);
     connect(edit, &QLineEdit::editingFinished, this, [this, id, edit] {
       send({{"op", "theme_assign"}, {"role", id}, {"color", edit->text()}});
     });
     r->addWidget(button("Default", row, [this, id] {
       send({{"op", "theme_default"}, {"role", id}});
-    }), 0, 2);
+    }), 1, 2, Qt::AlignRight);
     auto link = new QComboBox(row);
     link->setAccessibleName("Palette swatch link");
     link->setEditable(true);
     for (auto v : array(t, "palette_swatches"))
       link->addItem(str(v.toObject(), "name"));
     link->setEditText(str(o, "link"));
-    link->setMinimumContentsLength(12);
+    link->setMinimumContentsLength(9);
     link->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     r->addWidget(new QLabel("Palette link", row), 1, 0);
-    r->addWidget(link, 1, 1, 1, 2);
-    r->setColumnStretch(3, 1);
+    r->addWidget(link, 1, 1);
+    r->setColumnStretch(1, 1);
     connect(link, &QComboBox::activated, this, [this, id, link](int) {
       send({{"op", "theme_link"}, {"role", id}, {"name", link->currentText()}});
     });
@@ -2455,9 +2567,19 @@ QWidget *Frontend::themePage(Scene *reuse) {
   l->addWidget(error);
   l->addStretch();
   auto controlsScroll = scroll(w);
+  controlsScroll->setObjectName("themeInspector");
   controlsScroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
   controlsScroll->setMinimumHeight(48);
-  outerLayout->addWidget(controlsScroll, 3);
+  panes->addWidget(previewContainer);
+  panes->addWidget(controlsScroll);
+  connect(panes, &QSplitter::splitterMoved, this, [this, panes] {
+    if (panes->orientation() == Qt::Horizontal) {
+      const auto sizes = panes->sizes();
+      settings.setValue("board/themeSplitter", QVariantList{sizes[0], sizes[1]});
+    }
+  });
+  outerLayout->addWidget(panes, 1);
+  layoutThemePage(outer, tabs ? tabs->width() : outer->width(), true);
   return outer;
 }
 
