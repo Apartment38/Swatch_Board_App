@@ -449,6 +449,7 @@ class Frontend : public QWidget {
   QTabWidget *tabs = nullptr;
   QLabel *status = nullptr, *connectionStatus = nullptr;
   QAction *pickAction = nullptr;
+  QShortcut *undoShortcut = nullptr, *redoShortcut = nullptr;
   QVBoxLayout *root;
   QVBoxLayout *historyLayout = nullptr;
   QWidget *historyBox = nullptr;
@@ -491,6 +492,16 @@ class Frontend : public QWidget {
     if (result.isObject())
       updateState(result.toObject());
   }
+  QString activeEditor() const {
+    static const QStringList editors = {"mixer", "palette", "theme"};
+    return editors.value(tabs->currentIndex());
+  }
+  void updateUndoShortcuts() {
+    if (!undoShortcut || !tabs) return;
+    const auto editor = object(state.value(activeEditor()));
+    undoShortcut->setEnabled(editor.value("can_undo").toBool());
+    redoShortcut->setEnabled(editor.value("can_redo").toBool());
+  }
   void updateState(const QJsonObject &next) {
     if (next == state)
       return;
@@ -512,6 +523,7 @@ class Frontend : public QWidget {
       renderBoard(previous);
       if (state.value("show_palette").toBool() && tabs)
         tabs->setCurrentIndex(1);
+      updateUndoShortcuts();
     } else if (mode == "config")
       renderConfig();
     else
@@ -631,12 +643,18 @@ class Frontend : public QWidget {
       c->setCurrentIndex(i);
     return c;
   }
+  QString actionHint(const QString &label, const QString &iconName) const {
+    if (iconName != "edit-undo" && iconName != "edit-redo")
+      return label;
+    auto key = iconName == "edit-undo" ? QKeySequence::Undo : QKeySequence::Redo;
+    return label + " (" + QKeySequence(key).toString(QKeySequence::NativeText) + ")";
+  }
   QToolButton *toolButton(const QString &label, const QString &iconName,
                           QWidget *parent, const std::function<void()> &action) {
     auto b = new QToolButton(parent);
     b->setText(label);
     b->setAccessibleName(label);
-    b->setToolTip(label);
+    b->setToolTip(actionHint(label, iconName));
     b->setProperty("boardAction", true);
     b->setIcon(QIcon::fromTheme(iconName, style()->standardIcon(QStyle::SP_FileIcon)));
     b->setToolButtonStyle(settings.value("board/toolbarLabels", true).toBool()
@@ -801,6 +819,16 @@ class Frontend : public QWidget {
       splitter->addWidget(historyScroll);
       tabs = new QTabWidget(outer);
       tabs->setAccessibleName("Board sections");
+      undoShortcut = new QShortcut(this);
+      undoShortcut->setKeys(QKeySequence::keyBindings(QKeySequence::Undo));
+      redoShortcut = new QShortcut(this);
+      redoShortcut->setKeys(QKeySequence::keyBindings(QKeySequence::Redo));
+      connect(undoShortcut, &QShortcut::activated, this, [this] {
+        send({{"op", activeEditor() + "_undo"}});
+      });
+      connect(redoShortcut, &QShortcut::activated, this, [this] {
+        send({{"op", activeEditor() + "_redo"}});
+      });
       tabs->addTab(scroll(mixer()), "Mixer");
       tabs->addTab(scroll(palettePage()), "Palette");
       tabs->addTab(themePage(), "Theme");
@@ -818,6 +846,7 @@ class Frontend : public QWidget {
       connect(tabs, &QTabWidget::currentChanged, this,
               [this, pages](int i) {
                 settings.setValue("board/tab", i);
+                updateUndoShortcuts();
                 pinnedCurrent->setVisible(i == 0);
                 sizePinnedPalette();
                 pages[i]->setChecked(true);
@@ -1070,8 +1099,10 @@ class Frontend : public QWidget {
              {"Redo", "mixer_redo"},
              {"Add source", "mixer_source_add"},
              {"Mix", "mixer_mix"}}) {
-      auto icon = QIcon::fromTheme(actionIcon(pair.second), style()->standardIcon(QStyle::SP_FileIcon));
+      const auto iconName = actionIcon(pair.second);
+      auto icon = QIcon::fromTheme(iconName, style()->standardIcon(QStyle::SP_FileIcon));
       auto action = actions->addAction(icon, pair.first);
+      action->setToolTip(actionHint(pair.first, iconName));
       actions->widgetForAction(action)->setAccessibleName(pair.first);
       connect(action, &QAction::triggered, this, [this, pair] { send({{"op", pair.second}}); });
       if (pair.second == "mixer_undo")
@@ -1265,6 +1296,8 @@ public:
       };
       if (mode == "board" && tabs) {
         tabs->setCurrentIndex(0);
+        check(!undoShortcut->isEnabled() && !redoShortcut->isEnabled(),
+              "Mixer shortcuts disabled without history");
         auto selectFormat = [&](const QString &name) {
           for (auto combo : tabs->widget(0)->findChildren<QComboBox *>())
             if (combo->accessibleName() == "Color format") {
@@ -1285,12 +1318,75 @@ public:
         for (auto combo : tabs->widget(0)->findChildren<QComboBox *>())
           if (combo->accessibleName() == "Color format")
             check(combo->currentText() == "RGB", "Format retained after refresh");
+        auto key = [](QWidget *target, int code, Qt::KeyboardModifiers modifiers) {
+          QKeyEvent press(QEvent::KeyPress, code, modifiers, code == Qt::Key_X ? "x" : QString());
+          QApplication::sendEvent(target, &press);
+          QKeyEvent release(QEvent::KeyRelease, code, modifiers);
+          QApplication::sendEvent(target, &release);
+        };
+        auto page = tabs->widget(0);
+        QAbstractButton *undoButton = nullptr, *redoButton = nullptr, *applyButton = nullptr;
+        for (auto b : page->findChildren<QAbstractButton *>()) {
+          if (b->accessibleName() == "Undo") undoButton = b;
+          if (b->accessibleName() == "Redo") redoButton = b;
+          if (b->accessibleName() == "Apply") applyButton = b;
+        }
+        check(undoShortcut->isEnabled() && !redoShortcut->isEnabled(),
+              "Mixer shortcut availability after editing");
+        auto undoHint = QKeySequence(QKeySequence::Undo).toString(QKeySequence::NativeText);
+        auto redoHint = QKeySequence(QKeySequence::Redo).toString(QKeySequence::NativeText);
+        check(undoButton && undoButton->isEnabled() && undoButton->toolTip().contains(undoHint),
+              "Enabled Undo button shows shortcut hint");
+        check(redoButton && !redoButton->isEnabled() && redoButton->toolTip().contains(redoHint),
+              "Disabled Redo button shows shortcut hint");
+        check(applyButton, "Apply shortcut target available");
+        if (undoButton && applyButton) {
+          shot("shortcut-before-undo");
+          auto pos = undoButton->rect().center();
+          QHelpEvent hover(QEvent::ToolTip, pos, undoButton->mapToGlobal(pos));
+          QApplication::sendEvent(undoButton, &hover);
+          QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          for (auto widget : QApplication::topLevelWidgets())
+            if (widget->windowType() == Qt::ToolTip && widget->isVisible())
+              check(widget->grab().save(dir + "/shortcut-tooltip.png"), "Screenshot undo tooltip");
+          QToolTip::hideText();
+          applyButton->setFocus();
+          key(applyButton, Qt::Key_Z, Qt::ControlModifier);
+          check(str(object(state.value("mixer")), "current") == "#01020342",
+                "Undo keyboard shortcut");
+          check(redoShortcut->isEnabled(), "Mixer redo available after undo");
+          shot("shortcut-after-undo");
+          auto target = QApplication::focusWidget();
+          key(target ? target : this, Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+          check(str(object(state.value("mixer")), "current") == "#04050642",
+                "Redo keyboard shortcut");
+          check(!redoShortcut->isEnabled(), "Mixer redo exhausted");
+          shot("shortcut-after-redo");
+        }
         click(tabs->widget(0), "Undo");
         check(str(object(state.value("mixer")), "current") == "#01020342",
               "Undo");
         click(tabs->widget(0), "Redo");
         check(str(object(state.value("mixer")), "current") == "#04050642",
               "Redo");
+        QLineEdit *field = nullptr;
+        for (auto input : tabs->widget(0)->findChildren<QLineEdit *>())
+          if (input->accessibleName() == "Color value") field = input;
+        check(field, "Editable field available");
+        if (field) {
+          field->setFocus();
+          auto original = field->text();
+          field->selectAll();
+          key(field, Qt::Key_X, Qt::NoModifier);
+          check(field->text() == "x", "Editable field receives typed text");
+          key(field, Qt::Key_Z, Qt::ControlModifier);
+          check(str(object(state.value("mixer")), "current") == "#04050642" && field->text() == original,
+                "Editable field handles native undo");
+          key(field, Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+          check(str(object(state.value("mixer")), "current") == "#04050642" && field->text() == "x",
+                "Editable field handles native redo");
+          key(field, Qt::Key_Z, Qt::ControlModifier);
+        }
         for (auto example : QList<QPair<QString, QString>>{
                  {"RGBA", "rgba(255, 0, 0, 0.5)"},
                  {"HSL", "hsl(120, 100%, 50%)"},
@@ -1484,6 +1580,20 @@ public:
         check(str(object(state.value("mixer")), "current") == "#04050642",
               "Palette swatch selects mixer color");
         tabs->setCurrentIndex(1);
+        activateWindow();
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        tabs->setFocus();
+        auto paletteBeforeUndo = array(object(state.value("palette")), "swatches");
+        auto mixerBeforePaletteUndo = str(object(state.value("mixer")), "current");
+        key(tabs, Qt::Key_Z, Qt::ControlModifier);
+        check(array(object(state.value("palette")), "swatches") != paletteBeforeUndo,
+              "Palette undo keyboard shortcut");
+        check(str(object(state.value("mixer")), "current") == mixerBeforePaletteUndo,
+              "Palette undo leaves the current mixer color unchanged");
+        tabs->setFocus();
+        key(tabs, Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+        check(array(object(state.value("palette")), "swatches") == paletteBeforeUndo,
+              "Palette redo keyboard shortcut");
         shot("palette");
         const int normalShelfHeight = pinnedScroll->height();
         resize(540, 360);
@@ -1613,6 +1723,16 @@ public:
             break;
           }
           check(roleFieldFound, "Theme role color field available");
+          activateWindow();
+          QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          tabs->setFocus();
+          auto beforeThemeUndo = array(object(state.value("theme")), "roles");
+          key(tabs, Qt::Key_Z, Qt::ControlModifier);
+          check(array(object(state.value("theme")), "roles") == roles, "Theme undo keyboard shortcut");
+          tabs->setFocus();
+          key(tabs, Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+          check(array(object(state.value("theme")), "roles") == beforeThemeUndo,
+                "Theme redo keyboard shortcut");
           Scene *scenePreview = nullptr;
           for (auto widget : tabs->widget(2)->findChildren<QWidget *>())
             if ((scenePreview = dynamic_cast<Scene *>(widget))) break;
@@ -1818,10 +1938,18 @@ QWidget *Frontend::palettePage() {
   for (auto pair :
        QList<QPair<QString, QString>>{{"New draft", "palette_new"},
                                       {"Save", "palette_save"},
-                                      {"Duplicate", "palette_duplicate"}}) {
+                                      {"Duplicate", "palette_duplicate"},
+                                      {"Undo", "palette_undo"},
+                                      {"Redo", "palette_redo"}}) {
     auto b =
         toolButton(pair.first, actionIcon(pair.second), palette,
                    [this, pair] { send({{"op", pair.second}}); });
+    if (pair.second == "palette_undo" || pair.second == "palette_redo") {
+      const bool undo = pair.second == "palette_undo";
+      b->setProperty("boardAction", false);
+      b->setEnabled(p.value(undo ? "can_undo" : "can_redo").toBool());
+      b->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    }
     actions->addWidget(b);
   }
   actions->addStretch();
