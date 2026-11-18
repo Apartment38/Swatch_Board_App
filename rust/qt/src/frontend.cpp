@@ -462,6 +462,7 @@ class Frontend : public QWidget {
   QScrollArea *configScroll = nullptr;
   QList<QPushButton *> historyButtons;
   bool hiddenForPick = false, spectrumDragging = false;
+  int mixerFormat = 0;
   QPointer<Spectrum> mixerSpectrum;
   QPointer<MixerWheel> mixerWheel;
   QJsonObject configDraft, generationDraft, themeDraft;
@@ -774,11 +775,15 @@ class Frontend : public QWidget {
       labelToggle->setCheckable(true);
       labelToggle->setChecked(labels);
       connect(labelToggle, &QAction::toggled, this, [this, toolbar](bool visible) {
-        toolbar->setToolButtonStyle(visible ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
+        const auto buttonStyle = visible ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly;
+        toolbar->setToolButtonStyle(buttonStyle);
         settings.setValue("board/toolbarLabels", visible);
+        for (auto bar : findChildren<QToolBar *>())
+          if (bar->property("boardAction").toBool())
+            bar->setToolButtonStyle(buttonStyle);
         for (auto b : findChildren<QToolButton *>())
           if (b->property("boardAction").toBool())
-            b->setToolButtonStyle(visible ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
+            b->setToolButtonStyle(buttonStyle);
       });
       labelToggle->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
       layout->addWidget(toolbar);
@@ -1025,32 +1030,39 @@ class Frontend : public QWidget {
       });
     form->addRow("RGBA", rw);
     auto fields = array(m, "fields");
-    const char *labels[] = {"HEX", "RGB", "RGBA", "HSL", "HSV"};
-    for (int i = 0; i < 5; i++) {
-      auto row = new QWidget(w);
-      auto layout = new QHBoxLayout(row);
-      layout->setContentsMargins(0, 0, 0, 0);
-      auto e = line(labels[i], fields[i].toString(), row);
-      const int fieldChars[] = {10, 18, 25, 30, 30};
-      const int fieldWidth = e->fontMetrics().horizontalAdvance(
-                                 QString(fieldChars[i], QLatin1Char('0'))) + 20;
-      e->setMinimumWidth(fieldWidth);
-      e->setMaximumWidth(fieldWidth);
-      layout->addWidget(e);
-      auto apply = [this, e, i] {
-        e->setModified(false);
-        send({{"op", "mixer_apply"}, {"index", i}, {"text", e->text()}});
-      };
-      connect(e, &QLineEdit::returnPressed, this, apply);
-      layout->addWidget(button(QString("Apply %1").arg(labels[i]), row, apply));
-      layout->addStretch();
-      form->addRow(labels[i], row);
-    }
+    auto formatRow = new QWidget(w);
+    auto formatLayout = new QHBoxLayout(formatRow);
+    formatLayout->setContentsMargins(0, 0, 0, 0);
+    auto format = new QComboBox(formatRow);
+    format->setAccessibleName("Color format");
+    format->addItems({"HEX", "RGB", "RGBA", "HSL", "HSV"});
+    format->setCurrentIndex(mixerFormat);
+    auto value = line("Color value", fields[mixerFormat].toString(), formatRow);
+    value->setMinimumWidth(value->fontMetrics().horizontalAdvance(QString(18, QLatin1Char('0'))) + 20);
+    auto apply = [this, value] {
+      value->setModified(false);
+      send({{"op", "mixer_apply"}, {"index", mixerFormat}, {"text", value->text()}});
+    };
+    connect(format, &QComboBox::currentIndexChanged, this,
+            [this, value, fields](int index) {
+              mixerFormat = index;
+              value->setText(fields[index].toString());
+            });
+    connect(value, &QLineEdit::returnPressed, this, apply);
+    formatLayout->addWidget(format);
+    formatLayout->addWidget(value);
+    formatLayout->addWidget(button("Apply", formatRow, apply));
+    auto formatLabel = new QLabel("Format", w);
+    formatLabel->setBuddy(format);
+    form->addRow(formatLabel, formatRow);
     form->addRow("CMYK", new QLabel(str(m, "cmyk"), w));
     form->addRow("Output", new QLabel(str(m, "output"), w));
     l->addLayout(form);
     auto actions = new QToolBar(w);
     actions->setMovable(false);
+    actions->setProperty("boardAction", true);
+    actions->setToolButtonStyle(settings.value("board/toolbarLabels", true).toBool()
+                                    ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
     for (auto pair : QList<QPair<QString, QString>>{
              {"Copy", "mixer_copy"},
              {"Add to palette", "palette_add_current"},
@@ -1058,13 +1070,14 @@ class Frontend : public QWidget {
              {"Redo", "mixer_redo"},
              {"Add source", "mixer_source_add"},
              {"Mix", "mixer_mix"}}) {
-      auto b =
-          toolButton(pair.first, actionIcon(pair.second), w, [this, pair] { send({{"op", pair.second}}); });
+      auto icon = QIcon::fromTheme(actionIcon(pair.second), style()->standardIcon(QStyle::SP_FileIcon));
+      auto action = actions->addAction(icon, pair.first);
+      actions->widgetForAction(action)->setAccessibleName(pair.first);
+      connect(action, &QAction::triggered, this, [this, pair] { send({{"op", pair.second}}); });
       if (pair.second == "mixer_undo")
-        b->setEnabled(m.value("can_undo").toBool());
+        action->setEnabled(m.value("can_undo").toBool());
       if (pair.second == "mixer_redo")
-        b->setEnabled(m.value("can_redo").toBool());
-      actions->addWidget(b);
+        action->setEnabled(m.value("can_redo").toBool());
     }
     l->addWidget(actions);
     auto space = new QComboBox(w);
@@ -1252,20 +1265,50 @@ public:
       };
       if (mode == "board" && tabs) {
         tabs->setCurrentIndex(0);
-        edit(tabs->widget(0), "HEX", "#01020342");
-        click(tabs->widget(0), "Apply HEX");
+        auto selectFormat = [&](const QString &name) {
+          for (auto combo : tabs->widget(0)->findChildren<QComboBox *>())
+            if (combo->accessibleName() == "Color format") {
+              combo->setCurrentText(name);
+              return;
+            }
+          failures.append("Missing color format choice");
+        };
+        edit(tabs->widget(0), "Color value", "#01020342");
+        click(tabs->widget(0), "Apply");
         check(str(object(state.value("mixer")), "current") == "#01020342",
               "Apply HEX");
-        edit(tabs->widget(0), "RGB", "rgb(4, 5, 6)");
-        click(tabs->widget(0), "Apply RGB");
+        selectFormat("RGB");
+        edit(tabs->widget(0), "Color value", "rgb(4, 5, 6)");
+        click(tabs->widget(0), "Apply");
         check(str(object(state.value("mixer")), "current") == "#04050642",
               "RGB preserves alpha");
+        for (auto combo : tabs->widget(0)->findChildren<QComboBox *>())
+          if (combo->accessibleName() == "Color format")
+            check(combo->currentText() == "RGB", "Format retained after refresh");
         click(tabs->widget(0), "Undo");
         check(str(object(state.value("mixer")), "current") == "#01020342",
               "Undo");
         click(tabs->widget(0), "Redo");
         check(str(object(state.value("mixer")), "current") == "#04050642",
               "Redo");
+        for (auto example : QList<QPair<QString, QString>>{
+                 {"RGBA", "rgba(255, 0, 0, 0.5)"},
+                 {"HSL", "hsl(120, 100%, 50%)"},
+                 {"HSV", "hsv(240, 100%, 100%)"}}) {
+          selectFormat(example.first);
+          edit(tabs->widget(0), "Color value", example.second);
+          for (auto field : tabs->widget(0)->findChildren<QLineEdit *>())
+            if (field->accessibleName() == "Color value") {
+              QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+              QApplication::sendEvent(field, &enter);
+              break;
+            }
+          auto current = str(object(state.value("mixer")), "current");
+          check(current.startsWith(example.first == "RGBA" ? "#FF0000" :
+                                   example.first == "HSL" ? "#00FF00" : "#0000FF"),
+                example.first + " applies with Enter");
+          check(current.endsWith("80"), example.first + " alpha");
+        }
         send({{"op", "mixer_hsv"}, {"h", 123.456}, {"s", 67.891}, {"v", 42.345}});
         auto hsvBefore = array(object(state.value("mixer")), "hsv");
         auto findHsv = [&](const QString &name) -> QDoubleSpinBox * {
@@ -1313,7 +1356,7 @@ public:
                     qAbs(mixerWheel->hue() - hsv[0].toDouble()) < .01 &&
                     qAbs(mixerWheel->saturation() - hsv[1].toDouble()) < .01,
                 "Gradient updates wheel while dragging");
-          check(str(object(state.value("mixer")), "current").endsWith("42"),
+          check(str(object(state.value("mixer")), "current").endsWith("80"),
                 "Mixer selectors preserve alpha");
           QMouseEvent gradientRelease(QEvent::MouseButtonRelease, point, Qt::LeftButton,
                                       Qt::NoButton, Qt::NoModifier);
@@ -1323,7 +1366,7 @@ public:
           QMouseEvent blackPress(QEvent::MouseButtonPress, right, Qt::LeftButton,
                                  Qt::LeftButton, Qt::NoModifier);
           QApplication::sendEvent(mixerWheel, &blackPress);
-          check(str(object(state.value("mixer")), "current") == "#00000042" &&
+          check(str(object(state.value("mixer")), "current") == "#00000080" &&
                     qAbs(mixerSpectrum->hue() - mixerWheel->hue()) < .01,
                 "Wheel preserves black value and alpha while updating gradient hue");
           QMouseEvent blackRelease(QEvent::MouseButtonRelease, right, Qt::LeftButton,
@@ -1344,14 +1387,9 @@ public:
         check(labels && historyToggle, "Toolbar actions available");
         if (labels) {
           labels->setChecked(false);
-          auto buttons = tabs->widget(0)->findChildren<QToolButton *>();
-          bool hidden = false;
-          for (auto b : buttons)
-            if (b->property("boardAction").toBool()) {
-              hidden = b->toolButtonStyle() == Qt::ToolButtonIconOnly;
-              break;
-            }
-          check(hidden, "Toolbar labels can be hidden");
+          auto actions = tabs->widget(0)->findChild<QToolBar *>();
+          check(actions && actions->toolButtonStyle() == Qt::ToolButtonIconOnly,
+                "Toolbar labels can be hidden");
           labels->setChecked(true);
         }
         if (historyToggle) {
@@ -1360,18 +1398,50 @@ public:
           historyToggle->setChecked(true);
           check(historyScroll->isVisible(), "History expands");
         }
+        selectFormat("HEX");
         QSize mixerSize = size();
         resize(900, 700);
+        QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        auto mixerScroll = qobject_cast<QScrollArea *>(tabs->widget(0));
+        for (auto b : tabs->widget(0)->findChildren<QAbstractButton *>())
+          if (b->accessibleName() == "Copy" || b->accessibleName() == "Add to palette") {
+            QRect bounds(b->mapTo(mixerScroll->viewport(), QPoint()), b->size());
+            check(mixerScroll->viewport()->rect().contains(bounds),
+                  b->accessibleName() + " visible in initial Mixer viewport");
+          }
         shot("mixer");
         resize(540, 360);
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-        if (auto control = findHsv("Hue"))
-          for (auto parent = control->parentWidget(); parent; parent = parent->parentWidget())
-            if (auto scroll = qobject_cast<QScrollArea *>(parent)) {
-              scroll->ensureWidgetVisible(control);
-              break;
-            }
         shot("mixer-small");
+        for (auto field : mixerScroll->findChildren<QLineEdit *>())
+          if (field->accessibleName() == "Color value") {
+            mixerScroll->verticalScrollBar()->setValue(
+                field->mapTo(mixerScroll->widget(), QPoint()).y());
+            shot("mixer-small-format");
+            break;
+          }
+        auto actions = mixerScroll->findChild<QToolBar *>();
+        auto overflow = actions->findChild<QToolButton *>("qt_toolbar_ext_button");
+        check(overflow && overflow->isVisible(), "Compact mixer toolbar has overflow");
+        if (overflow && overflow->isVisible()) {
+          auto menu = overflow->menu();
+          check(menu, "Mixer overflow has a menu");
+          if (menu) {
+            QTimer::singleShot(0, menu, [&] {
+              check(menu->isVisible(), "Mixer overflow menu opens");
+              QStringList entries;
+              for (auto action : menu->actions())
+                if (action->isEnabled())
+                  entries.append(action->text());
+              check(entries.contains("Add source") && entries.contains("Mix"),
+                    "Add source and Mix available in compact toolbar overflow");
+              check(menu->grab().save(dir + "/mixer-small-overflow.png"),
+                    "Screenshot mixer-small-overflow");
+              menu->close();
+            });
+            overflow->showMenu();
+          }
+        }
         resize(mixerSize);
         auto activation = state;
         activation["show_palette"] = true;
