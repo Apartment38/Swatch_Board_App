@@ -1613,6 +1613,25 @@ public:
             break;
           }
           check(roleFieldFound, "Theme role color field available");
+          Scene *scenePreview = nullptr;
+          for (auto widget : tabs->widget(2)->findChildren<QWidget *>())
+            if ((scenePreview = dynamic_cast<Scene *>(widget))) break;
+          check(scenePreview && scenePreview->isVisible(), "Theme scene preview available");
+          if (scenePreview && scenePreview->isVisible()) {
+            QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+            // The example terminal's center falls on its background.
+            const QPoint position(scenePreview->width() / 2, scenePreview->height() / 2);
+            QMimeData mime;
+            mime.setText("#142638FF");
+            QDragEnterEvent enter(position, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+            QApplication::sendEvent(scenePreview, &enter);
+            QDropEvent drop(QPointF(position), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+            QApplication::sendEvent(scenePreview, &drop);
+            const auto updated = array(object(state.value("theme")), "roles");
+            check(drop.isAccepted() && !updated.isEmpty() &&
+                      str(updated[0].toObject(), "color") == "#142638FF",
+                  "Theme scene drop updates the background role");
+          }
           click(tabs->widget(2), "Save");
           click(tabs->widget(2), "Project");
           auto projectDialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
@@ -1660,6 +1679,12 @@ public:
         if (previewToggle && scene) {
           previewToggle->click();
           check(scene->isVisible(), "Theme preview can be expanded");
+          auto previewContainer = tabs->widget(2)->findChild<QWidget *>("themePreviewContainer");
+          auto sceneSelector = previewContainer ? previewContainer->findChild<QComboBox *>() : nullptr;
+          check(sceneSelector && sceneSelector->isVisible() &&
+                    sceneSelector->accessibleName() == "Preview scene",
+                "Theme scene selector stays with the expanded preview");
+          shot("theme-small-preview");
           previewToggle->click();
           check(!scene->isVisible(), "Theme preview can be collapsed");
           QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
@@ -2145,7 +2170,16 @@ QWidget *Frontend::themePage(Scene *reuse) {
   previewContainer->setObjectName("themePreviewContainer");
   auto previewLayout = new QHBoxLayout(previewContainer);
   previewLayout->setContentsMargins(0, 0, 0, 0);
-  previewLayout->addWidget(scene, 0, Qt::AlignTop);
+  auto sceneSelector = new QWidget(previewContainer);
+  sceneSelector->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+  auto sceneControls = new QVBoxLayout(sceneSelector);
+  sceneControls->setContentsMargins(0, 0, 0, 0);
+  auto sceneLabel = new QLabel("Preview scene", sceneSelector);
+  sceneLabel->setBuddy(scene);
+  sceneControls->addWidget(sceneLabel);
+  sceneControls->addWidget(scene);
+  sceneControls->addStretch();
+  previewLayout->addWidget(sceneSelector, 0, Qt::AlignTop);
   if (t.value("scene").isObject()) {
     Scene *preview;
     if (reuse) {
@@ -2155,10 +2189,18 @@ QWidget *Frontend::themePage(Scene *reuse) {
       preview = new Scene(
           t.value("scene").toObject(), [this](QJsonObject o) { send(o); }, outer);
     }
-    preview->setMaximumHeight(preview->fontMetrics().height() * 8);
-    preview->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
-    previewLayout->addWidget(preview, 1);
+    const auto sceneData = t.value("scene").toObject();
+    const int previewHeight = preview->fontMetrics().height() * 8;
+    const double aspect = sceneData.value("width").toDouble(1) /
+                          qMax(1.0, sceneData.value("height").toDouble(1));
+    const int previewWidth = qRound(qBound(double(preview->minimumWidth()),
+                                           previewHeight * aspect,
+                                           double(QWIDGETSIZE_MAX)));
+    preview->setMaximumSize(previewWidth, previewHeight);
+    preview->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Ignored);
+    previewLayout->addWidget(preview);
   }
+  previewLayout->addStretch(1);
   previewContainer->setVisible(themePreviewVisible);
   auto previewToggle = new QToolButton(actions);
   previewToggle->setObjectName("themePreviewToggle");
