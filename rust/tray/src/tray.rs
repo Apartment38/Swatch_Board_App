@@ -55,8 +55,7 @@ impl Tray for Item {
                 label: "Show Palette".into(),
                 icon_name: "color-management".into(),
                 activate: Box::new(|item: &mut Self| {
-                    let (reply, _) = oneshot::channel();
-                    let _ = item.requests.send(Request::ShowHistory(reply));
+                    let _ = item.requests.send(Request::OpenPalette);
                 }),
                 ..Default::default()
             }
@@ -146,4 +145,27 @@ pub async fn start(
     }
     .spawn()
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn show_palette_menu_dispatches_palette_request() {
+        let (requests, mut received) = mpsc::unbounded_channel();
+        let mut item = Item {
+            requests,
+            color: None,
+            message: None,
+        };
+        let action = item.menu().into_iter().find_map(|entry| match entry {
+            ksni::MenuItem::Standard(action) if action.label == "Show Palette" => Some(action),
+            _ => None,
+        });
+        let action = action.expect("Show Palette menu item");
+        assert!(action.visible && action.enabled);
+        (action.activate)(&mut item);
+        assert!(matches!(received.try_recv(), Ok(Request::OpenPalette)));
+    }
 }

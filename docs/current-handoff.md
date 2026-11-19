@@ -1,5 +1,132 @@
 # Swatch Board current handoff
 
+## Mixer wheel and gradient — 2026-11-16
+
+The mixer shows a hue/saturation wheel beside the saturation/value gradient.
+Both follow the shared HSV state during drags and after other color edits;
+wheel interaction preserves value and alpha, including at black. Both controls
+support arrow keys. The Board smoke checks wheel-to-gradient and gradient-to-
+wheel synchronization, color selection, alpha and black preservation.
+
+Workspace build/tests, strict Clippy and formatting passed locally. The full
+container suite passed, including Qt offscreen and private Weston Wayland UI
+smokes (one existing ignored Rust test and one Arch-only packaging skip). The
+final, strengthened event-position assertions also passed in local offscreen
+smoke. Physical KDE input and accessibility remain separate open checks.
+
+## Isolated X11 interaction check — 2026-11-16
+
+A disposable container/Xvfb session exercised pointer and keyboard interaction
+with Board and Settings at source `21ff8b1`. Swatch reordering/selection,
+toolbar toggles, theme drop and live preview, small-window scrolling, wheel
+mouse/keyboard input, and Settings validation/save received bounded X11 input
+checks. See [the evidence](evidence/ui-x11-2026-11-16/report.md) for results,
+fixture details, screenshots and limits. This is not physical KDE/Wayland,
+tray, portal or screen-reader acceptance; the remaining ToDos stay open.
+
+## Settings portal registration diagnosis — 2026-11-16
+
+The user-supplied transcript reports an earlier interpretation that the desktop
+portal could not find the tray application ID; the screenshot and literal error
+are not included. The tray registers `org.apartment38.SwatchBoard.Tray`, and
+its installer supplies the matching desktop entry. The documented uninstalled
+development workflow had omitted that entry. Registry failures now preserve the
+original portal error and explain how to check the desktop entry; README and
+troubleshooting describe the development setup and session visibility. Explicit
+permission denials keep their existing no-automatic-retry behavior.
+
+Verification: all nine tray tests passed, including registration error detail
+and denial handling; strict tray Clippy and workspace formatting passed. The
+12 packaging tests passed with the existing Arch-only skip; the installer test
+checks the installed tray entry and executable path. An isolated temporary XDG
+check verified that the documented entry step creates a missing entry and
+preserves an existing one. No user desktop entry was installed and no live KDE
+portal or shortcut permission was changed. Confirm the literal error and test
+the target session before marking the original report resolved.
+
+## Responsive layout and automated verification — 2026-11-16
+
+The Board now reaches 540×360 in the Qt control smoke while keeping its pinned
+Theme preview, scrollable controls, and shared palette visible. The palette
+shelf and Theme controls can shrink, and compact swatch labels remain visible.
+The smoke now exercises palette reorder, toolbar labels, history visibility,
+selection, incoming Palette activation, color drops and automatic theme preview
+updates. A separate wheel check sends key and marker-drag events. Private D-Bus
+regressions cover tray menu dispatch, activation of an existing Board, and
+Settings recovery when a tray service appears.
+
+`testing/container-tests.sh` now runs Board and Settings checks both with Qt
+Offscreen and a private headless Weston Wayland compositor. The full container
+run passed workspace build/tests, strict Clippy, formatting, packaging tests,
+wheel test, and all four UI smokes; the existing Rust and Arch-only packaging
+skips remain. The Wayland Theme client screenshot measured 540×360. These use
+synthetic Qt events, not physical pointer/keyboard input, and do not establish
+KDE Plasma, live tray, accessibility or physical desktop acceptance. The
+reported Settings error is still unidentified: the new test confirms a genuine
+missing-service status and recovery, not the cause of the user's report.
+
+## Containerized test automation — 2026-11-16
+
+Run `testing/container-tests.sh` for an isolated Docker build and the locked
+workspace build and tests, strict Clippy, rustfmt, packaging tests, and Board
+and Settings Qt offscreen control smokes. Set `SWATCH_TEST_ARTIFACTS` to retain
+JSON results and client screenshots. See [testing.md](testing.md) for setup,
+network requirements, and coverage limits.
+
+The full command passed in this environment with artifact export: workspace
+tests had one existing ignored test; packaging had one Arch-only skipped test;
+both UI result files reported no failures. D-Bus logged an fd-limit warning
+and Qt used its offscreen platform. These checks do not replace physical Plasma,
+Wayland, tray, or accessibility acceptance. The image's temporary workspace and
+XDG directories are separate from host data.
+
+## UI improvements continuation — 2026-11-16
+
+The generator now previews lock-aware generated colors without changing the
+palette or saving a generation. Fixed-harmony modes show draggable markers;
+dragging a marker rotates the base harmony, and Generate explicitly applies the
+result. A blank base follows the current mixer color. Mixer, Theme, and Settings
+have more compact inputs and wrapping/overflow behavior; the pinned theme scene
+can shrink. A tab-refresh issue that left a stale mixer color visible on Theme
+was corrected. Empty Settings status labels are hidden, while real errors remain
+visible as plain text.
+
+Offline locked workspace build and tests passed (one existing ignored test),
+strict Clippy and rustfmt passed. Isolated offscreen Board and Settings control
+smokes passed, including palette selection, a synthetic theme color drop, and
+pinned-color visibility. Small resize snapshots were inspected: Settings reached 540×360, but Board
+Theme remained 540×434 due to its minimum size. Scrolling is still necessary,
+and those snapshots do not establish physical desktop,
+keyboard-only, screen-reader, or compositor behavior. A standalone offscreen
+wheel input smoke checked keyboard and marker drag callbacks. The reported
+Settings footer error remains unidentified; an isolated session without a tray
+shows a genuine D-Bus service-unavailable status, which is not evidence that it
+matches the user's message. See [the ToDos](ui-improvements-todo.md).
+
+## UI improvements in progress — 2026-11-16
+
+Work began from freshly fetched `origin/main` (0f20cd7). The mixer has a pinned
+current color, a collapsible history sidebar, and a compact clickable,
+reorderable palette with context-menu editing. Navigation and common editing
+actions have icons and a persisted label preference. Theme role drops replace
+the field, the duplicate palette and manual render button are gone, and the
+scene stays visible while controls scroll. Preview files follow current resolved
+values and export renders those values; repeated snapshots cache the render.
+The generator has an interactive HSV base-color wheel. The tray's Show Palette
+action launches or activates the Board on its Palette page.
+
+The work list and remaining scope are in [ui-improvements-todo.md](ui-improvements-todo.md).
+In particular, the reported Settings footer error has not been identified; its
+exact message and desktop context are needed. The wheel does not yet provide
+Adobe-style draggable harmony handles, and the responsive cleanup is incomplete.
+The new interactions have not been accepted on a physical Plasma desktop.
+
+Verification: offline locked workspace build and workspace tests passed (one
+existing ignored test); Board and Settings Qt control smoke passed with the
+offscreen platform in isolated XDG directories. These are not Wayland, physical
+input, screen-reader, or tray integration acceptance. Qt development headers
+were extracted into `/tmp` for the build, without installing system packages.
+
 ## Native Qt frontend cutover
 
 Board, Settings, and the history popup now use Qt 6 Widgets through the shared

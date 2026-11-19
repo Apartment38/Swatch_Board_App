@@ -1,0 +1,3 @@
+The generator draws its hue and saturation surface at a consistent brightness. Marker fills and preview swatches show the actual palette colors. Mouse and keyboard edits preserve the base value and alpha, including at black.
+
+The gpt-6.2-astra builder finished the implementation and verified the workspace build, focused native wheel tests and Board smoke. A fresh gpt-6.2-sol judge compared the actual normal and compact renders with Round 8 and the official KDE screenshots. It accepted wheel contrast at both sizes and observed that two neighboring markers still overlap for the fixture's closely spaced hues.

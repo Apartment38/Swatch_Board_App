@@ -12,6 +12,7 @@ use tokio::{
 
 const PICK: &str = "pick-color";
 const HISTORY: &str = "show-history";
+const TRAY_APP_ID: &str = "org.apartment38.SwatchBoard.Tray";
 const RETRY: Duration = Duration::from_secs(30);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const FALLBACK: &str = "KDE fallback: in System Settings > Shortcuts, add two custom command shortcuts: qdbus6 org.apartment38.SwatchBoard1 /org/apartment38/SwatchBoard1 org.apartment38.SwatchBoard1.PickColor and qdbus6 org.apartment38.SwatchBoard1 /org/apartment38/SwatchBoard1 org.apartment38.SwatchBoard1.ShowHistory. Assign the desired keys there; remove them if portal shortcuts are later enabled to avoid conflicts.";
@@ -169,6 +170,14 @@ fn portal_failure(context: &str, error: ashpd::Error) -> Failure {
     }
 }
 
+fn registration_failure(error: ashpd::Error) -> Failure {
+    let mut failure = portal_failure("host app registration failed", error);
+    failure.message.push_str(&format!(
+        ". If the portal cannot find the app, install {TRAY_APP_ID}.desktop in an XDG applications directory visible to the desktop session, then restart the tray. See Swatch Board troubleshooting"
+    ));
+    failure
+}
+
 async fn run(
     mut requests: watch::Receiver<Option<(String, String, bool)>>,
     status: watch::Sender<String>,
@@ -258,14 +267,14 @@ async fn session(
             REQUEST_TIMEOUT,
             ashpd::register_host_app_with_connection(
                 connection.clone(),
-                "org.apartment38.SwatchBoard.Tray"
+                TRAY_APP_ID
                     .parse()
                     .map_err(|e| Failure::from(format!("invalid app identity: {e}")))?,
             ),
         )
         .await
         .map_err(|_| Failure::from("host app registration timed out"))?
-        .map_err(|e| portal_failure("host app registration failed", e))?;
+        .map_err(registration_failure)?;
         let portal = timeout(
             REQUEST_TIMEOUT,
             GlobalShortcuts::with_connection(connection),
@@ -380,5 +389,31 @@ async fn active_session(
                 status.send_replace(binding_status(response.shortcuts()));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn registration_error_keeps_portal_detail_and_offers_desktop_entry_help() {
+        let error = ashpd::Error::Portal(ashpd::PortalError::NotFound("app not found".into()));
+        let failure = registration_failure(error);
+        assert!(failure.message.contains("app not found"));
+        assert!(
+            failure
+                .message
+                .contains("org.apartment38.SwatchBoard.Tray.desktop")
+        );
+        assert!(failure.retry);
+    }
+
+    #[test]
+    fn registration_denial_is_still_not_retried_automatically() {
+        let error = ashpd::Error::Portal(ashpd::PortalError::NotAllowed("denied".into()));
+        let failure = registration_failure(error);
+        assert!(failure.message.contains("denied"));
+        assert!(!failure.retry);
     }
 }

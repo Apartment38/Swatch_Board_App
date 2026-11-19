@@ -24,6 +24,7 @@ enum Request {
     LastColor(oneshot::Sender<String>),
     History(u32, oneshot::Sender<Result<Vec<HistoryRow>, String>>),
     ShowHistory(oneshot::Sender<Result<&'static str, String>>),
+    OpenPalette,
     CopyHistory(String, oneshot::Sender<Result<String, String>>),
     Configure(oneshot::Sender<Result<&'static str, String>>),
     OpenBoard,
@@ -444,10 +445,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             } => {
                 history_child = None;
-                match result {
-                    Ok(status) if !status.success() => eprintln!("history popup exited abnormally: {status}"),
-                    Err(error) => eprintln!("failed waiting for history popup: {error}"),
-                    _ => {}
+                let error = match result {
+                    Ok(status) if !status.success() => Some(format!("History window exited abnormally: {status}")),
+                    Err(error) => Some(format!("Failed waiting for history window: {error}")),
+                    _ => None,
+                };
+                if let Some(reason) = error {
+                    eprintln!("{reason}");
+                    tray.update(|item| item.message = Some(reason.clone())).await;
+                    notify_failure(&connection, reason);
                 }
             },
             result = async {
@@ -535,6 +541,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Err(error) => {
                             let reason = format!("failed to launch history popup: {error}");
                             eprintln!("{reason}");
+                            tray.update(|item| item.message = Some(reason.clone())).await;
+                            notify_failure(&connection, reason.clone());
                             let _ = reply.send(Err(reason));
                         }
                     }
@@ -567,8 +575,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 }
-                Some(Request::OpenBoard) => {
-                    match Command::new(board_path()).spawn() {
+                Some(request @ (Request::OpenBoard | Request::OpenPalette)) => {
+                    let mut command = Command::new(board_path());
+                    if matches!(request, Request::OpenPalette) {
+                        command.arg("--palette");
+                    }
+                    match command.spawn() {
                         Ok(mut child) => {
                             let requests = requests.clone();
                             tokio::spawn(async move {

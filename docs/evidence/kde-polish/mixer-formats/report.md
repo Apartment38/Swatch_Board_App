@@ -1,0 +1,3 @@
+Mixer uses one Format selector and value field, making Copy and Add to palette visible at normal size. All five formats, Enter, alpha handling and compact toolbar overflow were checked by native Qt smoke. The gpt-6.2-astra judge accepted actual normal and compact renders and confirmed that Add source and Mix appear in the overflow menu.
+
+Workspace tests, strict Clippy, formatting and packaging checks passed in the builder worktree. A private Weston Board smoke reproduced the existing Theme export keyboard-focus failure on both the candidate and baseline. Fresh integrated Breeze Board smoke passed.

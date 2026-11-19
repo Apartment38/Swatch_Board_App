@@ -19,6 +19,7 @@ struct Board {
     connected: bool,
     loaded: bool,
     picking: bool,
+    initial_show_palette: bool,
     message: String,
     error: Option<String>,
     tx: Sender<Command>,
@@ -26,7 +27,7 @@ struct Board {
 }
 
 impl Board {
-    fn new(tx: Sender<Command>, rx: Receiver<Event>) -> Self {
+    fn new(tx: Sender<Command>, rx: Receiver<Event>, show_palette: bool) -> Self {
         Self {
             config: Config::default(),
             history: Vec::new(),
@@ -36,6 +37,7 @@ impl Board {
             connected: false,
             loaded: false,
             picking: false,
+            initial_show_palette: show_palette,
             message: "Loading saved history and settings…".into(),
             error: None,
             tx,
@@ -50,7 +52,7 @@ impl Board {
             .unwrap_or(Format::HexRgb)
     }
 
-    fn snapshot(&self, activate: bool, clipboard: Option<String>) -> Value {
+    fn snapshot(&self, activate: bool, show_palette: bool, clipboard: Option<String>) -> Value {
         let format = self.format();
         json!({
             "mixer": self.mixer.snapshot(format),
@@ -72,13 +74,21 @@ impl Board {
             "message": self.message,
             "error": self.error,
             "activate": activate,
+            "show_palette": show_palette,
             "clipboard": clipboard,
         })
     }
 
     fn request(&mut self, request: Value) -> Value {
+        if request["op"].as_str() == Some("palette_preview_generation") {
+            return match self.palette.preview_generation(&request) {
+                Ok(colors) => json!({"colors": colors}),
+                Err(error) => json!({"error": error}),
+            };
+        }
         let mut changed = false;
         let mut activate = false;
+        let mut show_palette = std::mem::take(&mut self.initial_show_palette);
         while let Ok(event) = self.rx.try_recv() {
             changed = true;
             match event {
@@ -105,12 +115,16 @@ impl Board {
                 }
                 Event::Error(error) => self.error = Some(error),
                 Event::Activate => activate = !self.picking,
+                Event::ActivatePalette => {
+                    activate = !self.picking;
+                    show_palette = true;
+                }
             }
         }
         let op = request["op"].as_str().unwrap_or("");
         if op == "poll" {
             return if changed {
-                self.snapshot(activate, None)
+                self.snapshot(activate, show_palette, None)
             } else {
                 Value::Null
             };
@@ -173,12 +187,13 @@ impl Board {
         if let Err(error) = result {
             self.error = Some(error);
         }
-        self.snapshot(activate, clipboard)
+        self.snapshot(activate, show_palette, clipboard)
     }
 }
 
 fn main() {
-    let (tx, rx) = match worker::start() {
+    let show_palette = std::env::args().skip(1).any(|arg| arg == "--palette");
+    let (tx, rx) = match worker::start(show_palette) {
         Ok(channels) => channels,
         Err(error) if error == "Board is already open" => return,
         Err(error) => {
@@ -186,7 +201,7 @@ fn main() {
             std::process::exit(1);
         }
     };
-    let mut board = Board::new(tx, rx);
+    let mut board = Board::new(tx, rx, show_palette);
     std::process::exit(swatch_board_qt::run("board", move |request| {
         board.request(request)
     }));

@@ -37,14 +37,33 @@ cargo build --locked --workspace
 ./target/debug/swatch-board-tray
 ```
 
+The tray registers the application ID `org.apartment38.SwatchBoard.Tray` with
+the desktop portal. A packaged installation supplies the matching desktop entry.
+When running an uninstalled development build and the portal cannot find that
+app, install the entry into the graphical session's XDG applications directory
+before restarting the tray:
+
+```sh
+entry="${XDG_DATA_HOME:-$HOME/.local/share}/applications/org.apartment38.SwatchBoard.Tray.desktop"
+if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then
+  install -Dm644 packaging/org.apartment38.SwatchBoard.Tray.desktop "$entry"
+else
+  printf 'Existing entry left unchanged: %s\n' "$entry"
+fi
+```
+
+Run that command from the repository root. The entry identifies the app to the
+portal; its `Exec=swatch-board-tray` launcher requires the installed binary on
+the desktop session's `PATH`. The portal uses its own session environment, so
+the directory must be visible to that session. This does not grant shortcut
+permissions; KDE may still require the user to authorize or assign shortcuts.
 
 Left-click the tray icon or select **Pick Color**. Successful captures are
 saved to `${XDG_DATA_HOME:-$HOME/.local/share}/swatch-board/library.sqlite3`,
 including repeated colors. The tray restores the last color on restart and owns
 the copied text independently of the picker process. **Show Palette** opens the
-history popup; selecting a swatch copies it without creating another capture,
-closes the popup, and shows a notification. Repeat the action, press Escape, or
-click outside to close without copying. **Configure** opens a separate settings
+Board's Palette page. The history shortcut opens the history popup; selecting a
+swatch copies it without creating another capture. **Configure** opens a separate settings
 window; closing it exits that process. **Open Board** launches the separate Board
 window. See the [D-Bus API](docs/ipc.md).
 
@@ -139,10 +158,12 @@ color or a mix source. Edit HEX, RGB, RGBA, HSL, or HSV values and apply them;
 editing a format without alpha preserves the current alpha. CMYK is approximate
 and unprofiled. Copy uses the configured clipboard format.
 
-Click or drag the saturation/value spectrum, or edit hue with the native numeric
-control. HSV values use degrees/percent; RGB and alpha use 0–255. Format fields
-have explicit Apply buttons and support Enter. Color edits participate in
-undo/redo; the channel controls use the desktop's native spin boxes.
+Click or drag the mixer wheel to choose hue and saturation, or use the adjacent
+saturation/value gradient. Both selectors follow the current color and update
+each other while dragging; arrow keys adjust the focused selector. HSV values
+use degrees/percent; RGB and alpha use 0–255. Format fields have explicit Apply
+buttons and support Enter. Color edits participate in undo/redo; the channel
+controls use the desktop's native spin boxes.
 
 Mix two or more sources with normalized weights in encoded sRGB or OKLCH.
 OKLCH averages hue along the shortest arc relative to the first chromatic source,

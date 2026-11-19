@@ -30,6 +30,7 @@ pub enum Event {
     PickFinished(Result<(), String>),
     Error(String),
     Activate,
+    ActivatePalette,
 }
 
 #[derive(Clone)]
@@ -50,6 +51,10 @@ impl BoardControl {
     fn activate(&self) {
         self.0.send(Event::Activate);
     }
+
+    fn activate_palette(&self) {
+        self.0.send(Event::ActivatePalette);
+    }
 }
 
 // The reply and completion signal can arrive in either order.
@@ -62,7 +67,7 @@ enum PickState {
     Active,
 }
 
-pub fn start() -> Result<(Sender<Command>, Receiver<Event>), String> {
+pub fn start(show_palette: bool) -> Result<(Sender<Command>, Receiver<Event>), String> {
     let (commands, command_rx) = mpsc::channel();
     let (event_tx, events) = mpsc::channel();
     let (ready_tx, ready_rx) = mpsc::sync_channel(1);
@@ -79,7 +84,12 @@ pub fn start() -> Result<(Sender<Command>, Receiver<Event>), String> {
                     return;
                 }
             };
-            runtime.block_on(run(command_rx, Events { sender: event_tx }, ready_tx));
+            runtime.block_on(run(
+                command_rx,
+                Events { sender: event_tx },
+                ready_tx,
+                show_palette,
+            ));
         })
         .map_err(|error| format!("Cannot start Board worker: {error}"))?;
     ready_rx
@@ -131,6 +141,7 @@ async fn run(
     commands: Receiver<Command>,
     events: Events,
     ready: mpsc::SyncSender<Result<(), String>>,
+    show_palette: bool,
 ) {
     let connection = match Connection::session().await {
         Ok(connection) => connection,
@@ -159,7 +170,16 @@ async fn run(
             let result = async {
                 let proxy =
                     zbus::Proxy::new(&connection, BOARD_SERVICE, BOARD_PATH, BOARD_SERVICE).await?;
-                proxy.call::<_, _, ()>("Activate", &()).await
+                proxy
+                    .call::<_, _, ()>(
+                        if show_palette {
+                            "ActivatePalette"
+                        } else {
+                            "Activate"
+                        },
+                        &(),
+                    )
+                    .await
             }
             .await;
             let _ = ready.send(match result {
@@ -345,5 +365,96 @@ async fn run(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    use std::process::Command as ProcessCommand;
+    use std::time::Instant;
+
+    // A separate bus makes the name-ownership and activation test independent of
+    // any Board or tray running in the user's session.
+    #[test]
+    fn second_board_activates_palette_over_private_bus() {
+        const CHILD: &str = "SWATCH_BOARD_ACTIVATION_TEST";
+        if std::env::var_os(CHILD).is_none() {
+            let root = std::env::temp_dir()
+                .join(format!("swatch-board-activation-{}", std::process::id()));
+            std::fs::create_dir_all(&root).unwrap();
+            let runtime = root.join("runtime");
+            std::fs::create_dir_all(&runtime).unwrap();
+            std::fs::set_permissions(&runtime, std::fs::Permissions::from_mode(0o700)).unwrap();
+            let result = ProcessCommand::new("dbus-run-session")
+                .arg("--")
+                .arg(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "worker::tests::second_board_activates_palette_over_private_bus",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .env("XDG_DATA_HOME", root.join("data"))
+                .env("XDG_CONFIG_HOME", root.join("config"))
+                .env("XDG_STATE_HOME", root.join("state"))
+                .env("XDG_RUNTIME_DIR", runtime)
+                .env("QT_QPA_PLATFORM", "offscreen")
+                .output()
+                .expect("start a private D-Bus session");
+            let _ = std::fs::remove_dir_all(root);
+            assert!(
+                result.status.success(),
+                "private activation test failed:\n{}\n{}",
+                String::from_utf8_lossy(&result.stdout),
+                String::from_utf8_lossy(&result.stderr)
+            );
+            return;
+        }
+
+        let (commands, events) = start(false).expect("start the first Board worker");
+        // Normal binary is built before tests so the theme worker is also present.
+        let board = std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("swatch-board");
+        assert!(
+            board.is_file(),
+            "build the workspace before running this test"
+        );
+        for (args, palette) in [(&["--palette"][..], true), (&[][..], false)] {
+            let mut child = ProcessCommand::new(&board)
+                .args(args)
+                .spawn()
+                .expect("launch the second Board");
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                if let Some(status) = child.try_wait().unwrap() {
+                    assert!(status.success(), "second Board exited with {status}");
+                    break;
+                }
+                if Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("second Board did not exit after activating the existing one");
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            loop {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                let event = events.recv_timeout(remaining).expect("activation event");
+                match event {
+                    Event::ActivatePalette if palette => break,
+                    Event::Activate if !palette => break,
+                    Event::ActivatePalette | Event::Activate => panic!("wrong activation event"),
+                    _ => {}
+                }
+            }
+        }
+        drop(commands);
     }
 }

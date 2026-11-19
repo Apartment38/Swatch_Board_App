@@ -6,6 +6,8 @@ use swatch_board_color::{
 };
 use swatch_board_storage::{GenerationRecord, PaletteRepository, Rgba8, SavedPalette};
 
+type GeneratedColors = (Vec<Color>, Vec<bool>, Vec<String>);
+
 #[derive(Clone, PartialEq)]
 struct Draft {
     name: String,
@@ -328,8 +330,14 @@ impl PaletteEditor {
         }
         Ok(())
     }
-    fn generate(&mut self, options: GenerationOptions, mixer: &mut Mixer) -> Result<(), String> {
-        let mut colors = generate(&options)?;
+    pub fn preview_generation(&self, request: &Value) -> Result<Vec<String>, String> {
+        let options = options(request)?;
+        let (colors, _, _) = self.generated_colors(&options)?;
+        Ok(colors.iter().map(|c| c.format(Format::HexRgba)).collect())
+    }
+
+    fn generated_colors(&self, options: &GenerationOptions) -> Result<GeneratedColors, String> {
+        let mut colors = generate(options)?;
         if self.draft.locked.iter().filter(|&&x| x).count() > options.count {
             return Err("Palette size is smaller than the number of locked swatches.".into());
         }
@@ -361,6 +369,11 @@ impl PaletteEditor {
                 names[j] = self.draft.names[i].clone();
             }
         }
+        Ok((colors, locks, names))
+    }
+
+    fn generate(&mut self, options: GenerationOptions, mixer: &mut Mixer) -> Result<(), String> {
+        let (colors, locks, names) = self.generated_colors(&options)?;
         let values: Vec<_> = colors.iter().copied().map(to_rgba).collect();
         self.repository
             .as_mut()
@@ -477,6 +490,34 @@ mod tests {
             lock_history: false,
             status: None,
         }
+    }
+    #[test]
+    fn generation_preview_preserves_locks_and_draft() {
+        let mut p = editor();
+        let mut m = Mixer::default();
+        p.add_history(Color::new(1, 2, 3, 255), &mut m);
+        p.command(
+            &json!({"op":"palette_lock","index":0,"locked":true}),
+            &mut m,
+        )
+        .unwrap();
+        let before = p.draft.clone();
+        let request = json!({"mode":"triadic", "count":3, "seed":"9", "base":"#3388CCFF",
+            "hue_min":0.0, "hue_max":360.0, "lightness_min":0.0, "lightness_max":1.0,
+            "chroma_min":0.0, "chroma_max":0.4, "contrast":null});
+        let preview = p.preview_generation(&request).unwrap();
+        let (generated, _, _) = p.generated_colors(&options(&request).unwrap()).unwrap();
+        assert_eq!(
+            preview,
+            generated
+                .iter()
+                .map(|c| c.format(Format::HexRgba))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(preview[0], "#010203FF");
+        assert_eq!(p.draft.colors, before.colors);
+        assert_eq!(p.draft.locked, before.locked);
+        assert_eq!(p.draft.names, before.names);
     }
     #[test]
     fn locks_reorder_and_undo() {
