@@ -54,6 +54,7 @@ public:
     setMaximumSize(280, 280);
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     setFocusPolicy(Qt::StrongFocus);
+    setCursor(Qt::CrossCursor);
     setAccessibleName("Palette hue and saturation wheel; arrow keys adjust base hue and saturation");
     setToolTip("Hue and saturation map at full brightness. Drag a generated color to rotate the harmony; arrow keys adjust the base color.");
   }
@@ -67,35 +68,65 @@ public:
 protected:
   void paintEvent(QPaintEvent *) override {
     const QRectF r = wheelRect();
-    const int side = qMax(1, int(r.width()));
+    const qreal dpr = devicePixelRatioF();
+    const int side = qMax(1, qRound(r.width() * dpr));
     QImage image(side, side, QImage::Format_ARGB32_Premultiplied);
+    image.setDevicePixelRatio(dpr);
     image.fill(Qt::transparent);
     const double radius = side / 2.0;
-    for (int y = 0; y < side; ++y) for (int x = 0; x < side; ++x) {
-      double dx = x + .5 - radius, dy = y + .5 - radius;
-      double sat = std::hypot(dx, dy) / radius;
-      if (sat <= 1.0) {
-        double hue = std::atan2(-dy, dx) / (2 * M_PI);
-        if (hue < 0) hue += 1;
-        // This is a hue/saturation map; value and alpha remain in the base color.
-        image.setPixelColor(x, y, QColor::fromHsvF(hue, sat, 1.0));
+    const double aaBand = qMax(1.0, dpr);
+    for (int y = 0; y < side; ++y) {
+      for (int x = 0; x < side; ++x) {
+        const double dx = x + 0.5 - radius;
+        const double dy = y + 0.5 - radius;
+        const double dist = std::hypot(dx, dy);
+        if (dist <= radius + 0.5) {
+          const double sat = qBound(0.0, dist / radius, 1.0);
+          double hue = std::atan2(-dy, dx) / (2.0 * M_PI);
+          if (hue < 0.0) hue += 1.0;
+          // This is a hue/saturation map; value and alpha remain in the base color.
+          const double edgeAlpha = qBound(0.0, (radius + 0.5 - dist) / aaBand, 1.0);
+          QColor px = QColor::fromHsvF(hue, sat, 1.0);
+          px.setAlphaF(edgeAlpha);
+          image.setPixelColor(x, y, px);
+        }
       }
     }
     QPainter p(this);
-    p.setRenderHint(QPainter::Antialiasing);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setRenderHint(QPainter::SmoothPixmapTransform, true);
     p.drawImage(r.topLeft(), image);
-    p.setPen(QPen(palette().color(QPalette::Text), 1));
+    const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
+    p.setPen(QPen(darkSurface ? QColor(255, 255, 255, 58) : QColor(0, 0, 0, 42), 1.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawEllipse(r.adjusted(0.5, 0.5, -0.5, -0.5));
+    QColor spoke = palette().color(QPalette::Text);
+    spoke.setAlpha(135);
+    p.setPen(QPen(spoke, 1.1));
     for (const auto &c : colors) p.drawLine(r.center(), marker(c));
     for (int i = 0; i < colors.size(); ++i) {
       const auto &c = colors[i];
-      auto point = marker(c);
-      p.setBrush(c); p.setPen(QPen(Qt::black, 2)); p.drawEllipse(point, 8, 8);
-      p.setPen(QPen(Qt::white, 1)); p.drawEllipse(point, 7, 7);
+      const auto point = marker(c);
+      p.setBrush(c);
+      p.setPen(QPen(QColor(0, 0, 0, 210), 1.8));
+      p.drawEllipse(point, 7.5, 7.5);
+      p.setBrush(Qt::NoBrush);
+      p.setPen(QPen(Qt::white, 1.4));
+      p.drawEllipse(point, 6.3, 6.3);
     }
+    const QPointF basePoint = marker(selected);
     p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(Qt::black, 3)); p.drawEllipse(marker(selected), 5, 5);
-    p.setPen(QPen(Qt::white, 1.5)); p.drawEllipse(marker(selected), 5, 5);
-    if (hasFocus()) { p.setPen(QPen(palette().color(QPalette::Highlight), 2)); p.drawRect(rect().adjusted(1, 1, -2, -2)); }
+    p.setPen(QPen(QColor(0, 0, 0, 225), 1.5));
+    p.drawEllipse(basePoint, 5.8, 5.8);
+    p.setPen(QPen(Qt::white, 1.6));
+    p.drawEllipse(basePoint, 4.6, 4.6);
+    p.setPen(QPen(QColor(0, 0, 0, 190), 1.0));
+    p.drawEllipse(basePoint, 3.4, 3.4);
+    if (hasFocus()) {
+      p.setPen(QPen(palette().color(QPalette::Highlight), 2.0));
+      p.setBrush(Qt::NoBrush);
+      p.drawRoundedRect(QRectF(rect()).adjusted(1.0, 1.0, -1.0, -1.0), 3.0, 3.0);
+    }
   }
   void mousePressEvent(QMouseEvent *e) override {
     if (e->button() != Qt::LeftButton) return;

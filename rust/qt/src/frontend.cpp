@@ -668,6 +668,150 @@ protected:
     }
   }
 };
+class PreviewStrip : public QWidget {
+  QList<QColor> stripColors;
+  QStringList stripLabels;
+
+  QString labelFor(int index) const {
+    const QString raw = stripLabels.value(index);
+    return raw.isEmpty() ? hex(stripColors[index]) : raw.toUpper();
+  }
+
+public:
+  explicit PreviewStrip(QWidget *parent = nullptr) : QWidget(parent) {
+    setAccessibleName("Generated palette preview");
+    setFixedHeight(36);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    setMouseTracking(true);
+  }
+  void setColors(const QList<QColor> &colors, const QStringList &labels = {}) {
+    stripColors = colors;
+    stripLabels = labels;
+    update();
+  }
+  int colorCount() const { return stripColors.size(); }
+
+protected:
+  bool event(QEvent *e) override {
+    if (e->type() == QEvent::ToolTip) {
+      auto *help = static_cast<QHelpEvent *>(e);
+      if (!stripColors.isEmpty() && width() > 0) {
+        const int idx = qBound(
+            0, int(help->pos().x() * stripColors.size() / width()),
+            int(stripColors.size()) - 1);
+        QToolTip::showText(help->globalPos(), labelFor(idx), this);
+      } else {
+        QToolTip::hideText();
+        e->ignore();
+      }
+      return true;
+    }
+    return QWidget::event(e);
+  }
+  void paintEvent(QPaintEvent *) override {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    const QRect r = rect();
+    const QRectF frameRect = QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5);
+    const qreal radius = 4.0;
+    QPainterPath clip;
+    clip.addRoundedRect(frameRect, radius, radius);
+
+    const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
+    QColor border = darkSurface ? QColor(255, 255, 255, 65)
+                                : palette().color(QPalette::Mid);
+    if (!darkSurface)
+      border.setAlpha(180);
+
+    if (stripColors.isEmpty()) {
+      p.save();
+      p.setClipPath(clip);
+      p.fillRect(r, palette().color(QPalette::Base));
+      p.setPen(mutedColor(palette(), 145));
+      p.drawText(r, Qt::AlignCenter, QStringLiteral("No preview"));
+      p.restore();
+      p.setPen(QPen(border, 1.0));
+      p.setBrush(Qt::NoBrush);
+      p.drawRoundedRect(frameRect, radius, radius);
+      return;
+    }
+
+    const int n = stripColors.size();
+    QFont labelFont = font();
+    labelFont.setBold(true);
+    if (labelFont.pointSizeF() > 0)
+      labelFont.setPointSizeF(qMax(8.0, labelFont.pointSizeF() - 1.0));
+    else if (labelFont.pixelSize() > 0)
+      labelFont.setPixelSize(qMax(9, labelFont.pixelSize() - 1));
+    const QFontMetrics fm(labelFont);
+
+    bool showFull = true;
+    bool showShort = true;
+    for (int i = 0; i < n; ++i) {
+      const int x0 = qRound(i * r.width() / double(n));
+      const int x1 = qRound((i + 1) * r.width() / double(n));
+      const int segW = qMax(1, x1 - x0);
+      const QString full = labelFor(i);
+      if (segW < fm.horizontalAdvance(full) + 10)
+        showFull = false;
+      const QString shortLabel =
+          (stripColors[i].alpha() == 255 && full.size() == 9) ? full.left(7)
+                                                               : full;
+      if (segW < fm.horizontalAdvance(shortLabel) + 10)
+        showShort = false;
+    }
+
+    p.save();
+    p.setClipPath(clip);
+    p.setFont(labelFont);
+    for (int i = 0; i < n; ++i) {
+      const int x0 = qRound(i * r.width() / double(n));
+      const int x1 = qRound((i + 1) * r.width() / double(n));
+      const QRect segRect(x0, r.top(), qMax(1, x1 - x0), r.height());
+      const QColor &c = stripColors[i];
+      const bool translucent = c.alpha() < 255;
+      if (translucent)
+        paintCheckerboard(p, segRect, 6);
+      p.fillRect(segRect, c);
+      if (i > 0) {
+        p.fillRect(QRect(x0, r.top(), 1, r.height()),
+                   darkSurface ? QColor(255, 255, 255, 36)
+                               : QColor(0, 0, 0, 34));
+      }
+      if (showFull || showShort) {
+        const QString full = labelFor(i);
+        const QString text =
+            showFull ? full
+                     : ((c.alpha() == 255 && full.size() == 9) ? full.left(7)
+                                                               : full);
+        const double a = c.alphaF();
+        const double cr = c.red() * a + 216.0 * (1.0 - a);
+        const double cg = c.green() * a + 216.0 * (1.0 - a);
+        const double cb = c.blue() * a + 216.0 * (1.0 - a);
+        const double luma = 0.2126 * cr + 0.7152 * cg + 0.0722 * cb;
+        const QColor fg = luma < 140.0 ? Qt::white : QColor(0x1B, 0x1E, 0x20);
+        const QRect textRect = segRect.adjusted(3, 2, -3, -2);
+        if (translucent) {
+          QRectF bounds = p.boundingRect(textRect, Qt::AlignCenter, text);
+          QRectF pill = bounds.adjusted(-4.0, -1.5, 4.0, 1.5)
+                            .intersected(QRectF(segRect).adjusted(2.0, 2.0, -2.0, -2.0));
+          p.setPen(QPen(QColor(0, 0, 0, 40), 1.0));
+          p.setBrush(QColor(255, 255, 255, 225));
+          p.drawRoundedRect(pill, 3.0, 3.0);
+          p.setPen(QColor(0x1B, 0x1E, 0x20));
+          p.drawText(textRect, Qt::AlignCenter, text);
+        } else {
+          p.setPen(fg);
+          p.drawText(textRect, Qt::AlignCenter, text);
+        }
+      }
+    }
+    p.restore();
+    p.setPen(QPen(border, 1.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(frameRect, radius, radius);
+  }
+};
 class Spectrum : public QWidget {
   double h, s, v;
   std::function<void(double, double, double, bool)> changed;
@@ -1195,10 +1339,10 @@ class Frontend : public QWidget {
     auto oldScroll = qobject_cast<QScrollArea *>(old),
          newScroll = qobject_cast<QScrollArea *>(replacement);
     if (!oldScroll && (old->objectName() == "themePage" || old->objectName() == "mixerPage" ||
-                       old->objectName() == "pinnedShelf"))
+                       old->objectName() == "palettePage" || old->objectName() == "pinnedShelf"))
       oldScroll = old->findChild<QScrollArea *>();
     if (!newScroll && (replacement->objectName() == "themePage" || replacement->objectName() == "mixerPage" ||
-                       replacement->objectName() == "pinnedShelf"))
+                       replacement->objectName() == "palettePage" || replacement->objectName() == "pinnedShelf"))
       newScroll = replacement->findChild<QScrollArea *>();
     int vertical = oldScroll ? oldScroll->verticalScrollBar()->value() : 0,
         horizontal = oldScroll ? oldScroll->horizontalScrollBar()->value() : 0;
@@ -1624,7 +1768,7 @@ class Frontend : public QWidget {
         send({{"op", activeEditor() + "_redo"}});
       });
       tabs->addTab(mixerPage(), "Mixer");
-      tabs->addTab(scroll(palettePage()), "Palette");
+      tabs->addTab(palettePage(), "Palette");
       tabs->addTab(themePage(), "Theme");
       tabs->setCurrentIndex(
           qBound(0, settings.value("board/tab", 0).toInt(), 2));
@@ -1706,10 +1850,9 @@ class Frontend : public QWidget {
       QSignalBlocker blocker(tabs);
       auto refresh = [this](int index, QWidget *page, const QString &title) {
         auto old = tabs->widget(index);
-        auto replacement = index == 1 ? scroll(page) : page;
-        preserveView(old, replacement);
+        preserveView(old, page);
         tabs->removeTab(index);
-        tabs->insertTab(index, replacement, title);
+        tabs->insertTab(index, page, title);
         old->deleteLater();
       };
       if (previous.value("mixer") != state.value("mixer")) {
@@ -2338,6 +2481,72 @@ class Frontend : public QWidget {
       }
     }
   }
+  void alignPaletteToolbar(QWidget *page) {
+    if (!page || page->objectName() != "palettePage" || !tabs)
+      return;
+    if (auto *bar = page->findChild<QToolBar *>("paletteActions")) {
+      const int topShift = qMax(0, -page->mapTo(tabs, QPoint(0, 0)).y());
+      const int targetH = headerBarHeight() + topShift;
+      if (bar->minimumHeight() != targetH || bar->maximumHeight() != targetH) {
+        bar->setFixedHeight(targetH);
+        bar->setContentsMargins(6, topShift, 6, 0);
+      }
+    }
+  }
+  void layoutPaletteNameRow(QWidget *nameRow, int width) {
+    if (!nameRow || nameRow->objectName() != "paletteNameRow")
+      return;
+    auto box = qobject_cast<QBoxLayout *>(nameRow->layout());
+    auto lock = nameRow->findChild<QCheckBox *>();
+    if (!box || !lock)
+      return;
+    const bool stacked = width > 0 && width < (150 + 12 + lock->sizeHint().width());
+    if (nameRow->property("stackedMode").isValid() &&
+        nameRow->property("stackedMode").toBool() == stacked)
+      return;
+    nameRow->setProperty("stackedMode", stacked);
+    box->setDirection(stacked ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+    box->setSpacing(stacked ? 4 : 12);
+  }
+  void layoutPaletteGenerator(QWidget *gen, int width) {
+    if (!gen || gen->objectName() != "paletteGenerator")
+      return;
+    auto columns = qobject_cast<QBoxLayout *>(gen->layout());
+    auto parameters = gen->findChild<QWidget *>("paletteParameters", Qt::FindDirectChildrenOnly);
+    auto selector = gen->findChild<QWidget *>("paletteSelector", Qt::FindDirectChildrenOnly);
+    if (!columns || !parameters || !selector)
+      return;
+    const bool compact = width < 620;
+    if (gen->property("compactMode").isValid() &&
+        gen->property("compactMode").toBool() == compact)
+      return;
+    gen->setProperty("compactMode", compact);
+    columns->setDirection(compact ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+    columns->setSpacing(compact ? 10 : 16);
+    columns->removeWidget(parameters);
+    columns->removeWidget(selector);
+    if (compact) {
+      selector->setMinimumWidth(0);
+      selector->setMaximumWidth(QWIDGETSIZE_MAX);
+      selector->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+      if (auto *sl = qobject_cast<QVBoxLayout *>(selector->layout()))
+        sl->setSpacing(4);
+      if (auto *wheel = selector->findChild<QWidget *>("paletteWheel"))
+        wheel->setFixedSize(124, 124);
+      columns->addWidget(selector, 0);
+      columns->addWidget(parameters, 0);
+    } else {
+      selector->setMinimumWidth(208);
+      selector->setMaximumWidth(216);
+      selector->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+      if (auto *sl = qobject_cast<QVBoxLayout *>(selector->layout()))
+        sl->setSpacing(8);
+      if (auto *wheel = selector->findChild<QWidget *>("paletteWheel"))
+        wheel->setFixedSize(160, 160);
+      columns->addWidget(parameters, 1, Qt::AlignTop);
+      columns->addWidget(selector, 0, Qt::AlignTop);
+    }
+  }
   QWidget *palettePage();
   QWidget *themePage(Scene *reuse = nullptr);
   void layoutThemePage(QWidget *page, int width, bool initialize = false);
@@ -2361,29 +2570,27 @@ protected:
     }
   }
   bool eventFilter(QObject *watched, QEvent *event) override {
+    if (event->type() == QEvent::Show || event->type() == QEvent::Move) {
+      if (auto page = qobject_cast<QWidget *>(watched);
+          page && page->objectName() == "palettePage")
+        alignPaletteToolbar(page);
+    }
     if (event->type() == QEvent::Resize) {
       if (watched == historyPanel)
         updateHistoryEmptyState(historyPanel->width());
       auto page = qobject_cast<QWidget *>(watched);
+      if (page && page->objectName() == "palettePage")
+        alignPaletteToolbar(page);
       auto scroll = page ? qobject_cast<QScrollArea *>(page->parentWidget()) : nullptr;
       if (scroll && page == scroll->viewport() && scroll->widget() &&
           scroll->widget()->objectName() == "mixerContent") {
         layoutMixerContent(scroll->widget(),
                            static_cast<QResizeEvent *>(event)->size());
       }
-      if (page && page->objectName() == "paletteGenerator") {
-        auto columns = qobject_cast<QBoxLayout *>(page->layout());
-        auto parameters = page->findChild<QWidget *>("paletteParameters", Qt::FindDirectChildrenOnly);
-        auto selector = page->findChild<QWidget *>("paletteSelector", Qt::FindDirectChildrenOnly);
-        if (columns && parameters && selector) {
-          const bool compact = page->width() < 620;
-          columns->setDirection(compact ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
-          columns->removeWidget(parameters);
-          columns->removeWidget(selector);
-          columns->addWidget(compact ? selector : parameters, 0, Qt::AlignTop);
-          columns->addWidget(compact ? parameters : selector, 0, Qt::AlignTop);
-        }
-      }
+      if (page && page->objectName() == "paletteNameRow")
+        layoutPaletteNameRow(page, static_cast<QResizeEvent *>(event)->size().width());
+      if (page && page->objectName() == "paletteGenerator")
+        layoutPaletteGenerator(page, static_cast<QResizeEvent *>(event)->size().width());
       if (page && page->objectName() == "themePage") {
         sizePinnedPalette();
         layoutThemePage(page, static_cast<QResizeEvent *>(event)->size().width());
@@ -2879,6 +3086,21 @@ public:
         key(tabs, Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
         check(array(object(state.value("palette")), "swatches") == paletteBeforeUndo,
               "Palette redo keyboard shortcut");
+        auto palActions = tabs->widget(1)->findChild<QToolBar *>("paletteActions");
+        check(palActions && palActions->parentWidget() == tabs->widget(1) &&
+                  palActions->isVisible() && histHdr &&
+                  histHdr->mapTo(splitter, QPoint(0, histHdr->height())).y() ==
+                      palActions->mapTo(splitter, QPoint(0, palActions->height())).y(),
+              "History and Palette toolbar hairlines align flush");
+        auto palPreview = dynamic_cast<PreviewStrip *>(
+            tabs->widget(1)->findChild<QWidget *>("palettePreviewStrip"));
+        check(palPreview && palPreview->colorCount() > 0,
+              "Palette preview populates immediately");
+        if (array(object(state.value("palette")), "saved").isEmpty()) {
+          for (auto b : tabs->widget(1)->findChildren<QAbstractButton *>())
+            if (b->accessibleName() == "Open" || b->accessibleName() == "Delete")
+              check(!b->isEnabled(), b->accessibleName() + " disabled when library is empty");
+        }
         shot("palette");
         const int normalShelfHeight = pinnedScroll->height();
         resize(540, 360);
@@ -2901,11 +3123,11 @@ public:
           GeneratorWheel *wheel = nullptr;
           for (auto widget : generator->findChildren<QWidget *>())
             if ((wheel = dynamic_cast<GeneratorWheel *>(widget))) break;
-          auto paletteScroll = qobject_cast<QScrollArea *>(tabs->widget(1));
-          if (wheel) paletteScroll->ensureWidgetVisible(wheel, 0, 0);
+          auto paletteScroll = tabs->widget(1)->findChild<QScrollArea *>();
+          if (wheel && paletteScroll) paletteScroll->ensureWidgetVisible(wheel, 0, 0);
           QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-          auto viewport = paletteScroll->viewport();
-          check(wheel && viewport->rect().contains(QRect(wheel->mapTo(viewport, QPoint()), wheel->size())) &&
+          auto viewport = paletteScroll ? paletteScroll->viewport() : nullptr;
+          check(wheel && viewport && viewport->rect().contains(QRect(wheel->mapTo(viewport, QPoint()), wheel->size())) &&
                     viewport->rect().contains(QRect(generate->mapTo(viewport, QPoint()), generate->size())),
                 "Compact palette shows complete wheel and Generate together");
           shot("palette-small");
@@ -2915,9 +3137,9 @@ public:
         }
         auto captureSavedGenerations = [&](const QString &name) {
           settleLayout();
-          auto scroll = qobject_cast<QScrollArea *>(tabs->widget(1));
-          auto row = scroll->findChild<QWidget *>("savedGenerationRow");
-          auto label = scroll->findChild<QLabel *>("savedGenerationLabel");
+          auto scroll = tabs->widget(1)->findChild<QScrollArea *>();
+          auto row = scroll ? scroll->findChild<QWidget *>("savedGenerationRow") : nullptr;
+          auto label = scroll ? scroll->findChild<QLabel *>("savedGenerationLabel") : nullptr;
           check(row && label, "Saved generation controls available");
           if (!row || !label)
             return;
@@ -3288,85 +3510,186 @@ public:
 
 QWidget *Frontend::palettePage() {
   auto p = object(state.value("palette"));
+  auto page = new QWidget;
+  page->setObjectName("palettePage");
+  page->installEventFilter(this);
+  auto pageLayout = new QVBoxLayout(page);
+  pageLayout->setContentsMargins(0, 0, 0, 0);
+  pageLayout->setSpacing(0);
+
+  auto actions = new QToolBar(page);
+  actions->setObjectName("paletteActions");
+  actions->setMovable(false);
+  actions->setFloatable(false);
+  actions->setIconSize(QSize(16, 16));
+  actions->setFixedHeight(headerBarHeight());
+  actions->setContentsMargins(6, 0, 6, 0);
+  actions->setProperty("boardAction", true);
+  actions->setToolButtonStyle(
+      settings.value("board/toolbarLabels", true).toBool()
+          ? Qt::ToolButtonTextBesideIcon
+          : Qt::ToolButtonIconOnly);
+  const QList<QPair<QString, QString>> actionItems{
+      {"New draft", "palette_new"},
+      {"Save", "palette_save"},
+      {"Duplicate", "palette_duplicate"},
+      {"Undo", "palette_undo"},
+      {"Redo", "palette_redo"}};
+  for (int idx = 0; idx < actionItems.size(); ++idx) {
+    if (idx == 3)
+      actions->addSeparator();
+    const auto &pair = actionItems[idx];
+    const auto icons = actionIcon(pair.second);
+    auto action = actions->addAction(themedIcon(icons, QStyle::SP_FileIcon),
+                                     pair.first);
+    action->setToolTip(actionHint(pair.first, icons.value(0)));
+    if (auto *btn = actions->widgetForAction(action))
+      btn->setAccessibleName(pair.first);
+    connect(action, &QAction::triggered, this,
+            [this, pair] { send({{"op", pair.second}}); });
+    if (pair.second == "palette_undo")
+      action->setEnabled(p.value("can_undo").toBool());
+    if (pair.second == "palette_redo")
+      action->setEnabled(p.value("can_redo").toBool());
+  }
+  pageLayout->addWidget(actions);
+  auto actionsLine = new Hairline(page);
+  actionsLine->setObjectName("paletteActionsHairline");
+  pageLayout->addWidget(actionsLine);
+
   auto w = new QWidget;
+  w->setObjectName("paletteContent");
   auto l = new QVBoxLayout(w);
-  auto palette = new QGroupBox("Palette", w);
-  auto paletteLayout = new QVBoxLayout(palette);
-  auto nameRow = new QFormLayout;
-  auto name = line("Palette name", str(p, "name"), palette);
+  l->setContentsMargins(12, 10, 12, 14);
+  l->setSpacing(10);
+
+  const QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+
+  // Section 1: Palette & Library
+  auto metaForm = new QFormLayout;
+  metaForm->setContentsMargins(0, 0, 0, 0);
+  metaForm->setHorizontalSpacing(8);
+  metaForm->setVerticalSpacing(6);
+  metaForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+  metaForm->setRowWrapPolicy(QFormLayout::WrapLongRows);
+  metaForm->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+
+  auto nameRow = new QWidget(w);
+  nameRow->setObjectName("paletteNameRow");
+  nameRow->installEventFilter(this);
+  auto nameRowLayout = new QBoxLayout(QBoxLayout::LeftToRight, nameRow);
+  nameRowLayout->setContentsMargins(0, 0, 0, 0);
+  nameRowLayout->setSpacing(12);
+  auto name = line("Palette name", str(p, "name"), nameRow);
+  name->setPlaceholderText("Untitled");
+  name->setMinimumWidth(140);
   name->setMaximumWidth(260);
-  nameRow->addRow("Name", name);
-  paletteLayout->addLayout(nameRow);
+  name->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   connect(name, &QLineEdit::editingFinished, this, [this, name] {
     send({{"op", "palette_name"}, {"name", name->text()}});
   });
-  auto actions = new QHBoxLayout;
-  for (auto pair :
-       QList<QPair<QString, QString>>{{"New draft", "palette_new"},
-                                      {"Save", "palette_save"},
-                                      {"Duplicate", "palette_duplicate"},
-                                      {"Undo", "palette_undo"},
-                                      {"Redo", "palette_redo"}}) {
-    auto b =
-        toolButton(pair.first, actionIcon(pair.second), palette,
-                   [this, pair] { send({{"op", pair.second}}); });
-    if (pair.second == "palette_undo" || pair.second == "palette_redo") {
-      const bool undo = pair.second == "palette_undo";
-      b->setProperty("boardAction", false);
-      b->setEnabled(p.value(undo ? "can_undo" : "can_redo").toBool());
-      b->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    }
-    actions->addWidget(b);
-  }
-  actions->addStretch();
-  paletteLayout->addLayout(actions);
-  l->addWidget(palette);
-  auto historyLock = new QCheckBox("Lock history additions", palette);
+  auto historyLock = new QCheckBox("Lock history additions", nameRow);
   historyLock->setChecked(p.value("lock_history").toBool());
+  historyLock->setToolTip(
+      "Lock new colors added from history so generation preserves them");
   connect(historyLock, &QCheckBox::toggled, this, [this](bool b) {
     send({{"op", "palette_lock_history"}, {"locked", b}});
   });
-  paletteLayout->addWidget(historyLock);
-  auto library = new QGroupBox("Palette library", w);
-  auto lib = new QHBoxLayout(library);
-  auto saved =
-      combo("Saved palettes", array(p, "saved"), library, str(p, "id"));
+  nameRowLayout->addWidget(name, 1);
+  nameRowLayout->addWidget(historyLock, 0, Qt::AlignVCenter);
+  metaForm->addRow("Name:", nameRow);
+
+  auto libRow = new QWidget(w);
+  auto libLayout = new QHBoxLayout(libRow);
+  libLayout->setContentsMargins(0, 0, 0, 0);
+  libLayout->setSpacing(6);
+  const auto savedEntries = array(p, "saved");
+  const bool hasSaved = !savedEntries.isEmpty();
+  auto saved = combo("Saved palettes", savedEntries, libRow, str(p, "id"));
   saved->setEditable(true);
   saved->setInsertPolicy(QComboBox::NoInsert);
   saved->lineEdit()->setPlaceholderText("Search saved palettes");
   saved->completer()->setFilterMode(Qt::MatchContains);
   saved->completer()->setCompletionMode(QCompleter::PopupCompletion);
   saved->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-  saved->setMinimumContentsLength(18);
-  lib->addWidget(saved, 1);
-  lib->addWidget(toolButton("Open", "document-open", library, [this, saved] {
+  saved->setMinimumContentsLength(14);
+  saved->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  libLayout->addWidget(saved, 1);
+
+  auto openBtn = button("Open", libRow, [this, saved] {
     send({{"op", "palette_open"}, {"id", saved->currentData().toString()}});
-  }));
-  lib->addWidget(toolButton("Delete", "edit-delete", library, [this, saved] {
+  });
+  openBtn->setIcon(themedIcon({"document-open-symbolic", "document-open"},
+                              QStyle::SP_DialogOpenButton));
+  openBtn->setIconSize(QSize(16, 16));
+  openBtn->setToolTip("Open the selected saved palette");
+  openBtn->setEnabled(hasSaved);
+  libLayout->addWidget(openBtn, 0);
+
+  auto deleteBtn = button("Delete", libRow, [this, saved] {
     if (QMessageBox::question(this, "Delete palette",
                               "Delete the selected saved palette?") ==
         QMessageBox::Yes)
       send({{"op", "palette_delete"}, {"id", saved->currentData().toString()}});
-  }));
-  l->addWidget(library);
-  auto gen = new QGroupBox("Generate palette", w);
+  });
+  deleteBtn->setIcon(themedIcon({"edit-delete-symbolic", "edit-delete"},
+                                QStyle::SP_TrashIcon));
+  deleteBtn->setIconSize(QSize(16, 16));
+  deleteBtn->setToolTip("Delete the selected saved palette");
+  deleteBtn->setEnabled(hasSaved);
+  libLayout->addWidget(deleteBtn, 0);
+
+  metaForm->addRow("Library:", libRow);
+  l->addLayout(metaForm);
+
+  l->addWidget(new Hairline(w));
+
+  // Section 2: Generate palette
+  auto genTitle = new QLabel("Generate palette", w);
+  QFont genTitleFont = genTitle->font();
+  genTitleFont.setWeight(QFont::DemiBold);
+  genTitle->setFont(genTitleFont);
+  l->addWidget(genTitle);
+
+  auto gen = new QWidget(w);
   gen->setObjectName("paletteGenerator");
   gen->installEventFilter(this);
   auto columns = new QBoxLayout(QBoxLayout::LeftToRight, gen);
+  columns->setContentsMargins(0, 0, 0, 0);
+  columns->setSpacing(16);
+
   auto parameters = new QWidget(gen);
   parameters->setObjectName("paletteParameters");
+  parameters->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
   auto f = new QFormLayout(parameters);
   f->setContentsMargins(0, 0, 0, 0);
+  f->setHorizontalSpacing(8);
+  f->setVerticalSpacing(6);
+  f->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
   f->setRowWrapPolicy(QFormLayout::WrapLongRows);
+  f->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+
   auto selector = new QWidget(gen);
   selector->setObjectName("paletteSelector");
+  selector->setMinimumWidth(208);
+  selector->setMaximumWidth(216);
+  selector->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
   auto selectorLayout = new QVBoxLayout(selector);
   selectorLayout->setContentsMargins(0, 0, 0, 0);
-  selectorLayout->setSpacing(3);
-  columns->addWidget(parameters, 0, Qt::AlignTop);
+  selectorLayout->setSpacing(8);
+
+  columns->addWidget(parameters, 1, Qt::AlignTop);
   columns->addWidget(selector, 0, Qt::AlignTop);
-  auto generations = combo("Palette generations", array(p, "generations"), gen);
-  generations->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+
+  auto generationRow = new QWidget(parameters);
+  generationRow->setObjectName("savedGenerationRow");
+  auto generationLayout = new QHBoxLayout(generationRow);
+  generationLayout->setContentsMargins(0, 0, 0, 0);
+  generationLayout->setSpacing(6);
+  auto generations =
+      combo("Palette generations", array(p, "generations"), generationRow);
+  generations->setSizeAdjustPolicy(
+      QComboBox::AdjustToMinimumContentsLengthWithIcon);
   generations->setMinimumContentsLength(20);
   // Compact layouts can shrink the selector while wider layouts fit its text.
   generations->setMinimumWidth(generations->minimumSizeHint().width());
@@ -3379,25 +3702,25 @@ QWidget *Frontend::palettePage() {
       generations, &QComboBox::currentIndexChanged, this, [this, generations] {
         generationDraft["generation"] = generations->currentData().toString();
       });
-  auto load = toolButton("Load generation", "document-open-recent", gen, [this, generations] {
-    send({{"op", "palette_generation"},
-          {"id", generations->currentData().toString()}});
-  });
+  auto load = toolButton("Load generation",
+                         {"document-open-recent-symbolic", "document-open-recent"},
+                         generationRow, [this, generations] {
+                           send({{"op", "palette_generation"},
+                                 {"id", generations->currentData().toString()}});
+                         });
+  load->setIconSize(QSize(16, 16));
   bool hasGenerations = generations->count() > 0;
   if (!hasGenerations) {
     generations->addItem("No saved generations");
     generations->setEnabled(false);
   }
   load->setEnabled(hasGenerations);
-  auto generationRow = new QWidget(gen);
-  generationRow->setObjectName("savedGenerationRow");
-  auto generationLayout = new QHBoxLayout(generationRow);
-  generationLayout->setContentsMargins(0, 0, 0, 0);
   generationLayout->addWidget(generations, 1);
-  generationLayout->addWidget(load);
-  f->addRow("Saved generations", generationRow);
+  generationLayout->addWidget(load, 0);
+  f->addRow("Saved generations:", generationRow);
   f->labelForField(generationRow)->setObjectName("savedGenerationLabel");
-  auto mode = new QComboBox(gen);
+
+  auto mode = new QComboBox(parameters);
   mode->setAccessibleName("Generation mode");
   for (auto entry : QList<QPair<QString, QString>>{
            {"Complementary", "complementary"},
@@ -3412,89 +3735,139 @@ QWidget *Frontend::palettePage() {
   int modeIndex = mode->findData(generationDraft.value("mode").toString());
   if (modeIndex >= 0)
     mode->setCurrentIndex(modeIndex);
+  mode->setMaximumWidth(240);
   connect(mode, &QComboBox::currentIndexChanged, this, [this, mode] {
     generationDraft["mode"] = mode->currentData().toString();
   });
-  f->addRow("Mode", mode);
+  f->addRow("Mode:", mode);
+
   auto count =
-      spin("Count", generationDraft.value("count").toInt(5), 1, 64, gen);
+      spin("Count", generationDraft.value("count").toInt(5), 1, 64, parameters);
+  count->setMaximumWidth(96);
   connect(count, &QSpinBox::valueChanged, this,
           [this](int value) { generationDraft["count"] = value; });
-  f->addRow("Count", count);
+  f->addRow("Count:", count);
+
   auto seed =
-      line("Random seed", generationDraft.value("seed").toString("0"), gen);
+      line("Random seed", generationDraft.value("seed").toString("0"), parameters);
+  seed->setFont(monoFont);
+  seed->setPlaceholderText("0");
   seed->setMaximumWidth(160);
   connect(seed, &QLineEdit::textChanged, this,
           [this](const QString &value) { generationDraft["seed"] = value; });
-  f->addRow("Seed", seed);
+  f->addRow("Seed:", seed);
+
   auto base = line("Base color (empty for current)",
-                   generationDraft.value("base").toString(), gen);
-  base->setMaximumWidth(160);
+                   generationDraft.value("base").toString(), parameters);
+  base->setFont(monoFont);
+  base->setPlaceholderText("Current mixer color");
+  base->setMaximumWidth(210);
   connect(base, &QLineEdit::textChanged, this,
           [this](const QString &value) { generationDraft["base"] = value; });
-  f->addRow("Base color", base);
+  f->addRow("Base color:", base);
+
   QColor initialBase = color(base->text().isEmpty()
                                  ? str(object(state.value("mixer")), "current")
                                  : base->text());
-  auto wheel = new GeneratorWheel(initialBase, [base](QColor c) {
-    base->setText(hex(c));
-  }, gen);
-  connect(base, &QLineEdit::textChanged, wheel, [wheel](const QString &text) {
-    wheel->setColor(color(text));
-  });
-  wheel->setFixedSize(140, 140);
-  selectorLayout->addWidget(wheel, 0, Qt::AlignLeft);
+  auto wheel = new GeneratorWheel(
+      initialBase, [base](QColor c) { base->setText(hex(c)); }, selector);
+  wheel->setObjectName("paletteWheel");
+  connect(base, &QLineEdit::textChanged, wheel,
+          [this, wheel](const QString &text) {
+            wheel->setColor(
+                color(text.isEmpty()
+                          ? str(object(state.value("mixer")), "current")
+                          : text));
+          });
+  wheel->setFixedSize(160, 160);
+  selectorLayout->addWidget(wheel, 0, Qt::AlignHCenter);
+
   auto hmin = decimal("Minimum hue", generationDraft.value("hmin").toDouble(0),
-                      0, 360, gen),
+                      0, 360, parameters),
        hmax = decimal("Maximum hue",
-                      generationDraft.value("hmax").toDouble(360), 0, 360, gen),
+                      generationDraft.value("hmax").toDouble(360), 0, 360,
+                      parameters),
        lmin = decimal("Minimum lightness",
-                      generationDraft.value("lmin").toDouble(0), 0, 1, gen),
+                      generationDraft.value("lmin").toDouble(0), 0, 1,
+                      parameters),
        lmax = decimal("Maximum lightness",
-                      generationDraft.value("lmax").toDouble(1), 0, 1, gen),
+                      generationDraft.value("lmax").toDouble(1), 0, 1,
+                      parameters),
        cmin = decimal("Minimum chroma",
-                      generationDraft.value("cmin").toDouble(0), 0, .4, gen),
+                      generationDraft.value("cmin").toDouble(0), 0, .4,
+                      parameters),
        cmax = decimal("Maximum chroma",
-                      generationDraft.value("cmax").toDouble(.4), 0, .4, gen);
+                      generationDraft.value("cmax").toDouble(.4), 0, .4,
+                      parameters);
+  for (auto *hSpin : {hmin, hmax}) {
+    hSpin->setDecimals(1);
+    hSpin->setSingleStep(1.0);
+    hSpin->setSuffix(QString::fromUtf8("°"));
+  }
+  hmin->setValue(generationDraft.value("hmin").toDouble(0));
+  hmax->setValue(generationDraft.value("hmax").toDouble(360));
+  for (auto *lcSpin : {lmin, lmax, cmin, cmax}) {
+    lcSpin->setDecimals(2);
+    lcSpin->setSingleStep(0.01);
+  }
+  lmin->setValue(generationDraft.value("lmin").toDouble(0));
+  lmax->setValue(generationDraft.value("lmax").toDouble(1));
+  cmin->setValue(generationDraft.value("cmin").toDouble(0));
+  cmax->setValue(generationDraft.value("cmax").toDouble(.4));
+
+  const int rangeSpinW = qMax(hmax->sizeHint().width(), 88);
   for (auto pair : QList<QPair<QDoubleSpinBox *, QString>>{{hmin, "hmin"},
                                                            {hmax, "hmax"},
                                                            {lmin, "lmin"},
                                                            {lmax, "lmax"},
                                                            {cmin, "cmin"},
-                                                           {cmax, "cmax"}})
-    {
-    pair.first->setMaximumWidth(110);
+                                                           {cmax, "cmax"}}) {
+    pair.first->setFixedWidth(rangeSpinW);
     connect(
         pair.first, &QDoubleSpinBox::valueChanged, this,
         [this, pair](double value) { generationDraft[pair.second] = value; });
-    }
-  f->addRow("Hue minimum", hmin);
-  f->addRow("Hue maximum", hmax);
-  f->addRow("Lightness minimum", lmin);
-  f->addRow("Lightness maximum", lmax);
-  f->addRow("Chroma minimum", cmin);
-  f->addRow("Chroma maximum", cmax);
+  }
+  auto makeRangeRow = [parameters](QDoubleSpinBox *lo, QDoubleSpinBox *hi) {
+    auto row = new QWidget(parameters);
+    auto rowLayout = new QHBoxLayout(row);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
+    rowLayout->setSpacing(6);
+    lo->setParent(row);
+    hi->setParent(row);
+    auto dash = new QLabel(QString::fromUtf8("–"), row);
+    QPalette pal = dash->palette();
+    const QColor muted = mutedColor(pal, 165);
+    pal.setColor(QPalette::WindowText, muted);
+    pal.setColor(QPalette::Text, muted);
+    dash->setPalette(pal);
+    rowLayout->addWidget(lo);
+    rowLayout->addWidget(dash);
+    rowLayout->addWidget(hi);
+    rowLayout->addStretch(1);
+    return row;
+  };
+  f->addRow("Hue range:", makeRangeRow(hmin, hmax));
+  f->addRow("Lightness:", makeRangeRow(lmin, lmax));
+  f->addRow("Chroma:", makeRangeRow(cmin, cmax));
+
   auto contrast = line("Contrast (optional)",
-                       generationDraft.value("contrast").toString(), gen);
-  contrast->setMaximumWidth(110);
+                       generationDraft.value("contrast").toString(), parameters);
+  contrast->setPlaceholderText("Optional (e.g. 4.5)");
+  contrast->setMaximumWidth(210);
   connect(
       contrast, &QLineEdit::textChanged, this,
       [this](const QString &value) { generationDraft["contrast"] = value; });
-  f->addRow("Contrast", contrast);
-  auto preview = new QWidget(gen);
-  auto previewLayout = new QHBoxLayout(preview);
-  previewLayout->setContentsMargins(0, 0, 0, 0);
-  previewLayout->setSpacing(0);
-  auto previewScroll = new QScrollArea(gen);
-  previewScroll->setWidgetResizable(true);
-  previewScroll->setFixedHeight(38);
-  previewScroll->setWidget(preview);
-  previewScroll->setAccessibleName("Generated palette preview");
-  selectorLayout->addWidget(previewScroll);
-  auto previewError = new QLabel(gen);
+  f->addRow("Contrast:", contrast);
+
+  auto previewStrip = new PreviewStrip(selector);
+  previewStrip->setObjectName("palettePreviewStrip");
+  selectorLayout->addWidget(previewStrip);
+
+  auto previewError = new QLabel(selector);
   previewError->setWordWrap(true);
   previewError->hide();
   selectorLayout->addWidget(previewError);
+
   auto makeRequest = [=, this](const QString &op) -> QJsonObject {
     bool ok = false;
     qulonglong sv = seed->text().toULongLong(&ok);
@@ -3517,36 +3890,36 @@ QWidget *Frontend::palettePage() {
             {"chroma_min", cmin->value()}, {"chroma_max", cmax->value()},
             {"contrast", cv}};
   };
+
+  auto updatePreview = [=, this] {
+    auto req = makeRequest("palette_preview_generation");
+    QJsonObject result =
+        req.isEmpty()
+            ? QJsonObject{{"error", "Enter a valid seed and contrast."}}
+            : request(req).toObject();
+    previewError->setText(str(result, "error"));
+    previewError->setVisible(!previewError->text().isEmpty());
+    QList<QColor> colors;
+    QStringList labels;
+    for (const auto &value : array(result, "colors")) {
+      const QString text = value.toString();
+      auto c = color(text);
+      if (!c.isValid())
+        continue;
+      colors.append(c);
+      labels.append(text);
+    }
+    previewStrip->setColors(colors, labels);
+    wheel->setColors(colors);
+    const auto selectedMode = mode->currentData().toString();
+    wheel->setHarmonyHandles(selectedMode != "random" &&
+                             selectedMode != "perceptual-contrast");
+  };
+
   auto previewTimer = new QTimer(gen);
   previewTimer->setSingleShot(true);
   previewTimer->setInterval(80);
-  connect(previewTimer, &QTimer::timeout, gen, [=, this] {
-    auto req = makeRequest("palette_preview_generation");
-    QJsonObject result = req.isEmpty() ? QJsonObject{{"error", "Enter a valid seed and contrast."}}
-                                       : request(req).toObject();
-    previewError->setText(str(result, "error"));
-    previewError->setVisible(!previewError->text().isEmpty());
-    while (auto item = previewLayout->takeAt(0)) {
-      if (item->widget()) item->widget()->deleteLater();
-      delete item;
-    }
-    QList<QColor> colors;
-    for (const auto &value : array(result, "colors")) {
-      auto c = color(value.toString());
-      if (!c.isValid()) continue;
-      colors.append(c);
-      auto swatch = new QLabel(value.toString(), preview);
-      swatch->setAccessibleName("Generated color " + value.toString());
-      swatch->setAlignment(Qt::AlignCenter);
-      swatch->setMinimumWidth(100);
-      swatch->setStyleSheet(QString("background-color: %1; color: %2;")
-                                .arg(c.name(), c.lightness() < 140 ? "white" : "black"));
-      previewLayout->addWidget(swatch);
-    }
-    wheel->setColors(colors);
-    const auto selectedMode = mode->currentData().toString();
-    wheel->setHarmonyHandles(selectedMode != "random" && selectedMode != "perceptual-contrast");
-  });
+  connect(previewTimer, &QTimer::timeout, gen, updatePreview);
   auto schedulePreview = [previewTimer] { previewTimer->start(); };
   connect(mode, &QComboBox::currentIndexChanged, gen, schedulePreview);
   connect(count, &QSpinBox::valueChanged, gen, schedulePreview);
@@ -3554,23 +3927,36 @@ QWidget *Frontend::palettePage() {
     connect(edit, &QLineEdit::textChanged, gen, schedulePreview);
   for (auto control : {hmin, hmax, lmin, lmax, cmin, cmax})
     connect(control, &QDoubleSpinBox::valueChanged, gen, schedulePreview);
-  previewTimer->start(0);
-  selectorLayout->addWidget(button("Generate", gen, [=, this] {
+
+  updatePreview();
+
+  auto generateBtn = button("Generate", selector, [=, this] {
     auto req = makeRequest("palette_generate");
     if (req.isEmpty()) {
-      QMessageBox::warning(this, "Invalid generation settings",
-                           "Enter a valid non-negative integer seed and numeric contrast.");
+      QMessageBox::warning(
+          this, "Invalid generation settings",
+          "Enter a valid non-negative integer seed and numeric contrast.");
       return;
     }
     send(req);
-  }));
+  });
+  generateBtn->setIcon(themedIcon(
+      {"color-fill-symbolic", "view-refresh-symbolic", "color-fill"},
+      QStyle::SP_BrowserReload));
+  generateBtn->setIconSize(QSize(16, 16));
+  generateBtn->setToolTip("Generate a new palette using these settings");
+  selectorLayout->addWidget(generateBtn);
+
   l->addWidget(gen);
   auto status = new QLabel(
       str(p, "error").isEmpty() ? str(p, "status") : str(p, "error"), w);
   status->setWordWrap(true);
+  status->setVisible(!status->text().isEmpty());
   l->addWidget(status);
   l->addStretch();
-  return w;
+
+  pageLayout->addWidget(scroll(w), 1);
+  return page;
 }
 
 void Frontend::layoutThemePage(QWidget *page, int width, bool initialize) {
