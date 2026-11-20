@@ -79,19 +79,37 @@ static void paintCheckerboard(QPainter &p, const QRect &r, int cell = 6) {
   }
 }
 
+static QColor mutedColor(const QPalette &pal, int alpha = 145) {
+  const QColor fg = pal.color(QPalette::WindowText);
+  const QColor bg = pal.color(QPalette::Window);
+  const qreal t = qBound(0.0, alpha / 255.0, 1.0);
+  return QColor::fromRgbF(fg.redF() * t + bg.redF() * (1.0 - t),
+                          fg.greenF() * t + bg.greenF() * (1.0 - t),
+                          fg.blueF() * t + bg.blueF() * (1.0 - t));
+}
+
 class Hairline : public QFrame {
 public:
-  explicit Hairline(QWidget *parent = nullptr) : QFrame(parent) {
-    setFrameShape(QFrame::HLine);
-    setFixedHeight(1);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  explicit Hairline(QWidget *parent = nullptr)
+      : Hairline(Qt::Horizontal, parent) {}
+  Hairline(Qt::Orientation orientation, QWidget *parent = nullptr)
+      : QFrame(parent) {
+    if (orientation == Qt::Vertical) {
+      setFrameShape(QFrame::VLine);
+      setFixedWidth(1);
+      setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    } else {
+      setFrameShape(QFrame::HLine);
+      setFixedHeight(1);
+      setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    }
   }
 
 protected:
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
     QColor c = palette().color(QPalette::Mid);
-    c.setAlpha(150);
+    c.setAlpha(155);
     p.fillRect(rect(), c);
   }
 };
@@ -182,9 +200,9 @@ protected:
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
     const QRect r = rect();
-    if (c.alpha() < 255)
-      paintCheckerboard(p, r, 6);
-    p.fillRect(r, c);
+    const QRectF tileRect = QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5);
+    const qreal radius = 4.0;
+    const bool translucent = c.alpha() < 255;
     const double a = c.alphaF();
     const double cr = c.red() * a + 216.0 * (1.0 - a);
     const double cg = c.green() * a + 216.0 * (1.0 - a);
@@ -192,26 +210,46 @@ protected:
     const double luma = 0.2126 * cr + 0.7152 * cg + 0.0722 * cb;
     const bool dark = luma < 140.0;
     const QColor fg = dark ? Qt::white : QColor(0x1B, 0x1E, 0x20);
+    QPainterPath clip;
+    clip.addRoundedRect(tileRect, radius, radius);
+    p.save();
+    p.setClipPath(clip);
+    if (translucent)
+      paintCheckerboard(p, r, 6);
+    p.fillRect(r, c);
     if (isDown())
       p.fillRect(r, dark ? QColor(255, 255, 255, 24) : QColor(0, 0, 0, 26));
     else if (underMouse())
       p.fillRect(r, dark ? QColor(255, 255, 255, 18) : QColor(0, 0, 0, 14));
-    if (paletteIndex > 0)
-      p.fillRect(QRect(0, 0, 1, r.height()),
-                 dark ? QColor(255, 255, 255, 45) : QColor(0, 0, 0, 45));
+    p.restore();
     QFont f = font();
     f.setBold(true);
     p.setFont(f);
-    p.setPen(fg);
     const bool compactTile = r.height() < 44;
     const QRect textRect =
         r.adjusted(6, 2, (tileLocked && compactTile) ? -22 : -6, -2);
-    p.drawText(textRect, Qt::AlignCenter, text());
+    if (translucent) {
+      QRectF textBounds = p.boundingRect(textRect, Qt::AlignCenter, text());
+      QRectF pill = textBounds.adjusted(-6.0, -2.0, 6.0, 2.0);
+      const QRectF pillLimit = tileRect.adjusted(3.0, 2.0, -3.0, -2.0);
+      pill = pill.intersected(pillLimit);
+      p.setPen(QPen(QColor(0, 0, 0, 40), 1.0));
+      p.setBrush(QColor(255, 255, 255, 225));
+      p.drawRoundedRect(pill, 3.0, 3.0);
+      p.setPen(QColor(0x1B, 0x1E, 0x20));
+      p.drawText(textRect, Qt::AlignCenter, text());
+    } else {
+      p.setPen(fg);
+      p.drawText(textRect, Qt::AlignCenter, text());
+    }
     if (tileLocked) {
       const int sz = 14;
       const QRect badgeRect(r.right() - sz - 5,
                             compactTile ? (r.height() - sz) / 2 : 5, sz, sz);
-      QIcon lockIcon = QIcon::fromTheme(QStringLiteral("object-locked"));
+      QIcon lockIcon =
+          QIcon::fromTheme(QStringLiteral("object-locked-symbolic"));
+      if (lockIcon.isNull())
+        lockIcon = QIcon::fromTheme(QStringLiteral("object-locked"));
       if (!lockIcon.isNull()) {
         const qreal dpr = devicePixelRatioF();
         QPixmap pm = lockIcon.pixmap(QSize(sz, sz), dpr);
@@ -244,16 +282,22 @@ protected:
     }
     if (hasFocus()) {
       QPen focusPen(fg, 2.0);
-      focusPen.setJoinStyle(Qt::MiterJoin);
       p.setPen(focusPen);
       p.setBrush(Qt::NoBrush);
-      p.drawRect(r.adjusted(1, 1, -2, -2));
+      p.drawRoundedRect(tileRect.adjusted(1.0, 1.0, -1.0, -1.0), radius - 1.0,
+                        radius - 1.0);
     } else if (underMouse()) {
       QColor hoverBorder = fg;
-      hoverBorder.setAlpha(90);
+      hoverBorder.setAlpha(105);
       p.setPen(QPen(hoverBorder, 1.0));
       p.setBrush(Qt::NoBrush);
-      p.drawRect(r.adjusted(0, 0, -1, -1));
+      p.drawRoundedRect(tileRect, radius, radius);
+    } else {
+      QColor subtleBorder = palette().color(QPalette::WindowText);
+      subtleBorder.setAlpha(48);
+      p.setPen(QPen(subtleBorder, 1.0));
+      p.setBrush(Qt::NoBrush);
+      p.drawRoundedRect(tileRect, radius, radius);
     }
   }
   void mousePressEvent(QMouseEvent *e) override {
@@ -329,29 +373,41 @@ public:
     setAlignment(Qt::AlignCenter);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setContentsMargins(12, 0, 12, 0);
-    setMinimumHeight(fontMetrics().height() + 4);
+    setMinimumHeight(fontMetrics().height() + 2);
     QPalette pal = palette();
-    QColor muted = pal.color(QPalette::WindowText);
-    muted.setAlpha(155);
+    const QColor muted = mutedColor(pal, 150);
     pal.setColor(QPalette::WindowText, muted);
+    pal.setColor(QPalette::Text, muted);
     setPalette(pal);
   }
 
 protected:
   void paintEvent(QPaintEvent *e) override {
+    const bool compactDrop = height() <= fontMetrics().height() + 10;
+    if (compactDrop) {
+      if (dragHover) {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing, true);
+        QColor fill = palette().color(QPalette::Highlight);
+        fill.setAlpha(24);
+        p.setBrush(fill);
+        p.setPen(Qt::NoPen);
+        p.drawRoundedRect(QRectF(rect()).adjusted(6.0, 2.0, -6.0, -2.0), 3.0,
+                          3.0);
+      }
+      QLabel::paintEvent(e);
+      return;
+    }
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
-    const bool tall = height() >= 44;
-    const QRectF zone =
-        tall ? QRectF(rect()).adjusted(10.5, 8.5, -10.5, -8.5)
-             : QRectF(rect()).adjusted(6.5, 2.5, -6.5, -2.5);
-    const qreal radius = tall ? 5.0 : 3.0;
+    const QRectF zone = QRectF(rect()).adjusted(6.5, 6.5, -6.5, -6.5);
+    const qreal radius = 5.0;
     QColor fill = dragHover ? palette().color(QPalette::Highlight)
                             : palette().color(QPalette::WindowText);
     fill.setAlpha(dragHover ? 24 : 8);
     QColor border = dragHover ? palette().color(QPalette::Highlight)
                               : palette().color(QPalette::Mid);
-    border.setAlpha(dragHover ? 210 : 155);
+    border.setAlpha(dragHover ? 215 : 165);
     p.setBrush(fill);
     p.setPen(QPen(border, 1.0, Qt::DashLine));
     p.drawRoundedRect(zone, radius, radius);
@@ -659,6 +715,7 @@ class Frontend : public QWidget {
   QTimer timer;
   QSettings settings;
   QTabWidget *tabs = nullptr;
+  QPointer<QToolBar> mainToolbar;
   QLabel *status = nullptr, *connectionStatus = nullptr;
   StatusDot *connectionDot = nullptr;
   QAction *pickAction = nullptr;
@@ -666,6 +723,7 @@ class Frontend : public QWidget {
   QVBoxLayout *root;
   QVBoxLayout *historyLayout = nullptr;
   QWidget *historyPanel = nullptr, *historyBox = nullptr;
+  QPointer<QLabel> historyEmptyHint;
   QScrollArea *historyScroll = nullptr;
   QSplitter *splitter = nullptr, *verticalSplitter = nullptr;
   QWidget *pinnedScroll = nullptr, *pinnedCurrent = nullptr;
@@ -751,8 +809,28 @@ class Frontend : public QWidget {
       s = str(state, "message");
     return s;
   }
+  QString statusSummary() const {
+    const QString msg = message();
+    if (!msg.isEmpty())
+      return msg;
+    const int count = array(object(state.value("palette")), "swatches").size();
+    if (count == 0)
+      return QStringLiteral("Palette empty");
+    if (count == 1)
+      return QStringLiteral("1 swatch in palette");
+    return QStringLiteral("%1 swatches in palette").arg(count);
+  }
+  void clearToolbarFocus() {
+    auto *focused = QApplication::focusWidget();
+    if (!focused || (mainToolbar && mainToolbar->isAncestorOf(focused))) {
+      if (tabs)
+        tabs->setFocus(Qt::OtherFocusReason);
+      else if (focused)
+        focused->clearFocus();
+    }
+  }
   bool compactShelf = false;
-  int normalPaletteShelfHeight = 110;
+  int normalPaletteShelfHeight = 76;
   bool compactHistory = false;
   int normalHistoryWidth = 124;
   void sizeHistorySidebar() {
@@ -782,8 +860,8 @@ class Frontend : public QWidget {
                              mixerEmptyShelf;
     const int dropHeight = fontMetrics().height() + 8;
     if (verticalSplitter && shrinkShelf && !compactShelf)
-      normalPaletteShelfHeight = verticalSplitter->sizes().value(1, 110);
-    pinnedScroll->setMinimumHeight(mixerEmptyShelf ? dropHeight : 38);
+      normalPaletteShelfHeight = verticalSplitter->sizes().value(1, 76);
+    pinnedScroll->setMinimumHeight(mixerEmptyShelf ? dropHeight : 42);
     pinnedScroll->setMaximumHeight(mixerEmptyShelf ? dropHeight :
                                    compact ? page->fontMetrics().height() * 3 : QWIDGETSIZE_MAX);
     if (verticalSplitter && shrinkShelf != compactShelf) {
@@ -798,9 +876,11 @@ class Frontend : public QWidget {
   void preserveView(QWidget *old, QWidget *replacement) {
     auto oldScroll = qobject_cast<QScrollArea *>(old),
          newScroll = qobject_cast<QScrollArea *>(replacement);
-    if (!oldScroll && (old->objectName() == "themePage" || old->objectName() == "mixerPage"))
+    if (!oldScroll && (old->objectName() == "themePage" || old->objectName() == "mixerPage" ||
+                       old->objectName() == "pinnedShelf"))
       oldScroll = old->findChild<QScrollArea *>();
-    if (!newScroll && (replacement->objectName() == "themePage" || replacement->objectName() == "mixerPage"))
+    if (!newScroll && (replacement->objectName() == "themePage" || replacement->objectName() == "mixerPage" ||
+                       replacement->objectName() == "pinnedShelf"))
       newScroll = replacement->findChild<QScrollArea *>();
     int vertical = oldScroll ? oldScroll->verticalScrollBar()->value() : 0,
         horizontal = oldScroll ? oldScroll->horizontalScrollBar()->value() : 0;
@@ -923,22 +1003,28 @@ class Frontend : public QWidget {
     return s;
   }
   QWidget *pinnedShelf() {
+    auto container = new QWidget;
+    container->setObjectName("pinnedShelf");
+    container->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+    container->setMinimumHeight(42);
+    auto l = new QVBoxLayout(container);
+    l->setContentsMargins(0, 0, 0, 0);
+    l->setSpacing(0);
+    l->addWidget(new Hairline(container));
     auto s = static_cast<QScrollArea *>(scroll(pinnedPalette()));
-    s->setObjectName("pinnedShelf");
-    s->setStyleSheet(
-        "#pinnedShelf { border: none; border-top: 1px solid palette(mid); }");
-    s->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
-    s->setMinimumHeight(38);
-    return s;
+    s->setObjectName("pinnedShelfScroll");
+    s->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    l->addWidget(s, 1);
+    return container;
   }
   QWidget *pinnedPalette() {
     auto p = object(state.value("palette"));
     auto w = new QWidget;
     auto l = new QVBoxLayout(w);
-    l->setContentsMargins(0, 0, 0, 0);
     l->setSpacing(0);
     auto swatches = array(p, "swatches");
-    if (swatches.isEmpty())
+    if (swatches.isEmpty()) {
+      l->setContentsMargins(0, 0, 0, 0);
       l->addWidget(new PaletteDrop(
           [this](int i, QString c) {
             if (i >= 0)
@@ -948,8 +1034,11 @@ class Frontend : public QWidget {
               send({{"op", "palette_add_current"}});
             }
           }, w));
+      return w;
+    }
+    l->setContentsMargins(6, 6, 6, 6);
     auto swatchRow = new QHBoxLayout;
-    swatchRow->setSpacing(0);
+    swatchRow->setSpacing(4);
     l->addLayout(swatchRow);
     int i = 0;
     for (auto value : swatches) {
@@ -959,7 +1048,7 @@ class Frontend : public QWidget {
       const bool locked = o.value("locked").toBool();
       auto sw = new Swatch(c, str(o, "name"), w);
       sw->setText(str(o, "color").toUpper());
-      sw->setMinimumSize(100, 30);
+      sw->setMinimumSize(96, 24);
       sw->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
       sw->setTileMode(true, locked);
       sw->setToolTip(
@@ -1008,10 +1097,14 @@ class Frontend : public QWidget {
       layout->setContentsMargins(0, 0, 0, 0);
       layout->setSpacing(0);
       auto toolbar = new QToolBar(outer);
+      mainToolbar = toolbar;
       toolbar->setMovable(false);
       toolbar->setFloatable(false);
+      toolbar->setFocusPolicy(Qt::NoFocus);
       toolbar->setContentsMargins(4, 2, 4, 2);
-      toolbar->setIconSize(QSize(18, 18));
+      toolbar->setIconSize(QSize(16, 16));
+      if (auto *tl = toolbar->layout())
+        tl->setSpacing(4);
       bool labels = settings.value("board/toolbarLabels", true).toBool();
       toolbar->setToolButtonStyle(labels ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
       auto addAction = [this, toolbar](const QString &name,
@@ -1031,10 +1124,15 @@ class Frontend : public QWidget {
         QStyle::StandardPixmap fallback;
       };
       for (const auto &entry : QList<NavEntry>{
-               {"Mixer", {"color-gradient"}, QStyle::SP_ComputerIcon},
-               {"Palette", {"color-fill"}, QStyle::SP_DirIcon},
+               {"Mixer",
+                {"color-gradient-symbolic", "color-gradient"},
+                QStyle::SP_ComputerIcon},
+               {"Palette",
+                {"color-fill-symbolic", "color-fill"},
+                QStyle::SP_DirIcon},
                {"Theme",
-                {"preferences-desktop-theme-global",
+                {"preferences-desktop-theme-global-symbolic",
+                 "preferences-desktop-theme-global",
                  "preferences-desktop-theme"},
                 QStyle::SP_DesktopIcon}}) {
         auto action = toolbar->addAction(
@@ -1042,11 +1140,15 @@ class Frontend : public QWidget {
         action->setCheckable(true);
         nav->addAction(action);
         int index = pages.size();
-        connect(action, &QAction::triggered, this, [this, index] { tabs->setCurrentIndex(index); });
+        connect(action, &QAction::triggered, this, [this, index] {
+          tabs->setCurrentIndex(index);
+          clearToolbarFocus();
+        });
         pages.append(action);
       }
       toolbar->addSeparator();
-      auto pick = addAction("Pick color", {"color-picker"},
+      auto pick = addAction("Pick color",
+                            {"color-picker-symbolic", "color-picker"},
                             QStyle::SP_DialogOpenButton, [this] {
         if (state.value("hide_board_while_picking").toBool()) {
           hiddenForPick = true;
@@ -1063,14 +1165,16 @@ class Frontend : public QWidget {
       spacer->setAttribute(Qt::WA_TransparentForMouseEvents);
       toolbar->addWidget(spacer);
       auto toggle = toolbar->addAction(
-          themedIcon({"view-history", "document-open-recent"},
+          themedIcon({"view-history-symbolic", "view-history",
+                      "document-open-recent"},
                      QStyle::SP_FileDialogListView),
           "History");
       toggle->setToolTip("Show or hide the picked color history sidebar");
       toggle->setCheckable(true);
       toggle->setChecked(settings.value("board/historyVisible", true).toBool());
       auto labelToggle = toolbar->addAction(
-          themedIcon({"view-list-text"}, QStyle::SP_FileDialogContentsView),
+          themedIcon({"view-list-text-symbolic", "view-list-text"},
+                     QStyle::SP_FileDialogContentsView),
           "Show labels");
       labelToggle->setToolTip("Show or hide toolbar button labels");
       labelToggle->setCheckable(true);
@@ -1086,38 +1190,52 @@ class Frontend : public QWidget {
           if (b->property("boardAction").toBool())
             b->setToolButtonStyle(buttonStyle);
       });
+      toolbar->addSeparator();
       auto settingsAction = addAction(
-          "Settings", {"configure"}, QStyle::SP_FileDialogDetailedView,
+          "Settings", {"configure-symbolic", "configure"},
+          QStyle::SP_FileDialogDetailedView,
           [this] { send({{"op", "configure"}}); });
       settingsAction->setToolTip("Open Swatch Board settings");
+      for (auto *btn : toolbar->findChildren<QToolButton *>())
+        btn->setFocusPolicy(Qt::TabFocus);
       layout->addWidget(toolbar);
       layout->addWidget(new Hairline(outer));
       splitter = new QSplitter(Qt::Horizontal, outer);
       historyPanel = new QWidget(splitter);
       historyPanel->setAutoFillBackground(true);
-      historyPanel->setBackgroundRole(QPalette::Base);
+      historyPanel->setBackgroundRole(QPalette::Window);
       historyPanel->setMinimumWidth(78);
-      auto historyPanelLayout = new QVBoxLayout(historyPanel);
+      historyPanel->installEventFilter(this);
+      auto historyOuter = new QHBoxLayout(historyPanel);
+      historyOuter->setContentsMargins(0, 0, 0, 0);
+      historyOuter->setSpacing(0);
+      auto historyContent = new QWidget(historyPanel);
+      historyContent->setBackgroundRole(QPalette::Window);
+      auto historyPanelLayout = new QVBoxLayout(historyContent);
       historyPanelLayout->setContentsMargins(0, 0, 0, 0);
       historyPanelLayout->setSpacing(0);
-      auto historyHeader = new QLabel("History", historyPanel);
+      auto historyHeader = new QLabel("History", historyContent);
       QFont headerFont = historyHeader->font();
-      headerFont.setBold(true);
+      headerFont.setWeight(QFont::DemiBold);
       historyHeader->setFont(headerFont);
-      historyHeader->setContentsMargins(10, 7, 10, 6);
+      historyHeader->setContentsMargins(10, 7, 10, 7);
       historyPanelLayout->addWidget(historyHeader);
-      historyPanelLayout->addWidget(new Hairline(historyPanel));
+      historyPanelLayout->addWidget(new Hairline(historyContent));
       historyBox = new QWidget;
-      historyBox->setBackgroundRole(QPalette::Base);
+      historyBox->setBackgroundRole(QPalette::Window);
       historyLayout = new QVBoxLayout(historyBox);
       historyLayout->setContentsMargins(6, 6, 6, 6);
       historyLayout->setSpacing(4);
-      historyScroll = new QScrollArea(historyPanel);
+      historyScroll = new QScrollArea(historyContent);
       historyScroll->setFrameShape(QFrame::NoFrame);
       historyScroll->setWidgetResizable(true);
-      historyScroll->setBackgroundRole(QPalette::Base);
+      historyScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+      historyScroll->setBackgroundRole(QPalette::Window);
+      historyScroll->viewport()->setBackgroundRole(QPalette::Window);
       historyScroll->setWidget(historyBox);
       historyPanelLayout->addWidget(historyScroll, 1);
+      historyOuter->addWidget(historyContent, 1);
+      historyOuter->addWidget(new Hairline(Qt::Vertical, historyPanel));
       historyPanel->setVisible(toggle->isChecked());
       connect(toggle, &QAction::toggled, this, [this](bool visible) {
         historyPanel->setVisible(visible);
@@ -1127,6 +1245,8 @@ class Frontend : public QWidget {
       tabs = new QTabWidget(outer);
       tabs->setDocumentMode(true);
       tabs->setAccessibleName("Board sections");
+      tabs->setFocusProxy(nullptr);
+      tabs->setFocusPolicy(Qt::ClickFocus);
       undoShortcut = new QShortcut(this);
       undoShortcut->setKeys(QKeySequence::keyBindings(QKeySequence::Undo));
       redoShortcut = new QShortcut(this);
@@ -1158,6 +1278,7 @@ class Frontend : public QWidget {
                 pinnedCurrent->setVisible(i == 0);
                 sizePinnedPalette();
                 pages[i]->setChecked(true);
+                clearToolbarFocus();
               });
       splitter->addWidget(content);
       verticalSplitter = new QSplitter(Qt::Vertical, outer);
@@ -1171,12 +1292,12 @@ class Frontend : public QWidget {
         splitter->setSizes({124, 776});
       if (!verticalSplitter->restoreState(
               settings.value("board/verticalSplitter").toByteArray()))
-        verticalSplitter->setSizes({540, 110});
+        verticalSplitter->setSizes({574, 76});
       layout->addWidget(verticalSplitter, 1);
       layout->addWidget(new Hairline(outer));
       auto statusBar = new QWidget(outer);
       auto statusRow = new QHBoxLayout(statusBar);
-      statusRow->setContentsMargins(8, 4, 8, 4);
+      statusRow->setContentsMargins(10, 5, 10, 5);
       statusRow->setSpacing(6);
       QFont statusFont = font();
       if (statusFont.pointSizeF() > 0)
@@ -1184,9 +1305,9 @@ class Frontend : public QWidget {
       else if (statusFont.pixelSize() > 0)
         statusFont.setPixelSize(qMax(10, statusFont.pixelSize() - 1));
       QPalette statusPalette = palette();
-      QColor statusFg = statusPalette.color(QPalette::WindowText);
-      statusFg.setAlpha(195);
+      const QColor statusFg = mutedColor(statusPalette, 195);
       statusPalette.setColor(QPalette::WindowText, statusFg);
+      statusPalette.setColor(QPalette::Text, statusFg);
       status = new QLabel(statusBar);
       status->setWordWrap(true);
       status->setFont(statusFont);
@@ -1202,6 +1323,8 @@ class Frontend : public QWidget {
       statusRow->addWidget(connectionStatus, 0, Qt::AlignVCenter);
       layout->addWidget(statusBar);
       replace(outer);
+      clearToolbarFocus();
+      QTimer::singleShot(0, this, [this] { clearToolbarFocus(); });
     } else {
       int current = tabs->currentIndex();
       if (previous.value("mixer") != state.value("mixer")) {
@@ -1269,8 +1392,10 @@ class Frontend : public QWidget {
       }
       tabs->setCurrentIndex(current);
       pinnedCurrent->setVisible(current == 0);
+      clearToolbarFocus();
     }
     if (first || previous.value("history") != state.value("history")) {
+      historyEmptyHint = nullptr;
       while (auto item = historyLayout->takeAt(0)) {
         if (item->widget())
           item->widget()->deleteLater();
@@ -1278,18 +1403,64 @@ class Frontend : public QWidget {
       }
       auto entries = array(state, "history");
       if (entries.isEmpty()) {
-        auto empty = new QLabel(
-            "No picked colors yet.\nUse Pick color to capture.", historyBox);
-        empty->setWordWrap(true);
-        empty->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-        empty->setContentsMargins(6, 8, 6, 8);
-        QPalette ep = empty->palette();
-        QColor muted = ep.color(QPalette::WindowText);
-        muted.setAlpha(140);
-        ep.setColor(QPalette::WindowText, muted);
-        empty->setPalette(ep);
-        historyLayout->addWidget(empty);
+        historyLayout->setContentsMargins(8, 12, 8, 12);
+        historyLayout->setSpacing(6);
+        historyLayout->addStretch(1);
+        QIcon histIcon = themedIcon(
+            {"view-history-symbolic", "view-history", "document-open-recent"},
+            QStyle::SP_FileDialogListView);
+        if (!histIcon.isNull()) {
+          const int iconSz = 22;
+          const qreal dpr = devicePixelRatioF();
+          QPixmap raw = histIcon.pixmap(QSize(iconSz, iconSz), dpr);
+          QPixmap tinted(raw.size());
+          tinted.setDevicePixelRatio(raw.devicePixelRatio());
+          tinted.fill(Qt::transparent);
+          QPainter tp(&tinted);
+          tp.drawPixmap(0, 0, raw);
+          tp.setCompositionMode(QPainter::CompositionMode_SourceIn);
+          tp.fillRect(tinted.rect(), mutedColor(palette(), 110));
+          tp.end();
+          auto iconLabel = new QLabel(historyBox);
+          iconLabel->setPixmap(tinted);
+          iconLabel->setAlignment(Qt::AlignCenter);
+          historyLayout->addWidget(iconLabel, 0, Qt::AlignHCenter);
+        }
+        auto primary = new QLabel("No history yet", historyBox);
+        primary->setWordWrap(true);
+        primary->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
+        primary->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
+        QPalette primaryPal = primary->palette();
+        const QColor primaryMuted = mutedColor(primaryPal, 145);
+        primaryPal.setColor(QPalette::WindowText, primaryMuted);
+        primaryPal.setColor(QPalette::Text, primaryMuted);
+        primary->setPalette(primaryPal);
+        historyLayout->addWidget(primary);
+        auto hint = new QLabel("Use Pick color to capture", historyBox);
+        hint->setWordWrap(true);
+        hint->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
+        hint->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
+        QFont hintFont = hint->font();
+        if (hintFont.pointSizeF() > 0)
+          hintFont.setPointSizeF(qMax(8.0, hintFont.pointSizeF() - 1.0));
+        else if (hintFont.pixelSize() > 0)
+          hintFont.setPixelSize(qMax(9, hintFont.pixelSize() - 1));
+        hint->setFont(hintFont);
+        QPalette hintPal = hint->palette();
+        const QColor hintMuted = mutedColor(hintPal, 118);
+        hintPal.setColor(QPalette::WindowText, hintMuted);
+        hintPal.setColor(QPalette::Text, hintMuted);
+        hint->setPalette(hintPal);
+        const int panelW = historyPanel->width() > 0
+                               ? historyPanel->width()
+                               : (compactHistory ? 82 : normalHistoryWidth);
+        hint->setVisible(panelW >= 115);
+        historyEmptyHint = hint;
+        historyLayout->addWidget(hint);
+        historyLayout->addStretch(1);
       } else {
+        historyLayout->setContentsMargins(6, 6, 6, 6);
+        historyLayout->setSpacing(4);
         int index = 0;
         for (auto v : entries) {
           auto o = v.toObject();
@@ -1306,19 +1477,32 @@ class Frontend : public QWidget {
           });
           historyLayout->addWidget(b);
         }
+        historyLayout->addStretch();
       }
-      historyLayout->addStretch();
     }
-    status->setText(message());
+    status->setText(statusSummary());
     const bool picking = state.value("picking").toBool();
     const bool loaded = state.value("loaded").toBool();
     const bool connected = state.value("connected").toBool();
     pickAction->setEnabled(loaded && connected && !picking);
-    connectionStatus->setText(picking    ? "Picking…"
-                              : !loaded  ? "Loading…"
-                              : connected ? "Connected"
-                                          : "Disconnected");
+    const QString connText = picking    ? QStringLiteral("Picking color…")
+                             : !loaded  ? QStringLiteral("Loading…")
+                             : connected ? QStringLiteral("Tray connected")
+                                         : QStringLiteral("Tray disconnected");
+    const QString connTip =
+        picking
+            ? QStringLiteral(
+                  "Picking a color from the screen; press Escape or right-click to cancel")
+        : !loaded
+            ? QStringLiteral("Loading saved history and settings")
+        : connected
+            ? QStringLiteral("Connected to Swatch Board Tray for screen color picking")
+            : QStringLiteral(
+                  "Start Swatch Board Tray to enable screen color picking");
+    connectionStatus->setText(connText);
+    connectionStatus->setToolTip(connTip);
     if (connectionDot) {
+      connectionDot->setToolTip(connTip);
       connectionDot->setColor(
           (picking || !loaded) ? QColor(0xF6, 0x74, 0x00)
           : connected          ? QColor(0x27, 0xAE, 0x60)
@@ -1585,6 +1769,11 @@ protected:
   }
   bool eventFilter(QObject *watched, QEvent *event) override {
     if (event->type() == QEvent::Resize) {
+      if (watched == historyPanel && historyEmptyHint) {
+        historyEmptyHint->setVisible(historyPanel->width() >= 115);
+        if (historyBox)
+          historyBox->updateGeometry();
+      }
       auto page = qobject_cast<QWidget *>(watched);
       if (page && page->objectName() == "mixerPage")
         layoutMixerActions(page);

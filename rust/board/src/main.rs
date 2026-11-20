@@ -102,7 +102,7 @@ impl Board {
                     self.connected = connected;
                     self.loaded = true;
                     if !self.picking {
-                        self.message = "History is saved automatically.".into();
+                        self.message.clear();
                     }
                 }
                 Event::PickStarted => {}
