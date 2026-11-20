@@ -142,11 +142,13 @@ protected:
 };
 
 class NavToolButton : public QToolButton {
+  bool pointerHovered = false;
+
 public:
   explicit NavToolButton(QWidget *parent = nullptr) : QToolButton(parent) {
     setAutoRaise(true);
     setFocusPolicy(Qt::NoFocus);
-    setAttribute(Qt::WA_Hover, true);
+    setMouseTracking(true);
     setMinimumWidth(0);
     setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Preferred);
   }
@@ -167,16 +169,35 @@ public:
   QSize minimumSizeHint() const override { return sizeHint(); }
 
 protected:
+  void mouseMoveEvent(QMouseEvent *e) override {
+    if (!pointerHovered) {
+      pointerHovered = true;
+      update();
+    }
+    QToolButton::mouseMoveEvent(e);
+  }
+  void leaveEvent(QEvent *e) override {
+    if (pointerHovered) {
+      pointerHovered = false;
+      update();
+    }
+    QToolButton::leaveEvent(e);
+  }
+  void hideEvent(QHideEvent *e) override {
+    if (pointerHovered) {
+      pointerHovered = false;
+      update();
+    }
+    QToolButton::hideEvent(e);
+  }
   void paintEvent(QPaintEvent *) override {
-    QStyleOptionToolButton opt;
-    initStyleOption(&opt);
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
 
     const bool checked = isChecked();
     const bool pressed = isDown();
-    const bool hovered = (opt.state & QStyle::State_MouseOver) && isEnabled();
-    const QColor hi = palette().color(QPalette::Highlight);
+    const bool hovered = pointerHovered && isEnabled();
+    const QColor hi = palette().color(QPalette::Active, QPalette::Highlight);
     const QColor fg = palette().color(
         isEnabled() ? QPalette::Active : QPalette::Disabled,
         QPalette::WindowText);
