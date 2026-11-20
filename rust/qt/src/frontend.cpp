@@ -1248,10 +1248,30 @@ public:
       images.append(image);
     }
   }
+  int wideTargetHeight(int forWidth) const {
+    const double sw = scene.value("width").toDouble(0);
+    const double sh = scene.value("height").toDouble(0);
+    if (sw <= 0 || sh <= 0 || forWidth <= 0)
+      return 220;
+    return qBound(160, qRound(forWidth * sh / sw) + 2, 240);
+  }
+  void syncWideMaxHeight(int forWidth = -1) {
+    if (compactMode)
+      return;
+    const int w = forWidth > 0 ? forWidth : width();
+    if (w <= 0)
+      return;
+    const int targetH = wideTargetHeight(w);
+    if (maximumHeight() != targetH) {
+      setMaximumHeight(targetH);
+      updateGeometry();
+    }
+  }
   QSize sizeHint() const override {
     if (compactMode)
-      return QSize(420, 82);
-    return QSize(390, 214);
+      return QSize(420, 78);
+    const int w = width() > 140 ? width() : 390;
+    return QSize(390, wideTargetHeight(w));
   }
   void setTopAligned(bool aligned) {
     topAligned = aligned;
@@ -1274,6 +1294,11 @@ public:
   }
 
 protected:
+  void resizeEvent(QResizeEvent *e) override {
+    QWidget::resizeEvent(e);
+    if (!compactMode && e->size().width() > 0)
+      syncWideMaxHeight(e->size().width());
+  }
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
@@ -4585,7 +4610,7 @@ protected:
   bool event(QEvent *e) override {
     const bool res = QSplitter::event(e);
     if (!applying && !pendingSizes.isEmpty() &&
-        orientation() == Qt::Horizontal && width() >= 680 &&
+        orientation() == Qt::Horizontal && width() >= 680 && count() == 2 &&
         (e->type() == QEvent::LayoutRequest || e->type() == QEvent::Resize)) {
       applying = true;
       setSizes(pendingSizes);
@@ -4598,16 +4623,20 @@ protected:
 void Frontend::layoutThemePage(QWidget *page, int width, bool initialize) {
   auto panes = dynamic_cast<ThemeSplitter *>(
       page->findChild<QSplitter *>("themePanes"));
-  if (!panes)
+  auto preview = page->findChild<QWidget *>("themePreviewContainer");
+  auto inspector = page->findChild<QScrollArea *>("themeInspector");
+  if (!panes || !preview || !inspector)
     return;
-  auto preview = panes->widget(0);
-  auto inspector = panes->widget(1);
   auto previewBody = preview->findChild<QWidget *>("themePreviewBody");
   auto rightLine = preview->findChild<QWidget *>("themePreviewRightLine");
   auto bottomLine = preview->findChild<QWidget *>("themePreviewBottomLine");
   auto canvas = static_cast<Scene *>(preview->findChild<QWidget *>("themeScene"));
   auto renderedBox = page->findChild<QWidget *>("themeRenderedPreviewBox");
   auto inspectorContent = page->findChild<QWidget *>("themeInspectorContent");
+  auto inspectorLayout =
+      inspectorContent
+          ? qobject_cast<QVBoxLayout *>(inspectorContent->layout())
+          : nullptr;
   auto exportHairline = page->findChild<QWidget *>("themeExportHairline");
   auto toggle = page->findChild<QAction *>("themePreviewAction");
   auto contextSpacer = page->findChild<QAction *>("themeContextSpacerAction");
@@ -4623,50 +4652,109 @@ void Frontend::layoutThemePage(QWidget *page, int width, bool initialize) {
     contextSpacer->setVisible(showContext);
   if (contextAction)
     contextAction->setVisible(showContext);
-  preview->setVisible(canvas && (!compact || compactThemePreview));
   if (rightLine)
     rightLine->setVisible(!compact);
   if (bottomLine)
     bottomLine->setVisible(compact);
-  if (!initialize && panes->orientation() == orientation)
+  if (!initialize && panes->orientation() == orientation) {
+    preview->setVisible(canvas && (!compact || compactThemePreview));
     return;
+  }
 
-  panes->setOrientation(orientation);
-  panes->setHandleWidth(compact ? 0 : style()->pixelMetric(QStyle::PM_SplitterWidth));
-  panes->handle(1)->setEnabled(!compact);
-  inspector->setMinimumWidth(compact ? 0 : 200);
   auto previewLayout =
       previewBody ? static_cast<QBoxLayout *>(previewBody->layout()) : nullptr;
-  if (previewLayout) {
-    previewLayout->setDirection(QBoxLayout::TopToBottom);
-    previewLayout->setContentsMargins(compact ? 10 : 12, compact ? 4 : 10, 10,
-                                      compact ? 6 : 10);
-    previewLayout->setSpacing(compact ? 4 : 10);
+
+  if (compact) {
+    panes->pendingSizes.clear();
+    if (inspectorContent && inspectorLayout) {
+      if (preview->parentWidget() != inspectorContent) {
+        preview->setParent(inspectorContent);
+        inspectorLayout->insertWidget(0, preview);
+      } else if (inspectorLayout->indexOf(preview) < 0) {
+        inspectorLayout->insertWidget(0, preview);
+      }
+      inspectorLayout->setContentsMargins(12, 6, 12, 12);
+      inspectorLayout->setSpacing(6);
+    }
+    panes->setOrientation(Qt::Vertical);
+    panes->setHandleWidth(0);
+    if (panes->count() > 1 && panes->handle(1))
+      panes->handle(1)->setEnabled(false);
+    inspector->setMinimumWidth(0);
+
+    preview->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    preview->setMinimumHeight(0);
+    preview->setMaximumHeight(QWIDGETSIZE_MAX);
+    if (previewBody) {
+      previewBody->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+      previewBody->setMinimumHeight(0);
+      previewBody->setMaximumHeight(QWIDGETSIZE_MAX);
+    }
+    if (previewLayout) {
+      previewLayout->setDirection(QBoxLayout::TopToBottom);
+      previewLayout->setContentsMargins(0, 0, 0, 5);
+      previewLayout->setSpacing(4);
+    }
+    if (canvas) {
+      canvas->setMaximumWidth(QWIDGETSIZE_MAX);
+      canvas->setTopAligned(false);
+      canvas->setCompactMode(true);
+      canvas->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+      canvas->setFixedHeight(78);
+    }
+  } else {
+    if (inspectorLayout) {
+      inspectorLayout->removeWidget(preview);
+      inspectorLayout->setContentsMargins(12, 10, 12, 12);
+      inspectorLayout->setSpacing(10);
+    }
+    if (preview->parentWidget() != panes)
+      panes->insertWidget(0, preview);
+    panes->setOrientation(Qt::Horizontal);
+    panes->setHandleWidth(style()->pixelMetric(QStyle::PM_SplitterWidth));
+    if (panes->count() > 1 && panes->handle(1))
+      panes->handle(1)->setEnabled(true);
+    panes->setChildrenCollapsible(false);
+    inspector->setMinimumWidth(200);
+
+    preview->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+    preview->setMinimumHeight(0);
+    preview->setMaximumHeight(QWIDGETSIZE_MAX);
+    if (previewBody) {
+      previewBody->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+      previewBody->setMinimumHeight(0);
+      previewBody->setMaximumHeight(QWIDGETSIZE_MAX);
+    }
+    if (previewLayout) {
+      previewLayout->setDirection(QBoxLayout::TopToBottom);
+      previewLayout->setContentsMargins(12, 10, 10, 10);
+      previewLayout->setSpacing(10);
+    }
+    if (canvas) {
+      canvas->setMaximumWidth(QWIDGETSIZE_MAX);
+      canvas->setTopAligned(true);
+      canvas->setCompactMode(false);
+      canvas->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+      canvas->setMinimumHeight(68);
+      canvas->setMaximumHeight(QWIDGETSIZE_MAX);
+    }
   }
-  preview->setMaximumHeight(compact ? 118 : QWIDGETSIZE_MAX);
-  if (canvas) {
-    canvas->setMaximumWidth(QWIDGETSIZE_MAX);
-    canvas->setTopAligned(!compact);
-    canvas->setCompactMode(compact);
-  }
+
+  preview->setVisible(canvas && (!compact || compactThemePreview));
 
   const bool previewInLeft = !compact && canvas && previewBody && previewLayout;
   if (renderedBox) {
-    auto inspectorLayout =
-        inspectorContent
-            ? qobject_cast<QVBoxLayout *>(inspectorContent->layout())
-            : nullptr;
     if (previewInLeft) {
       if (inspectorLayout)
         inspectorLayout->removeWidget(renderedBox);
       if (renderedBox->parentWidget() != previewBody)
         renderedBox->setParent(previewBody);
       if (previewLayout->indexOf(renderedBox) < 0)
-        previewLayout->addWidget(renderedBox, 2);
+        previewLayout->addWidget(renderedBox, 1);
       else
-        previewLayout->setStretchFactor(renderedBox, 2);
+        previewLayout->setStretchFactor(renderedBox, 1);
       if (canvas)
-        previewLayout->setStretchFactor(canvas, 3);
+        previewLayout->setStretchFactor(canvas, 2);
       for (auto *te : renderedBox->findChildren<QPlainTextEdit *>()) {
         te->setMinimumHeight(40);
         te->setMaximumHeight(QWIDGETSIZE_MAX);
@@ -4685,7 +4773,7 @@ void Frontend::layoutThemePage(QWidget *page, int width, bool initialize) {
                                       renderedBox);
       }
       if (canvas && previewLayout)
-        previewLayout->setStretchFactor(canvas, 1);
+        previewLayout->setStretchFactor(canvas, 0);
       for (auto *te : renderedBox->findChildren<QPlainTextEdit *>()) {
         const int h = te->property("compactHeight").toInt();
         te->setFixedHeight(h > 0 ? h : 96);
@@ -4693,19 +4781,16 @@ void Frontend::layoutThemePage(QWidget *page, int width, bool initialize) {
       renderedBox->show();
     }
   } else if (canvas && previewLayout) {
-    previewLayout->setStretchFactor(canvas, 1);
+    previewLayout->setStretchFactor(canvas, compact ? 0 : 1);
   }
 
-  if (compact) {
-    panes->pendingSizes.clear();
-    const int previewH =
-        (canvas && compactThemePreview) ? preview->maximumHeight() : 0;
-    panes->setSizes({previewH, qMax(1, page->height() - previewH)});
-  } else {
+  if (!compact) {
     const auto saved = settings.value("board/themeSplitter").toList();
     const QList<int> target =
         saved.size() == 2 ? QList<int>{saved[0].toInt(), saved[1].toInt()}
                           : QList<int>{416, 364};
+    if (canvas)
+      canvas->syncWideMaxHeight(qMax(canvas->width(), qMax(140, target[0] - 23)));
     panes->pendingSizes = target;
     panes->setSizes(target);
   }
@@ -4777,14 +4862,15 @@ QWidget *Frontend::themePage(Scene *reuse) {
                                  "Discard unsaved theme changes?") ==
                QMessageBox::Yes;
   };
-  pluginLayout->addWidget(makeDialogButton(
+  auto newThemeBtn = makeDialogButton(
       "New theme", {"document-new-symbolic", "document-new"}, QStyle::SP_FileIcon,
       pluginRow, [this, plugins, discard] {
         if (discard())
           send({{"op", "theme_choose"},
                 {"id", plugins->currentData().toString()},
                 {"discard", true}});
-      }));
+      });
+  pluginLayout->addWidget(newThemeBtn);
   selection->addRow("Plugin:", pluginRow);
 
   const auto savedEntries = array(t, "saved");
@@ -4829,6 +4915,11 @@ QWidget *Frontend::themePage(Scene *reuse) {
   connect(reloadBtn, &QToolButton::clicked, this,
           [this] { send({{"op", "theme_reload"}}); });
   savedLayout->addWidget(reloadBtn);
+  const int rightColW = qMax(newThemeBtn->sizeHint().width(),
+                             openBtn->sizeHint().width() + 6 + reloadSide);
+  newThemeBtn->setMinimumWidth(rightColW);
+  openBtn->setMinimumWidth(
+      qMax(openBtn->sizeHint().width(), rightColW - 6 - reloadSide));
   selection->addRow("Saved:", savedRow);
 
   auto name = line("Theme name", str(project, "name"), projectDialog);
@@ -5043,15 +5134,6 @@ QWidget *Frontend::themePage(Scene *reuse) {
   previewGrid->setRowStretch(0, 1);
   previewGrid->setColumnStretch(0, 1);
 
-  connect(previewToggleAction, &QAction::toggled, this,
-          [this, previewContainer, panes](bool visible) {
-            compactThemePreview = visible;
-            previewContainer->setVisible(visible);
-            if (panes->orientation() == Qt::Vertical) {
-              const int h = visible ? previewContainer->maximumHeight() : 0;
-              panes->setSizes({h, qMax(1, panes->height() - h)});
-            }
-          });
   if (themeProjectVisible)
     projectDialog->show();
 
@@ -5289,18 +5371,29 @@ QWidget *Frontend::themePage(Scene *reuse) {
   exportActionRow->addStretch(1);
 
   auto exportBtn = new PrimaryActionButton("Export", w);
+  exportBtn->setAccessibleName("Export");
   exportBtn->setIcon(themedIcon({"document-export-symbolic", "document-export"},
                                 QStyle::SP_DialogSaveButton));
   exportBtn->setIconSize(QSize(16, 16));
-  exportBtn->setPrimary(!dir->text().trimmed().isEmpty());
-  connect(dir, &QLineEdit::textChanged, exportBtn,
-          [exportBtn](const QString &value) {
-            exportBtn->setPrimary(!value.trimmed().isEmpty());
-          });
+  auto updateExportButton = [exportBtn](const QString &value) {
+    const bool hasDir = !value.trimmed().isEmpty();
+    exportBtn->setText(hasDir ? QStringLiteral("Export")
+                              : QString::fromUtf8("Export\u2026"));
+    exportBtn->setPrimary(hasDir);
+    exportBtn->setToolTip(
+        hasDir ? QStringLiteral("Export theme files to the selected folder")
+               : QStringLiteral("Choose a folder and export theme files"));
+  };
+  updateExportButton(dir->text());
+  connect(dir, &QLineEdit::textChanged, exportBtn, updateExportButton);
   connect(exportBtn, &QPushButton::clicked, this, [this, dir, overwrite] {
-    if (dir->text().trimmed().isEmpty()) {
-      QMessageBox::warning(this, "Export theme", "Choose an export directory.");
-      return;
+    QString targetDir = dir->text().trimmed();
+    if (targetDir.isEmpty()) {
+      targetDir =
+          QFileDialog::getExistingDirectory(this, "Export theme", dir->text());
+      if (targetDir.isEmpty())
+        return;
+      dir->setText(targetDir);
     }
     send({{"op", "theme_export"},
           {"directory", dir->text()},
@@ -5320,10 +5413,21 @@ QWidget *Frontend::themePage(Scene *reuse) {
   controlsScroll->setObjectName("themeInspector");
   controlsScroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
   controlsScroll->setMinimumHeight(48);
+  connect(previewToggleAction, &QAction::toggled, this,
+          [this, previewContainer, controlsScroll](bool visible) {
+            compactThemePreview = visible;
+            previewContainer->setVisible(visible);
+            if (visible) {
+              if (auto *sa = qobject_cast<QScrollArea *>(controlsScroll)) {
+                if (auto *vbar = sa->verticalScrollBar())
+                  vbar->setValue(0);
+              }
+            }
+          });
   panes->addWidget(previewContainer);
   panes->addWidget(controlsScroll);
   connect(panes, &QSplitter::splitterMoved, this, [this, panes] {
-    if (panes->orientation() == Qt::Horizontal) {
+    if (panes->orientation() == Qt::Horizontal && panes->count() == 2) {
       panes->pendingSizes.clear();
       const auto sizes = panes->sizes();
       settings.setValue("board/themeSplitter", QVariantList{sizes[0], sizes[1]});
