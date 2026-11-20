@@ -52,20 +52,27 @@ fn encode(value: &impl Serialize, limit: usize) -> Result<Vec<u8>, String> {
     serde_json::to_writer(&mut out, value).map_err(|e| e.to_string())?;
     Ok(out.bytes)
 }
-fn worker_path() -> Result<PathBuf, String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+fn cargo_test_profile_dir(dir: &Path) -> Option<&Path> {
+    if dir.file_name() == Some(OsStr::new("deps")) {
+        return dir.parent();
+    }
+    // Cargo 1.100+ places test binaries under target/{profile}/build/{pkg}/{hash}/out/{bin}.
+    if dir.file_name() == Some(OsStr::new("out")) {
+        let build_dir = dir.parent()?.parent()?.parent()?;
+        if build_dir.file_name() == Some(OsStr::new("build")) {
+            return build_dir.parent();
+        }
+    }
+    None
+}
+fn worker_path_from(exe: &Path) -> Result<PathBuf, String> {
     let dir = exe.parent().ok_or("no executable directory")?;
     let sibling = dir.join(WORKER);
     if sibling.is_file() {
         return Ok(sibling);
     }
-    // Cargo unit/integration tests live under target/{profile}/deps.
-    #[cfg(debug_assertions)]
-    if dir.file_name() == Some(OsStr::new("deps")) {
-        let candidate = dir
-            .parent()
-            .ok_or("no Cargo profile directory")?
-            .join(WORKER);
+    if let Some(profile_dir) = cargo_test_profile_dir(dir) {
+        let candidate = profile_dir.join(WORKER);
         if candidate.is_file() {
             return Ok(candidate);
         }
@@ -73,6 +80,10 @@ fn worker_path() -> Result<PathBuf, String> {
     Err(format!(
         "missing {WORKER} beside executable; build/install the rendering helper"
     ))
+}
+fn worker_path() -> Result<PathBuf, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    worker_path_from(&exe)
 }
 
 // Every return, including IO/protocol errors, kills and waits. Successful children
@@ -420,5 +431,38 @@ mod tests {
             )
             .is_err()
         );
+    }
+    #[test]
+    fn worker_path_supports_sibling_and_cargo_test_layouts() {
+        let root =
+            std::env::temp_dir().join(format!("swatch-worker-path-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let profile = root.join("target/release");
+        let worker = profile.join(WORKER);
+        fs::create_dir_all(profile.join("deps")).unwrap();
+        fs::create_dir_all(profile.join("build/swatch-board/abcdef0123456789/out")).unwrap();
+        fs::create_dir_all(profile.join("nested/subdir")).unwrap();
+        fs::write(&worker, b"").unwrap();
+
+        assert_eq!(
+            worker_path_from(&profile.join("swatch-board")).unwrap(),
+            worker
+        );
+        assert_eq!(
+            worker_path_from(&profile.join("deps/swatch_board-1234")).unwrap(),
+            worker
+        );
+        assert_eq!(
+            worker_path_from(
+                &profile.join("build/swatch-board/abcdef0123456789/out/swatch_board-1234")
+            )
+            .unwrap(),
+            worker
+        );
+        // Production/non-Cargo subdirectories must not walk up to parent directories.
+        assert!(worker_path_from(&profile.join("nested/swatch-board")).is_err());
+        assert!(worker_path_from(&profile.join("nested/subdir/swatch-board")).is_err());
+
+        let _ = fs::remove_dir_all(&root);
     }
 }

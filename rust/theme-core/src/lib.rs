@@ -186,6 +186,29 @@ fn parent_at(root: &File, path: &str) -> Result<(File, String), String> {
     }
     Ok((dir, ps.last().unwrap().to_string_lossy().into_owned()))
 }
+fn ensure_parent_at(
+    root: &File,
+    path: &str,
+    created_dirs: &mut Vec<(File, CString)>,
+) -> Result<(File, String), String> {
+    let ps = parts(path)?;
+    let mut dir = root.try_clone().map_err(|e| e.to_string())?;
+    for p in &ps[..ps.len() - 1] {
+        let cname = cstr(p)?;
+        let rc = unsafe { libc::mkdirat(dir.as_raw_fd(), cname.as_ptr(), 0o755) };
+        if rc == 0 {
+            let parent = dir.try_clone().map_err(|e| e.to_string())?;
+            created_dirs.push((parent, cname));
+        } else {
+            let err = io::Error::last_os_error();
+            if err.raw_os_error() != Some(libc::EEXIST) {
+                return Err(err.to_string());
+            }
+        }
+        dir = open_at(&dir, p, libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
+    }
+    Ok((dir, ps.last().unwrap().to_string_lossy().into_owned()))
+}
 fn read_at(root: &File, path: &str, limit: usize) -> Result<Vec<u8>, String> {
     let (dir, name) = parent_at(root, path).map_err(|e| format!("{path}: {e}"))?;
     let file = open_at(
@@ -619,15 +642,19 @@ pub fn export(destination: &Path, files: &[RenderedFile], overwrite: bool) -> Re
     if files.is_empty() || files.len() > MAX_OUTPUTS {
         return Err("invalid output count".into());
     }
-    let root = open_root(destination)?;
     let mut seen = BTreeSet::new();
+    for file in files {
+        if file.content.len() > OUTPUT_LIMIT || !seen.insert(&file.path) {
+            return Err("duplicate or oversized output".into());
+        }
+        parts(&file.path)?;
+    }
+    let root = open_root(destination)?;
     let mut staged: Vec<(File, String, String)> = Vec::new();
+    let mut created_dirs: Vec<(File, CString)> = Vec::new();
     let result = (|| -> Result<(), String> {
         for (i, file) in files.iter().enumerate() {
-            if file.content.len() > OUTPUT_LIMIT || !seen.insert(&file.path) {
-                return Err("duplicate or oversized output".into());
-            }
-            let (dir, name) = parent_at(&root, &file.path)?;
+            let (dir, name) = ensure_parent_at(&root, &file.path, &mut created_dirs)?;
             // Refuse symlinks and non-regular targets even when overwrite was requested.
             let cname = cstr(OsStr::new(&name))?;
             let mut st: libc::stat = unsafe { std::mem::zeroed() };
@@ -703,6 +730,13 @@ pub fn export(destination: &Path, files: &[RenderedFile], overwrite: bool) -> Re
         if let Ok(t) = cstr(OsStr::new(tmp)) {
             unsafe {
                 libc::unlinkat(dir.as_raw_fd(), t.as_ptr(), 0);
+            }
+        }
+    }
+    if result.is_err() {
+        for (parent, name) in created_dirs.iter().rev() {
+            unsafe {
+                libc::unlinkat(parent.as_raw_fd(), name.as_ptr(), libc::AT_REMOVEDIR);
             }
         }
     }
@@ -889,5 +923,97 @@ mod tests {
                 "{name}"
             );
         }
+    }
+    #[test]
+    fn export_creates_nested_directories_safely_and_rolls_back_on_error() {
+        let t = Temp::new();
+        let nested = [
+            RenderedFile {
+                path: "themes/my-theme.conf".into(),
+                content: "background = #123456\n".into(),
+            },
+            RenderedFile {
+                path: "deep/a/b/theme.json".into(),
+                content: "{}\n".into(),
+            },
+        ];
+        export(&t.0, &nested, false).unwrap();
+        assert_eq!(
+            fs::read_to_string(t.0.join("themes/my-theme.conf")).unwrap(),
+            "background = #123456\n"
+        );
+        assert_eq!(
+            fs::read_to_string(t.0.join("deep/a/b/theme.json")).unwrap(),
+            "{}\n"
+        );
+
+        // Symlinked intermediate directory must remain strictly blocked.
+        let outside = Temp::new();
+        std::os::unix::fs::symlink(&outside.0, t.0.join("linked")).unwrap();
+        assert!(
+            export(
+                &t.0,
+                &[RenderedFile {
+                    path: "linked/sub/escape.conf".into(),
+                    content: "bad".into(),
+                }],
+                true
+            )
+            .is_err()
+        );
+        assert!(!outside.0.join("sub").exists());
+
+        // Non-directory intermediate components (regular file & FIFO) must be rejected.
+        fs::write(t.0.join("regular"), "file").unwrap();
+        assert!(
+            export(
+                &t.0,
+                &[RenderedFile {
+                    path: "regular/child.conf".into(),
+                    content: "bad".into(),
+                }],
+                true
+            )
+            .is_err()
+        );
+        let fifo_path = t.0.join("pipe");
+        let cfifo = cstr(fifo_path.as_os_str()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(cfifo.as_ptr(), 0o600) }, 0);
+        assert!(
+            export(
+                &t.0,
+                &[RenderedFile {
+                    path: "pipe/child.conf".into(),
+                    content: "bad".into(),
+                }],
+                true
+            )
+            .is_err()
+        );
+
+        // Failed export rolls back newly created intermediate directories and staging files.
+        fs::write(t.0.join("existing.conf"), "keep").unwrap();
+        assert!(
+            export(
+                &t.0,
+                &[
+                    RenderedFile {
+                        path: "rollback/sub/new.conf".into(),
+                        content: "new".into(),
+                    },
+                    RenderedFile {
+                        path: "existing.conf".into(),
+                        content: "clobber".into(),
+                    },
+                ],
+                false
+            )
+            .is_err()
+        );
+        assert!(!t.0.join("rollback").exists());
+        assert_eq!(
+            fs::read_to_string(t.0.join("existing.conf")).unwrap(),
+            "keep"
+        );
     }
 }

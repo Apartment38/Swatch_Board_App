@@ -31,12 +31,31 @@ struct Project {
     dirty: bool,
 }
 
-type PreviewCache = Option<(BTreeMap<String, String>, Result<Vec<RenderedFile>, String>)>;
+impl Project {
+    fn same_content(&self, other: &Self) -> bool {
+        fn effective(
+            map: &BTreeMap<String, Assignment>,
+        ) -> impl Iterator<Item = (&String, &Assignment)> {
+            map.iter()
+                .filter(|(_, v)| !matches!(v, Assignment::Default))
+        }
+        self.version == other.version
+            && self.name == other.name
+            && self.plugin_id == other.plugin_id
+            && self.plugin_version == other.plugin_version
+            && self.palette_id == other.palette_id
+            && self.scene == other.scene
+            && effective(&self.assignments).eq(effective(&other.assignments))
+    }
+}
+
+type PreviewCache = Option<(BTreeMap<String, String>, Vec<RenderedFile>)>;
 
 pub struct ThemeEditor {
     plugins: Vec<PluginMetadata>,
     plugin: Option<Plugin>,
     project: Option<Project>,
+    saved_state: Option<Project>,
     repo: Option<ThemeRepository>,
     saved: Vec<SavedTheme>,
     undo: Vec<Project>,
@@ -57,6 +76,7 @@ impl ThemeEditor {
             plugins: Vec::new(),
             plugin: None,
             project: None,
+            saved_state: None,
             repo,
             saved: Vec::new(),
             undo: Vec::new(),
@@ -70,23 +90,53 @@ impl ThemeEditor {
             match repo.load_draft() {
                 Ok(Some(json)) => match serde_json::from_str::<Project>(&json) {
                     Ok(p) if p.version == 1 => this.project = Some(p),
-                    Ok(_) => this.error = Some("Unsupported theme draft version".into()),
-                    Err(e) => this.error = Some(format!("Cannot read theme draft: {e}")),
+                    Ok(_) => this.push_error("Unsupported theme draft version".into()),
+                    Err(e) => this.push_error(format!("Cannot read theme draft: {e}")),
                 },
                 Ok(None) => (),
-                Err(e) => this.error = Some(e.to_string()),
+                Err(e) => this.push_error(e.to_string()),
             }
         }
         this.reload();
         this.refresh();
+        if let Some(project) = &this.project {
+            if !project.id.is_empty() {
+                if let Some(record) = this.saved.iter().find(|r| r.id == project.id) {
+                    if let Ok(mut saved) = serde_json::from_str::<Project>(&record.payload) {
+                        if saved.version == 1 {
+                            saved.id = record.id.clone();
+                            saved.dirty = false;
+                            this.saved_state = Some(saved);
+                        }
+                    }
+                }
+            }
+        }
         this
     }
 
+    fn push_error(&mut self, message: String) {
+        match &mut self.error {
+            Some(existing) if !existing.is_empty() => {
+                existing.push('\n');
+                existing.push_str(&message);
+            }
+            slot => *slot = Some(message),
+        }
+    }
+    fn update_dirty(&mut self) {
+        if let Some(project) = &mut self.project {
+            project.dirty = self
+                .saved_state
+                .as_ref()
+                .is_none_or(|saved| !project.same_content(saved));
+        }
+    }
     fn refresh(&mut self) {
         if let Some(repo) = &self.repo {
             match repo.list() {
                 Ok(saved) => self.saved = saved,
-                Err(e) => self.error = Some(e.to_string()),
+                Err(e) => self.push_error(e.to_string()),
             }
         }
     }
@@ -95,23 +145,39 @@ impl ThemeEditor {
         self.plugins = plugins;
         self.preview_cache.replace(None);
         self.plugin = None;
-        if let Some(project) = &self.project {
+        let mut scene_updated = false;
+        let mut load_error = None;
+        if let Some(project) = &mut self.project {
             if let Some(meta) = self.plugins.iter().find(|p| {
                 p.manifest.id == project.plugin_id && p.manifest.version == project.plugin_version
             }) {
                 match core::load(&meta.path) {
-                    Ok(plugin) => self.plugin = Some(plugin),
-                    Err(e) => self.error = Some(e),
+                    Ok(plugin) => {
+                        if !plugin.scenes.iter().any(|s| s.id == project.scene) {
+                            if let Some(first) = plugin.scenes.first() {
+                                project.scene = first.id.clone();
+                                scene_updated = true;
+                            }
+                        }
+                        self.plugin = Some(plugin);
+                    }
+                    Err(e) => load_error = Some(e),
                 }
             } else {
-                self.error = Some(format!(
+                load_error = Some(format!(
                     "Plugin {} version {} is missing or incompatible; project retained",
                     project.plugin_id, project.plugin_version
                 ));
             }
         }
+        if scene_updated {
+            self.persist();
+        }
+        if let Some(e) = load_error {
+            self.push_error(e);
+        }
         if !errors.is_empty() {
-            self.error = Some(errors.join("\n"));
+            self.push_error(errors.join("\n"));
         }
         self.preview.clear();
     }
@@ -128,15 +194,15 @@ impl ThemeEditor {
         }
     }
     fn changed(&mut self, previous: Project) {
-        if let Some(project) = &mut self.project {
-            if *project != previous {
-                project.dirty = true;
+        if let Some(project) = &self.project {
+            if !project.same_content(&previous) {
                 if self.undo.len() == 100 {
                     self.undo.remove(0);
                 }
                 self.undo.push(previous);
                 self.redo.clear();
                 self.preview.clear();
+                self.update_dirty();
                 self.persist();
             }
         }
@@ -162,6 +228,7 @@ impl ThemeEditor {
                     assignments: BTreeMap::new(),
                     dirty: true,
                 });
+                self.saved_state = None;
                 self.preview_cache.replace(None);
                 self.plugin = Some(plugin);
                 self.selected = None;
@@ -204,8 +271,12 @@ impl ThemeEditor {
         plugin.resolve(&values)
     }
     fn save(&mut self) {
-        let (Some(repo), Some(project)) = (&mut self.repo, &mut self.project) else {
+        let Some(repo) = &mut self.repo else {
             self.error = Some("Theme storage unavailable".into());
+            return;
+        };
+        let Some(project) = &mut self.project else {
+            self.error = Some("Select a plugin first".into());
             return;
         };
         if project.name.trim().is_empty() {
@@ -233,8 +304,13 @@ impl ThemeEditor {
         };
         match repo.save(&record) {
             Ok(id) => {
-                project.id = id;
+                project.id = id.clone();
                 project.dirty = false;
+                let snapshot = project.clone();
+                for entry in self.undo.iter_mut().chain(self.redo.iter_mut()) {
+                    entry.id = id.clone();
+                }
+                self.saved_state = Some(snapshot);
                 self.error = None;
                 self.persist();
                 self.refresh();
@@ -247,6 +323,7 @@ impl ThemeEditor {
             Ok(mut p) if p.version == 1 => {
                 p.id = record.id.clone();
                 p.dirty = false;
+                self.saved_state = Some(p.clone());
                 self.project = Some(p);
                 self.undo.clear();
                 self.redo.clear();
@@ -261,7 +338,20 @@ impl ThemeEditor {
     fn assign(&mut self, role: &str, assignment: Assignment) {
         if let Some(project) = &mut self.project {
             let previous = project.clone();
-            project.assignments.insert(role.to_owned(), assignment);
+            match assignment {
+                Assignment::Default => {
+                    if matches!(
+                        project.assignments.get(role),
+                        None | Some(Assignment::Default)
+                    ) {
+                        return;
+                    }
+                    project.assignments.remove(role);
+                }
+                other => {
+                    project.assignments.insert(role.to_owned(), other);
+                }
+            }
             self.changed(previous);
         }
     }
@@ -271,17 +361,32 @@ impl ThemeEditor {
         let rendered = values.and_then(|v| {
             self.plugin.as_ref().map(|p| {
                 let mut cache = self.preview_cache.borrow_mut();
-                if cache.as_ref().is_none_or(|(key, _)| key != v) {
-                    *cache = Some((v.clone(), p.render(v)));
+                if let Some((key, files)) = cache.as_ref() {
+                    if key == v {
+                        return Ok(files.clone());
+                    }
                 }
-                cache.as_ref().unwrap().1.clone()
+                match p.render(v) {
+                    Ok(files) => {
+                        *cache = Some((v.clone(), files.clone()));
+                        Ok(files)
+                    }
+                    Err(err) => {
+                        *cache = None;
+                        Err(err)
+                    }
+                }
             })
         });
         let (palette_id, palette_name, swatches) = palette.theme_palette();
         let mut scene_error = None;
         let scene = self.plugin.as_ref().and_then(|plugin| {
             let project = self.project.as_ref()?;
-            let scene = plugin.scenes.iter().find(|s| s.id == project.scene)?;
+            let scene = plugin
+                .scenes
+                .iter()
+                .find(|s| s.id == project.scene)
+                .or_else(|| plugin.scenes.first())?;
             let elements: Vec<Value> = scene.nodes.iter().map(|node| {
                 let color = |id: Option<&String>, fallback: &str| {
                     id.and_then(|id| values.and_then(|v| v.get(id)))
@@ -375,7 +480,10 @@ impl ThemeEditor {
         };
         let op = field("op")?;
         match op {
-            "theme_reload" => self.reload(),
+            "theme_reload" => {
+                self.reload();
+                self.refresh();
+            }
             "theme_choose" | "theme_open" => {
                 let id = field("id")?;
                 if self.project.as_ref().is_some_and(|p| p.dirty)
@@ -417,7 +525,13 @@ impl ThemeEditor {
                 match op {
                     "theme_name" => project.name = field("name")?.to_owned(),
                     "theme_scene" => project.scene = field("id")?.to_owned(),
-                    _ => project.palette_id = palette.theme_palette().0.map(str::to_owned),
+                    _ => {
+                        let id = palette
+                            .theme_palette()
+                            .0
+                            .ok_or("Save the active palette before binding it to a theme")?;
+                        project.palette_id = Some(id.to_owned());
+                    }
                 }
                 self.changed(previous);
             }
@@ -451,49 +565,114 @@ impl ThemeEditor {
                     }
                     _ => {
                         let name = field("name")?;
-                        let (palette_id, _, swatches) = palette.theme_palette();
-                        if palette_id.is_none()
-                            || self.project.as_ref().and_then(|p| p.palette_id.as_deref())
-                                != palette_id
-                        {
-                            return Err(
-                                "Open the project's saved source palette before resolving links"
-                                    .into(),
-                            );
+                        if name.trim().is_empty() {
+                            let current_link =
+                                self.project
+                                    .as_ref()
+                                    .and_then(|p| match p.assignments.get(id) {
+                                        Some(Assignment::Link(linked)) => Some(linked.clone()),
+                                        _ => None,
+                                    });
+                            if let Some(linked_name) = current_link {
+                                let (palette_id, _, swatches) = palette.theme_palette();
+                                let replacement = if palette_id.is_some()
+                                    && self.project.as_ref().and_then(|p| p.palette_id.as_deref())
+                                        == palette_id
+                                {
+                                    swatches.iter().find(|(n, _)| n == &linked_name).and_then(
+                                        |(_, c)| {
+                                            let value = c.format(Format::HexRgba);
+                                            let mut input = BTreeMap::new();
+                                            input.insert(id.to_owned(), value.clone());
+                                            let resolved_link = plugin.resolve(&input).ok()?;
+                                            let resolved_default =
+                                                plugin.resolve(&BTreeMap::new()).ok()?;
+                                            if resolved_link.get(id) != resolved_default.get(id) {
+                                                Some(Assignment::Override(value))
+                                            } else {
+                                                None
+                                            }
+                                        },
+                                    )
+                                } else {
+                                    None
+                                };
+                                self.assign(id, replacement.unwrap_or(Assignment::Default));
+                            }
+                        } else {
+                            let (palette_id, _, swatches) = palette.theme_palette();
+                            if palette_id.is_none()
+                                || self.project.as_ref().and_then(|p| p.palette_id.as_deref())
+                                    != palette_id
+                            {
+                                return Err(
+                                    "Open the project's saved source palette before resolving links"
+                                        .into(),
+                                );
+                            }
+                            let Some((_, swatch_color)) = swatches.iter().find(|(n, _)| n == name)
+                            else {
+                                return Err("Unknown or unavailable palette swatch".into());
+                            };
+                            if !role.links.is_empty() && !role.links.iter().any(|n| n == name) {
+                                return Err("Unknown or unavailable palette swatch".into());
+                            }
+                            let value = swatch_color.format(Format::HexRgba);
+                            let mut input = BTreeMap::new();
+                            input.insert(id.to_owned(), value);
+                            plugin.resolve(&input)?;
+                            self.assign(id, Assignment::Link(name.to_owned()));
                         }
-                        if !swatches.iter().any(|(n, _)| n == name)
-                            || (!role.links.is_empty() && !role.links.iter().any(|n| n == name))
-                        {
-                            return Err("Unknown or unavailable palette swatch".into());
-                        }
-                        self.assign(id, Assignment::Link(name.to_owned()));
                     }
                 }
             }
             "theme_undo" | "theme_redo" => {
-                let source = if op == "theme_undo" {
-                    &mut self.undo
+                let is_undo = op == "theme_undo";
+                let has_entry = if is_undo {
+                    !self.undo.is_empty()
                 } else {
-                    &mut self.redo
+                    !self.redo.is_empty()
                 };
-                let next = source.pop().ok_or("Nothing to undo or redo")?;
+                if !has_entry {
+                    return Err("Nothing to undo or redo".into());
+                }
                 let project = self.project.as_mut().ok_or("Select a plugin first")?;
+                let mut next = if is_undo {
+                    self.undo.pop().unwrap()
+                } else {
+                    self.redo.pop().unwrap()
+                };
+                if !project.id.is_empty() {
+                    next.id = project.id.clone();
+                }
                 let old = std::mem::replace(project, next);
-                if op == "theme_undo" {
+                if is_undo {
                     self.redo.push(old);
                 } else {
                     self.undo.push(old);
                 }
+                self.update_dirty();
                 self.preview.clear();
                 self.persist();
             }
             "theme_preview" => {
                 let values = self.resolved(palette)?;
-                self.preview = self
+                let rendered = self
                     .plugin
                     .as_ref()
                     .ok_or("The selected plugin is unavailable")?
-                    .render(&values)?;
+                    .render(&values);
+                match rendered {
+                    Ok(files) => {
+                        self.preview_cache.replace(Some((values, files.clone())));
+                        self.preview = files;
+                    }
+                    Err(err) => {
+                        self.preview_cache.replace(None);
+                        self.preview.clear();
+                        return Err(err);
+                    }
+                }
             }
             "theme_export" => {
                 let directory = field("directory")?;
@@ -766,5 +945,519 @@ mod tests {
                 assert!(editor.resolved(&palette).is_err());
             },
         );
+    }
+
+    #[test]
+    fn undo_redo_after_save_preserves_id_and_tracks_dirty_state() {
+        isolated(
+            "undo_redo_after_save_preserves_id_and_tracks_dirty_state",
+            |root| {
+                install_package(root);
+                let palette = PaletteEditor::new();
+                let mut editor = ThemeEditor::new();
+                editor
+                    .command(
+                        &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                        &palette,
+                    )
+                    .unwrap();
+                editor
+                    .command(
+                        &json!({"op":"theme_assign","role":"ink","color":"#abcdef"}),
+                        &palette,
+                    )
+                    .unwrap();
+                editor
+                    .command(&json!({"op":"theme_save"}), &palette)
+                    .unwrap();
+                let saved_id = editor.project.as_ref().unwrap().id.clone();
+                assert!(!saved_id.is_empty());
+                assert!(!editor.project.as_ref().unwrap().dirty);
+                assert_eq!(editor.saved.len(), 1);
+
+                // Undo after save must keep Project.id and set dirty = true (discard guard active).
+                editor
+                    .command(&json!({"op":"theme_undo"}), &palette)
+                    .unwrap();
+                assert_eq!(editor.project.as_ref().unwrap().id, saved_id);
+                assert!(editor.project.as_ref().unwrap().dirty);
+                assert!(
+                    editor
+                        .command(
+                            &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                            &palette,
+                        )
+                        .is_err()
+                );
+
+                // Saving after undo must update the existing project rather than create a duplicate.
+                editor
+                    .command(&json!({"op":"theme_save"}), &palette)
+                    .unwrap();
+                assert_eq!(editor.project.as_ref().unwrap().id, saved_id);
+                assert!(!editor.project.as_ref().unwrap().dirty);
+                assert_eq!(editor.saved.len(), 1);
+
+                // Redo moves away from the newly saved state -> dirty = true.
+                editor
+                    .command(&json!({"op":"theme_redo"}), &palette)
+                    .unwrap();
+                assert_eq!(editor.project.as_ref().unwrap().id, saved_id);
+                assert!(editor.project.as_ref().unwrap().dirty);
+
+                // Save the redone state, then undo back to the previously saved state:
+                // dirty must be true (never stale false from the undo entry).
+                editor
+                    .command(&json!({"op":"theme_save"}), &palette)
+                    .unwrap();
+                assert!(!editor.project.as_ref().unwrap().dirty);
+                assert_eq!(editor.saved.len(), 1);
+                editor
+                    .command(&json!({"op":"theme_undo"}), &palette)
+                    .unwrap();
+                assert!(editor.project.as_ref().unwrap().dirty);
+                assert!(
+                    editor
+                        .command(
+                            &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                            &palette,
+                        )
+                        .is_err()
+                );
+
+                // Redoing back to the saved state clears dirty and allows switching without discard.
+                editor
+                    .command(&json!({"op":"theme_redo"}), &palette)
+                    .unwrap();
+                assert!(!editor.project.as_ref().unwrap().dirty);
+                editor
+                    .command(
+                        &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                        &palette,
+                    )
+                    .unwrap();
+            },
+        );
+    }
+
+    #[test]
+    fn theme_link_validates_alpha_and_supports_unlinking() {
+        isolated(
+            "theme_link_validates_alpha_and_supports_unlinking",
+            |root| {
+                install_package(root);
+                // Add an alpha-capable role to the fixture package.
+                let package = root.join("data/swatch-board/plugins/runtime-fixture");
+                fs::write(
+                    package.join("roles.json"),
+                    serde_json::to_vec_pretty(&json!([
+                        {"id":"surface", "title":"Surface", "default":"#112233", "alpha":false},
+                        {"id":"ink", "title":"Ink", "default":"#445566", "alpha":false},
+                        {"id":"tint", "title":"Tint", "default":"#44556680", "alpha":true}
+                    ]))
+                    .unwrap(),
+                )
+                .unwrap();
+
+                let mut repo = swatch_board_storage::PaletteRepository::open_default().unwrap();
+                let saved = repo
+                    .save_named(
+                        None,
+                        "Source",
+                        &[
+                            swatch_board_storage::Rgba8 {
+                                r: 0xAB,
+                                g: 0xCD,
+                                b: 0xEF,
+                                a: 0xFF,
+                            },
+                            swatch_board_storage::Rgba8 {
+                                r: 0xAB,
+                                g: 0xCD,
+                                b: 0xEF,
+                                a: 0x80,
+                            },
+                            swatch_board_storage::Rgba8 {
+                                r: 0x44,
+                                g: 0x55,
+                                b: 0x66,
+                                a: 0xFF,
+                            },
+                        ],
+                        &[false, false, false],
+                        &["Accent".into(), "Glass".into(), "DefaultInk".into()],
+                    )
+                    .unwrap();
+                let mut palette = PaletteEditor::new();
+                let mut mixer = crate::mixer::Mixer::default();
+                palette
+                    .command(&json!({"op":"palette_open","id":saved.id}), &mut mixer)
+                    .unwrap();
+
+                let mut editor = ThemeEditor::new();
+                editor
+                    .command(
+                        &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                        &palette,
+                    )
+                    .unwrap();
+
+                // Translucent swatch rejected for opaque role without corrupting assignments/preview.
+                let err = editor
+                    .command(
+                        &json!({"op":"theme_link","role":"ink","name":"Glass"}),
+                        &palette,
+                    )
+                    .unwrap_err();
+                assert!(err.contains("nonopaque"), "{err}");
+                assert!(
+                    !editor
+                        .project
+                        .as_ref()
+                        .unwrap()
+                        .assignments
+                        .contains_key("ink")
+                );
+                assert!(editor.resolved(&palette).is_ok());
+
+                // Translucent swatch accepted for alpha: true role.
+                editor
+                    .command(
+                        &json!({"op":"theme_link","role":"tint","name":"Glass"}),
+                        &palette,
+                    )
+                    .unwrap();
+                assert_eq!(editor.resolved(&palette).unwrap()["tint"], "#ABCDEF80");
+
+                // Unlinking a linked role whose value differs from default converts to Override.
+                editor
+                    .command(
+                        &json!({"op":"theme_link","role":"ink","name":"Accent"}),
+                        &palette,
+                    )
+                    .unwrap();
+                editor
+                    .command(&json!({"op":"theme_link","role":"ink","name":""}), &palette)
+                    .unwrap();
+                assert!(matches!(
+                    editor.project.as_ref().unwrap().assignments.get("ink"),
+                    Some(Assignment::Override(_))
+                ));
+                palette
+                    .command(
+                        &json!({"op":"palette_edit","index":0,"name":"Accent","color":"#102030"}),
+                        &mut mixer,
+                    )
+                    .unwrap();
+                assert_eq!(editor.resolved(&palette).unwrap()["ink"], "#ABCDEF");
+
+                // Unlinking an already non-linked role is a clean no-op.
+                editor
+                    .command(&json!({"op":"theme_save"}), &palette)
+                    .unwrap();
+                let undo_len = editor.undo.len();
+                editor
+                    .command(
+                        &json!({"op":"theme_link","role":"ink","name":"   "}),
+                        &palette,
+                    )
+                    .unwrap();
+                assert!(!editor.project.as_ref().unwrap().dirty);
+                assert_eq!(editor.undo.len(), undo_len);
+
+                // Unlinking a link whose color equals the role default removes the assignment.
+                editor
+                    .command(
+                        &json!({"op":"theme_link","role":"ink","name":"DefaultInk"}),
+                        &palette,
+                    )
+                    .unwrap();
+                editor
+                    .command(&json!({"op":"theme_link","role":"ink","name":""}), &palette)
+                    .unwrap();
+                assert!(
+                    !editor
+                        .project
+                        .as_ref()
+                        .unwrap()
+                        .assignments
+                        .contains_key("ink")
+                );
+
+                // Unlinking a broken link removes the assignment cleanly without error.
+                editor
+                    .command(
+                        &json!({"op":"theme_link","role":"ink","name":"Accent"}),
+                        &palette,
+                    )
+                    .unwrap();
+                palette
+                    .command(
+                        &json!({"op":"palette_edit","index":0,"name":"Renamed","color":"#102030"}),
+                        &mut mixer,
+                    )
+                    .unwrap();
+                assert!(editor.resolved(&palette).is_err());
+                editor
+                    .command(&json!({"op":"theme_link","role":"ink","name":""}), &palette)
+                    .unwrap();
+                assert!(
+                    !editor
+                        .project
+                        .as_ref()
+                        .unwrap()
+                        .assignments
+                        .contains_key("ink")
+                );
+                assert_eq!(editor.resolved(&palette).unwrap()["ink"], "#445566");
+            },
+        );
+    }
+
+    #[test]
+    fn theme_palette_bind_rejects_unsaved_palette() {
+        isolated("theme_palette_bind_rejects_unsaved_palette", |root| {
+            install_package(root);
+            let mut repo = swatch_board_storage::PaletteRepository::open_default().unwrap();
+            let saved = repo
+                .save_named(
+                    None,
+                    "Bound",
+                    &[swatch_board_storage::Rgba8 {
+                        r: 1,
+                        g: 2,
+                        b: 3,
+                        a: 255,
+                    }],
+                    &[false],
+                    &["Primary".into()],
+                )
+                .unwrap();
+            let mut palette = PaletteEditor::new();
+            let mut mixer = crate::mixer::Mixer::default();
+            palette
+                .command(&json!({"op":"palette_open","id":saved.id}), &mut mixer)
+                .unwrap();
+
+            let mut editor = ThemeEditor::new();
+            editor
+                .command(
+                    &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                    &palette,
+                )
+                .unwrap();
+            editor
+                .command(&json!({"op":"theme_save"}), &palette)
+                .unwrap();
+            assert_eq!(
+                editor.project.as_ref().unwrap().palette_id.as_deref(),
+                Some(saved.id.as_str())
+            );
+
+            // Switch to an unsaved palette and attempt to bind it.
+            let unsaved_palette = PaletteEditor::new();
+            assert!(unsaved_palette.theme_palette().0.is_none());
+            let err = editor
+                .command(&json!({"op":"theme_palette_bind"}), &unsaved_palette)
+                .unwrap_err();
+            assert!(err.contains("Save the active palette"), "{err}");
+            assert_eq!(
+                editor.project.as_ref().unwrap().palette_id.as_deref(),
+                Some(saved.id.as_str())
+            );
+            assert!(!editor.project.as_ref().unwrap().dirty);
+        });
+    }
+
+    #[test]
+    fn preview_cache_does_not_cache_render_errors_and_syncs_with_preview() {
+        isolated(
+            "preview_cache_does_not_cache_render_errors_and_syncs_with_preview",
+            |root| {
+                install_package(root);
+                let package = root.join("data/swatch-board/plugins/runtime-fixture");
+                fs::write(
+                    package.join("templates/example.j2"),
+                    "ink={{ roles.undefined_role }}\n",
+                )
+                .unwrap();
+
+                let palette = PaletteEditor::new();
+                let mut editor = ThemeEditor::new();
+                editor
+                    .command(
+                        &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                        &palette,
+                    )
+                    .unwrap();
+
+                let state = editor.snapshot(&palette, Format::HexRgba);
+                assert!(state["error"].is_string());
+                assert!(state["preview"].is_null());
+                assert!(editor.preview_cache.borrow().is_none());
+
+                assert!(
+                    editor
+                        .command(&json!({"op":"theme_preview"}), &palette)
+                        .is_err()
+                );
+                assert!(editor.preview_cache.borrow().is_none());
+
+                // Fix template, reload, and confirm theme_preview populates preview_cache.
+                fs::write(
+                    package.join("templates/example.j2"),
+                    "ink={{ roles.ink }}\nsurface={{ roles.surface }}\n",
+                )
+                .unwrap();
+                editor
+                    .command(&json!({"op":"theme_reload"}), &palette)
+                    .unwrap();
+                editor
+                    .command(&json!({"op":"theme_preview"}), &palette)
+                    .unwrap();
+                assert!(editor.preview_cache.borrow().is_some());
+                let ok_state = editor.snapshot(&palette, Format::HexRgba);
+                assert!(ok_state["error"].is_null());
+                assert!(
+                    ok_state["preview"][0]["content"]
+                        .as_str()
+                        .unwrap()
+                        .contains("ink=#445566")
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn theme_reload_falls_back_removed_scene_preserves_errors_and_reloads_saved_themes() {
+        isolated(
+            "theme_reload_falls_back_removed_scene_preserves_errors_and_reloads_saved_themes",
+            |root| {
+                install_package(root);
+                let palette = PaletteEditor::new();
+                let mut editor = ThemeEditor::new();
+                editor
+                    .command(
+                        &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                        &palette,
+                    )
+                    .unwrap();
+                editor
+                    .command(&json!({"op":"theme_scene","id":"drawer"}), &palette)
+                    .unwrap();
+                editor
+                    .command(&json!({"op":"theme_save"}), &palette)
+                    .unwrap();
+                assert_eq!(editor.saved.len(), 1);
+
+                // Externally add a second saved theme to storage.
+                let mut external_repo = ThemeRepository::open_default().unwrap();
+                external_repo
+                    .save(&SavedTheme {
+                        id: String::new(),
+                        name: "External Theme".into(),
+                        plugin_id: "runtime-fixture".into(),
+                        plugin_version: "1.0".into(),
+                        palette_id: None,
+                        scene: "home".into(),
+                        payload: serde_json::to_string(editor.project.as_ref().unwrap()).unwrap(),
+                        dirty: false,
+                    })
+                    .unwrap();
+
+                // Remove the active "drawer" scene from the plugin on disk.
+                let package = root.join("data/swatch-board/plugins/runtime-fixture");
+                fs::write(
+                    package.join("scenes.json"),
+                    serde_json::to_vec_pretty(&json!([
+                        {"id":"home", "title":"Home", "width":400, "height":200, "nodes":[
+                            {"id":"background", "kind":"window", "rect":[0,0,400,200], "role":"surface"}
+                        ]}
+                    ]))
+                    .unwrap(),
+                )
+                .unwrap();
+
+                editor
+                    .command(&json!({"op":"theme_reload"}), &palette)
+                    .unwrap();
+                assert_eq!(editor.project.as_ref().unwrap().scene, "home");
+                let state = editor.snapshot(&palette, Format::HexRgba);
+                assert!(!state["scene"].is_null());
+                assert_eq!(state["saved"].as_array().unwrap().len(), 2);
+
+                // Remove active plugin AND add an unrelated broken plugin; both errors must appear.
+                fs::remove_dir_all(&package).unwrap();
+                let broken = root.join("data/swatch-board/plugins/broken-plugin");
+                fs::create_dir_all(&broken).unwrap();
+                fs::write(broken.join("manifest.json"), "{invalid json").unwrap();
+
+                let err = editor
+                    .command(&json!({"op":"theme_reload"}), &palette)
+                    .unwrap_err();
+                assert!(err.contains("runtime-fixture"), "{err}");
+                assert!(err.contains("broken-plugin"), "{err}");
+            },
+        );
+    }
+
+    #[test]
+    fn theme_default_noop_and_save_error_messages() {
+        isolated("theme_default_noop_and_save_error_messages", |root| {
+            install_package(root);
+            let palette = PaletteEditor::new();
+            let mut editor = ThemeEditor::new();
+
+            // Clicking Save with no open project must not blame storage.
+            let err = editor
+                .command(&json!({"op":"theme_save"}), &palette)
+                .unwrap_err();
+            assert_eq!(err, "Select a plugin first");
+
+            editor
+                .command(
+                    &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                    &palette,
+                )
+                .unwrap();
+            editor
+                .command(&json!({"op":"theme_save"}), &palette)
+                .unwrap();
+            let saved_id = editor.project.as_ref().unwrap().id.clone();
+            editor
+                .command(&json!({"op":"theme_open","id":saved_id}), &palette)
+                .unwrap();
+            assert!(!editor.project.as_ref().unwrap().dirty);
+            assert!(editor.undo.is_empty());
+
+            // Resetting an already-default role is a true no-op.
+            editor
+                .command(&json!({"op":"theme_default","role":"ink"}), &palette)
+                .unwrap();
+            assert!(!editor.project.as_ref().unwrap().dirty);
+            assert!(editor.undo.is_empty());
+            assert!(editor.project.as_ref().unwrap().assignments.is_empty());
+
+            // Overriding then resetting removes the key instead of storing Assignment::Default.
+            editor
+                .command(
+                    &json!({"op":"theme_assign","role":"ink","color":"#abcdef"}),
+                    &palette,
+                )
+                .unwrap();
+            assert!(editor.project.as_ref().unwrap().dirty);
+            editor
+                .command(&json!({"op":"theme_default","role":"ink"}), &palette)
+                .unwrap();
+            assert!(editor.project.as_ref().unwrap().assignments.is_empty());
+            assert!(!editor.project.as_ref().unwrap().dirty);
+
+            // Missing storage still reports "Theme storage unavailable".
+            editor.repo = None;
+            let storage_err = editor
+                .command(&json!({"op":"theme_save"}), &palette)
+                .unwrap_err();
+            assert_eq!(storage_err, "Theme storage unavailable");
+        });
     }
 }
