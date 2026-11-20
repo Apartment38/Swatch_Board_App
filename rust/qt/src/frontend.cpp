@@ -384,30 +384,18 @@ public:
 protected:
   void paintEvent(QPaintEvent *e) override {
     const bool compactDrop = height() <= fontMetrics().height() + 10;
-    if (compactDrop) {
-      if (dragHover) {
-        QPainter p(this);
-        p.setRenderHint(QPainter::Antialiasing, true);
-        QColor fill = palette().color(QPalette::Highlight);
-        fill.setAlpha(24);
-        p.setBrush(fill);
-        p.setPen(Qt::NoPen);
-        p.drawRoundedRect(QRectF(rect()).adjusted(6.0, 2.0, -6.0, -2.0), 3.0,
-                          3.0);
-      }
-      QLabel::paintEvent(e);
-      return;
-    }
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
-    const QRectF zone = QRectF(rect()).adjusted(6.5, 6.5, -6.5, -6.5);
-    const qreal radius = 5.0;
+    const QRectF zone = compactDrop
+                            ? QRectF(rect()).adjusted(6.5, 2.5, -6.5, -2.5)
+                            : QRectF(rect()).adjusted(6.5, 6.5, -6.5, -6.5);
+    const qreal radius = compactDrop ? 3.5 : 5.0;
     QColor fill = dragHover ? palette().color(QPalette::Highlight)
                             : palette().color(QPalette::WindowText);
     fill.setAlpha(dragHover ? 24 : 8);
     QColor border = dragHover ? palette().color(QPalette::Highlight)
                               : palette().color(QPalette::Mid);
-    border.setAlpha(dragHover ? 215 : 165);
+    border.setAlpha(dragHover ? 215 : (compactDrop ? 145 : 165));
     p.setBrush(fill);
     p.setPen(QPen(border, 1.0, Qt::DashLine));
     p.drawRoundedRect(zone, radius, radius);
@@ -716,6 +704,7 @@ class Frontend : public QWidget {
   QSettings settings;
   QTabWidget *tabs = nullptr;
   QPointer<QToolBar> mainToolbar;
+  QList<QPointer<QToolButton>> navButtons;
   QLabel *status = nullptr, *connectionStatus = nullptr;
   StatusDot *connectionDot = nullptr;
   QAction *pickAction = nullptr;
@@ -723,7 +712,7 @@ class Frontend : public QWidget {
   QVBoxLayout *root;
   QVBoxLayout *historyLayout = nullptr;
   QWidget *historyPanel = nullptr, *historyBox = nullptr;
-  QPointer<QLabel> historyEmptyHint;
+  QPointer<QLabel> historyEmptyPrimary, historyEmptyHint;
   QScrollArea *historyScroll = nullptr;
   QSplitter *splitter = nullptr, *verticalSplitter = nullptr;
   QWidget *pinnedScroll = nullptr, *pinnedCurrent = nullptr;
@@ -820,6 +809,52 @@ class Frontend : public QWidget {
       return QStringLiteral("1 swatch in palette");
     return QStringLiteral("%1 swatches in palette").arg(count);
   }
+  void updateNavButtonStyles() {
+    if (!mainToolbar || navButtons.isEmpty())
+      return;
+    const QColor hi = mainToolbar->palette().color(QPalette::Highlight);
+    const auto rgba = [](const QColor &c, int alpha) {
+      return QStringLiteral("rgba(%1, %2, %3, %4)")
+          .arg(c.red())
+          .arg(c.green())
+          .arg(c.blue())
+          .arg(alpha);
+    };
+    const QString css = QStringLiteral(
+                            "QToolButton {"
+                            "  background-color: transparent;"
+                            "  border: 1px solid transparent;"
+                            "  border-radius: 3px;"
+                            "  padding: 3px 6px;"
+                            "}"
+                            "QToolButton:hover {"
+                            "  background-color: %1;"
+                            "  border: 1px solid %2;"
+                            "}"
+                            "QToolButton:checked {"
+                            "  background-color: %3;"
+                            "  border: 1px solid %4;"
+                            "}"
+                            "QToolButton:checked:hover {"
+                            "  background-color: %5;"
+                            "  border: 1px solid %6;"
+                            "}")
+                            .arg(rgba(hi, 24), rgba(hi, 115), rgba(hi, 46),
+                                 rgba(hi, 191), rgba(hi, 64), rgba(hi, 215));
+    for (const auto &btn : navButtons)
+      if (btn)
+        btn->setStyleSheet(css);
+  }
+  void updateHistoryEmptyState(int panelW) {
+    if (historyEmptyPrimary)
+      historyEmptyPrimary->setText(panelW < 105
+                                       ? QStringLiteral("No history")
+                                       : QStringLiteral("No history yet"));
+    if (historyEmptyHint)
+      historyEmptyHint->setVisible(panelW >= 115);
+    if (historyBox)
+      historyBox->updateGeometry();
+  }
   void clearToolbarFocus() {
     auto *focused = QApplication::focusWidget();
     if (!focused || (mainToolbar && mainToolbar->isAncestorOf(focused))) {
@@ -829,6 +864,7 @@ class Frontend : public QWidget {
         focused->clearFocus();
     }
   }
+  static constexpr int compactHistoryWidth = 92;
   bool compactShelf = false;
   int normalPaletteShelfHeight = 76;
   bool compactHistory = false;
@@ -838,9 +874,10 @@ class Frontend : public QWidget {
       return;
     const bool narrow = width() < 680;
     if (narrow && !compactHistory)
-      normalHistoryWidth = qMax(82, splitter->sizes().value(0, 124));
+      normalHistoryWidth =
+          qMax(compactHistoryWidth, splitter->sizes().value(0, 124));
     if (narrow != compactHistory) {
-      const int target = narrow ? 82 : normalHistoryWidth;
+      const int target = narrow ? compactHistoryWidth : normalHistoryWidth;
       splitter->setSizes({target, qMax(1, splitter->width() - target)});
       compactHistory = narrow;
     }
@@ -1117,35 +1154,52 @@ class Frontend : public QWidget {
       };
       auto nav = new QActionGroup(toolbar);
       nav->setExclusive(true);
+      navButtons.clear();
       QList<QAction *> pages;
       struct NavEntry {
         QString label;
         QStringList icons;
         QStyle::StandardPixmap fallback;
+        Qt::Key key;
       };
       for (const auto &entry : QList<NavEntry>{
                {"Mixer",
                 {"color-gradient-symbolic", "color-gradient"},
-                QStyle::SP_ComputerIcon},
+                QStyle::SP_ComputerIcon,
+                Qt::Key_1},
                {"Palette",
                 {"color-fill-symbolic", "color-fill"},
-                QStyle::SP_DirIcon},
+                QStyle::SP_DirIcon,
+                Qt::Key_2},
                {"Theme",
                 {"preferences-desktop-theme-global-symbolic",
                  "preferences-desktop-theme-global",
                  "preferences-desktop-theme"},
-                QStyle::SP_DesktopIcon}}) {
+                QStyle::SP_DesktopIcon,
+                Qt::Key_3}}) {
+        int index = pages.size();
+        const QKeySequence shortcutSeq(Qt::CTRL | entry.key);
         auto action = toolbar->addAction(
             themedIcon(entry.icons, entry.fallback), entry.label);
         action->setCheckable(true);
+        action->setToolTip(entry.label + " (" +
+                           shortcutSeq.toString(QKeySequence::NativeText) + ")");
         nav->addAction(action);
-        int index = pages.size();
         connect(action, &QAction::triggered, this, [this, index] {
           tabs->setCurrentIndex(index);
           clearToolbarFocus();
         });
+        auto *navShortcut = new QShortcut(shortcutSeq, this);
+        connect(navShortcut, &QShortcut::activated, this, [this, index] {
+          if (tabs)
+            tabs->setCurrentIndex(index);
+        });
+        if (auto *btn =
+                qobject_cast<QToolButton *>(toolbar->widgetForAction(action)))
+          navButtons.append(btn);
         pages.append(action);
       }
+      updateNavButtonStyles();
       toolbar->addSeparator();
       auto pick = addAction("Pick color",
                             {"color-picker-symbolic", "color-picker"},
@@ -1196,8 +1250,6 @@ class Frontend : public QWidget {
           QStyle::SP_FileDialogDetailedView,
           [this] { send({{"op", "configure"}}); });
       settingsAction->setToolTip("Open Swatch Board settings");
-      for (auto *btn : toolbar->findChildren<QToolButton *>())
-        btn->setFocusPolicy(Qt::TabFocus);
       layout->addWidget(toolbar);
       layout->addWidget(new Hairline(outer));
       splitter = new QSplitter(Qt::Horizontal, outer);
@@ -1395,6 +1447,7 @@ class Frontend : public QWidget {
       clearToolbarFocus();
     }
     if (first || previous.value("history") != state.value("history")) {
+      historyEmptyPrimary = nullptr;
       historyEmptyHint = nullptr;
       while (auto item = historyLayout->takeAt(0)) {
         if (item->widget())
@@ -1428,18 +1481,21 @@ class Frontend : public QWidget {
         }
         auto primary = new QLabel("No history yet", historyBox);
         primary->setWordWrap(true);
-        primary->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
-        primary->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
+        primary->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+        primary->setMinimumWidth(0);
+        primary->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
         QPalette primaryPal = primary->palette();
         const QColor primaryMuted = mutedColor(primaryPal, 145);
         primaryPal.setColor(QPalette::WindowText, primaryMuted);
         primaryPal.setColor(QPalette::Text, primaryMuted);
         primary->setPalette(primaryPal);
+        historyEmptyPrimary = primary;
         historyLayout->addWidget(primary);
         auto hint = new QLabel("Use Pick color to capture", historyBox);
         hint->setWordWrap(true);
-        hint->setAlignment(Qt::AlignHCenter | Qt::AlignVCenter);
-        hint->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
+        hint->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+        hint->setMinimumWidth(0);
+        hint->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
         QFont hintFont = hint->font();
         if (hintFont.pointSizeF() > 0)
           hintFont.setPointSizeF(qMax(8.0, hintFont.pointSizeF() - 1.0));
@@ -1451,13 +1507,14 @@ class Frontend : public QWidget {
         hintPal.setColor(QPalette::WindowText, hintMuted);
         hintPal.setColor(QPalette::Text, hintMuted);
         hint->setPalette(hintPal);
-        const int panelW = historyPanel->width() > 0
-                               ? historyPanel->width()
-                               : (compactHistory ? 82 : normalHistoryWidth);
-        hint->setVisible(panelW >= 115);
         historyEmptyHint = hint;
         historyLayout->addWidget(hint);
         historyLayout->addStretch(1);
+        const int panelW = historyPanel->width() > 0
+                               ? historyPanel->width()
+                               : (compactHistory ? compactHistoryWidth
+                                                 : normalHistoryWidth);
+        updateHistoryEmptyState(panelW);
       } else {
         historyLayout->setContentsMargins(6, 6, 6, 6);
         historyLayout->setSpacing(4);
@@ -1760,6 +1817,12 @@ class Frontend : public QWidget {
   void renderHistory();
 
 protected:
+  void changeEvent(QEvent *event) override {
+    QWidget::changeEvent(event);
+    if (event->type() == QEvent::PaletteChange ||
+        event->type() == QEvent::StyleChange)
+      updateNavButtonStyles();
+  }
   void resizeEvent(QResizeEvent *event) override {
     QWidget::resizeEvent(event);
     sizeHistorySidebar();
@@ -1769,11 +1832,8 @@ protected:
   }
   bool eventFilter(QObject *watched, QEvent *event) override {
     if (event->type() == QEvent::Resize) {
-      if (watched == historyPanel && historyEmptyHint) {
-        historyEmptyHint->setVisible(historyPanel->width() >= 115);
-        if (historyBox)
-          historyBox->updateGeometry();
-      }
+      if (watched == historyPanel)
+        updateHistoryEmptyState(historyPanel->width());
       auto page = qobject_cast<QWidget *>(watched);
       if (page && page->objectName() == "mixerPage")
         layoutMixerActions(page);
