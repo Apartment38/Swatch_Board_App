@@ -153,7 +153,6 @@ impl PaletteEditor {
         self.error = None;
     }
     fn open_palette(&mut self, palette: &SavedPalette, mixer: &mut Mixer, saved: bool) {
-        let previous = self.draft.clone();
         let name = if palette.name.trim().is_empty() {
             let existing = self.draft.name.trim();
             if !existing.is_empty() && existing.chars().count() <= 256 {
@@ -172,14 +171,20 @@ impl PaletteEditor {
         while names.len() < colors.len() {
             names.push(Self::fresh_name(&names));
         }
-        self.draft = Draft {
+        let mut candidate = Draft {
             name,
             colors,
             locked,
             names,
             id: saved.then(|| palette.id.clone()),
-            lineage: self.next_lineage(),
+            lineage: self.draft.lineage,
         };
+        if candidate.same_content(&self.draft) {
+            return;
+        }
+        let previous = self.draft.clone();
+        candidate.lineage = self.next_lineage();
+        self.draft = candidate;
         self.commit(previous, mixer);
     }
     pub fn snapshot(&self) -> Value {
@@ -915,5 +920,59 @@ mod tests {
             vec![Color::new(10, 20, 30, 255), Color::new(40, 50, 60, 255)]
         );
         assert!(p.generations.is_empty());
+    }
+
+    #[test]
+    fn noop_open_palette_preserves_lineage_so_save_undo_save_does_not_duplicate() {
+        let db = TempDb::new();
+        let mut p = db.editor();
+        let mut m = Mixer::default();
+
+        let request = json!({
+            "op": "palette_generate",
+            "mode": "triadic",
+            "count": 3,
+            "seed": "42",
+            "base": "#3388CCFF",
+            "hue_min": 0.0,
+            "hue_max": 360.0,
+            "lightness_min": 0.0,
+            "lightness_max": 1.0,
+            "chroma_min": 0.0,
+            "chroma_max": 0.4,
+            "contrast": null
+        });
+        p.command(&request, &mut m).unwrap();
+        let gen_id = p.generations[0].id.clone();
+
+        p.command(&json!({"op": "palette_name", "name": "Ocean"}), &mut m)
+            .unwrap();
+        let lineage_before = p.draft.lineage;
+        let undo_before = p.undo.len();
+        let redo_before = p.redo.len();
+
+        // Reloading the identical generation is a content no-op and must not fork lineage.
+        p.command(&json!({"op": "palette_generation", "id": gen_id}), &mut m)
+            .unwrap();
+        assert_eq!(p.draft.lineage, lineage_before);
+        assert_eq!(p.undo.len(), undo_before);
+        assert_eq!(p.redo.len(), redo_before);
+
+        p.command(&json!({"op": "palette_save"}), &mut m).unwrap();
+        assert_eq!(p.saved.len(), 1);
+        let saved_id = p.saved[0].id.clone();
+
+        // Reopening the already-open saved palette is also a strict no-op.
+        let lineage_saved = p.draft.lineage;
+        p.command(&json!({"op": "palette_open", "id": saved_id}), &mut m)
+            .unwrap();
+        assert_eq!(p.draft.lineage, lineage_saved);
+
+        p.command(&json!({"op": "palette_undo"}), &mut m).unwrap();
+        assert_eq!(p.draft.id.as_deref(), Some(saved_id.as_str()));
+
+        p.command(&json!({"op": "palette_save"}), &mut m).unwrap();
+        assert_eq!(p.saved.len(), 1);
+        assert_eq!(p.saved[0].id, saved_id);
     }
 }

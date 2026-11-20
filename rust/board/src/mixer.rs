@@ -25,6 +25,7 @@ pub struct Mixer {
     palette: Vec<Color>,
     undo: Vec<State>,
     redo: Vec<State>,
+    drag_origin: Option<State>,
     error: Option<String>,
 }
 
@@ -44,6 +45,7 @@ impl Default for Mixer {
             palette: Vec::new(),
             undo: Vec::new(),
             redo: Vec::new(),
+            drag_origin: None,
             error: None,
         }
     }
@@ -68,7 +70,13 @@ impl Mixer {
             self.redo.clear();
         }
     }
+    fn flush_drag(&mut self) {
+        if let Some(origin) = self.drag_origin.take() {
+            self.commit(origin);
+        }
+    }
     pub fn select(&mut self, color: Color) {
+        self.flush_drag();
         let previous = self.state.clone();
         let mut channels = hsv(color);
         if channels[1] == 0.0 {
@@ -122,10 +130,22 @@ impl Mixer {
                 let h = number(r, "h", 360.0)? as f32 / 360.0;
                 let s = number(r, "s", 100.0)? as f32 / 100.0;
                 let v = number(r, "v", 100.0)? as f32 / 100.0;
-                let previous = self.state.clone();
+                let is_final = r.get("final").and_then(Value::as_bool).unwrap_or(true);
+                if !is_final {
+                    if self.drag_origin.is_none() {
+                        self.drag_origin = Some(self.state.clone());
+                    }
+                    self.state.hsv = [h, s, v];
+                    self.state.current = from_hsv([h, s, v], self.current().a);
+                    return Ok(());
+                }
+                let origin = self
+                    .drag_origin
+                    .take()
+                    .unwrap_or_else(|| self.state.clone());
                 self.state.hsv = [h, s, v];
                 self.state.current = from_hsv([h, s, v], self.current().a);
-                self.commit(previous);
+                self.commit(origin);
             }
             "mixer_rgba" => {
                 let channel = |name| {
@@ -136,6 +156,7 @@ impl Mixer {
                         .ok_or_else(|| format!("Invalid {name}"))
                 };
                 let c = Color::new(channel("r")?, channel("g")?, channel("b")?, channel("a")?);
+                self.flush_drag();
                 let previous = self.state.clone();
                 if (c.r, c.g, c.b) != (self.current().r, self.current().g, self.current().b) {
                     let mut channels = hsv(c);
@@ -148,16 +169,19 @@ impl Mixer {
                 self.commit(previous);
             }
             "mixer_undo" => {
+                self.flush_drag();
                 if let Some(s) = self.undo.pop() {
                     self.redo.push(std::mem::replace(&mut self.state, s));
                 }
             }
             "mixer_redo" => {
+                self.flush_drag();
                 if let Some(s) = self.redo.pop() {
                     self.undo.push(std::mem::replace(&mut self.state, s));
                 }
             }
             "mixer_source_add" => {
+                self.flush_drag();
                 let p = self.state.clone();
                 self.state.sources.push((self.current(), 1.0));
                 let result = self.blend();
@@ -169,6 +193,7 @@ impl Mixer {
                 if self.state.sources.len() <= 2 {
                     return Err("At least two sources are required.".into());
                 }
+                self.flush_drag();
                 let p = self.state.clone();
                 self.state.sources.remove(i);
                 let result = self.blend();
@@ -182,6 +207,7 @@ impl Mixer {
                 if self.state.sources[i] == (c, w) {
                     return Ok(());
                 }
+                self.flush_drag();
                 let p = self.state.clone();
                 self.state.sources[i] = (c, w);
                 let result = self.blend();
@@ -194,6 +220,10 @@ impl Mixer {
                     "oklch" => MixingSpace::Oklch,
                     _ => return Err("Invalid mixing space".into()),
                 };
+                if self.state.space == space {
+                    return Ok(());
+                }
+                self.flush_drag();
                 let p = self.state.clone();
                 self.state.space = space;
                 let result = self.blend();
@@ -201,6 +231,7 @@ impl Mixer {
                 result?;
             }
             "mixer_mix" => {
+                self.flush_drag();
                 let p = self.state.clone();
                 self.blend()?;
                 self.commit(p);
@@ -399,5 +430,179 @@ mod tests {
             );
             assert_eq!(hsv_snap[1].as_f64().unwrap(), 0.0);
         }
+    }
+
+    #[test]
+    fn unchanged_mixer_space_is_noop_including_with_zero_weights() {
+        let mut m = Mixer::default();
+        let first = Color::new(12, 34, 56, 255);
+        let second = Color::new(78, 90, 123, 255);
+        m.select(first);
+        m.select(second);
+        m.command(&json!({"op": "mixer_undo"})).unwrap();
+        assert_eq!(m.current(), first);
+        let undo_len = m.undo.len();
+        let redo_len = m.redo.len();
+        assert!(redo_len > 0);
+
+        // Normal unchanged space is a strict no-op.
+        m.command(&json!({"op": "mixer_space", "space": "srgb"}))
+            .unwrap();
+        assert_eq!(m.current(), first);
+        assert_eq!(m.undo.len(), undo_len);
+        assert_eq!(m.redo.len(), redo_len);
+
+        // Zero-weight unchanged space is also a strict no-op and does not fail on zero-sum weights.
+        m.command(&json!({
+            "op": "mixer_source",
+            "index": 0,
+            "color": "#FF0000FF",
+            "weight": 0.0,
+        }))
+        .unwrap();
+        assert!(
+            m.command(&json!({
+                "op": "mixer_source",
+                "index": 1,
+                "color": "#0000FFFF",
+                "weight": 0.0,
+            }))
+            .is_err()
+        );
+        m.select(first);
+        m.select(second);
+        m.command(&json!({"op": "mixer_undo"})).unwrap();
+        let zero_undo_len = m.undo.len();
+        let zero_redo_len = m.redo.len();
+        m.command(&json!({"op": "mixer_space", "space": "srgb"}))
+            .unwrap();
+        assert_eq!(m.current(), first);
+        assert_eq!(m.undo.len(), zero_undo_len);
+        assert_eq!(m.redo.len(), zero_redo_len);
+
+        // Changing space with zero weights still fails to blend.
+        assert!(
+            m.command(&json!({"op": "mixer_space", "space": "oklch"}))
+                .is_err()
+        );
+        // Repeating the now-current space ("oklch") is again a no-op.
+        let oklch_undo_len = m.undo.len();
+        m.command(&json!({"op": "mixer_space", "space": "oklch"}))
+            .unwrap();
+        assert_eq!(m.undo.len(), oklch_undo_len);
+    }
+
+    #[test]
+    fn mixer_hsv_continuous_drag_coalesces_into_single_undo_entry() {
+        let mut m = Mixer::default();
+        let initial = m.current();
+        let prior_1 = Color::new(10, 20, 30, 255);
+        let prior_2 = Color::new(40, 50, 60, 255);
+        let redo_color = Color::new(70, 80, 90, 255);
+        m.select(prior_1);
+        m.select(prior_2);
+        m.select(redo_color);
+        m.command(&json!({"op": "mixer_undo"})).unwrap();
+        assert_eq!(m.current(), prior_2);
+        let undo_before = m.undo.len();
+        let redo_before = m.redo.len();
+        assert_eq!(undo_before, 2);
+        assert_eq!(redo_before, 1);
+
+        // 150 intermediate drag steps must not push undo entries or clear redo.
+        for step in 0..150 {
+            let h = (step as f64) * 2.0;
+            m.command(&json!({
+                "op": "mixer_hsv",
+                "h": h,
+                "s": 80.0,
+                "v": 90.0,
+                "final": false,
+            }))
+            .unwrap();
+        }
+        assert_eq!(m.undo.len(), undo_before);
+        assert_eq!(m.redo.len(), redo_before);
+        assert_ne!(m.current(), prior_2);
+
+        // Final release pushes exactly 1 undo entry and clears redo.
+        m.command(&json!({
+            "op": "mixer_hsv",
+            "h": 120.0,
+            "s": 100.0,
+            "v": 100.0,
+            "final": true,
+        }))
+        .unwrap();
+        assert_eq!(m.current(), Color::new(0, 255, 0, 255));
+        assert_eq!(m.undo.len(), undo_before + 1);
+        assert!(m.redo.is_empty());
+
+        // Single undo restores pre-drag color and prior undo history remains intact.
+        m.command(&json!({"op": "mixer_undo"})).unwrap();
+        assert_eq!(m.current(), prior_2);
+        m.command(&json!({"op": "mixer_undo"})).unwrap();
+        assert_eq!(m.current(), prior_1);
+        m.command(&json!({"op": "mixer_undo"})).unwrap();
+        assert_eq!(m.current(), initial);
+    }
+
+    #[test]
+    fn mixer_hsv_drag_flushes_cleanly_on_interrupting_commands() {
+        // Interrupt with mixer_undo
+        let mut m = Mixer::default();
+        let pre_drag = Color::new(200, 10, 10, 255);
+        m.select(pre_drag);
+        m.command(&json!({
+            "op": "mixer_hsv",
+            "h": 240.0,
+            "s": 100.0,
+            "v": 100.0,
+            "final": false,
+        }))
+        .unwrap();
+        assert_eq!(m.current(), Color::new(0, 0, 255, 255));
+        m.command(&json!({"op": "mixer_undo"})).unwrap();
+        assert_eq!(m.current(), pre_drag);
+        assert!(m.drag_origin.is_none());
+        m.command(&json!({"op": "mixer_redo"})).unwrap();
+        assert_eq!(m.current(), Color::new(0, 0, 255, 255));
+
+        // Interrupt with mixer_redo clears stale redo after committing drag
+        m.command(&json!({"op": "mixer_undo"})).unwrap();
+        assert_eq!(m.redo.len(), 1);
+        m.command(&json!({
+            "op": "mixer_hsv",
+            "h": 60.0,
+            "s": 100.0,
+            "v": 100.0,
+            "final": false,
+        }))
+        .unwrap();
+        let dragged = m.current();
+        m.command(&json!({"op": "mixer_redo"})).unwrap();
+        assert_eq!(m.current(), dragged);
+        assert!(m.redo.is_empty());
+        assert!(m.drag_origin.is_none());
+
+        // Interrupt with another mutating command preserves both pre-drag and dragged states
+        let before_second_drag = m.current();
+        m.command(&json!({
+            "op": "mixer_hsv",
+            "h": 180.0,
+            "s": 100.0,
+            "v": 100.0,
+            "final": false,
+        }))
+        .unwrap();
+        let cyan = m.current();
+        m.command(&json!({"op": "mixer_rgba", "r": 12, "g": 34, "b": 56, "a": 255}))
+            .unwrap();
+        assert_eq!(m.current(), Color::new(12, 34, 56, 255));
+        assert!(m.drag_origin.is_none());
+        m.command(&json!({"op": "mixer_undo"})).unwrap();
+        assert_eq!(m.current(), cyan);
+        m.command(&json!({"op": "mixer_undo"})).unwrap();
+        assert_eq!(m.current(), before_second_drag);
     }
 }

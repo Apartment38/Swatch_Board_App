@@ -79,7 +79,7 @@ impl ThemeRepository {
         )?;
         tx.execute("DELETE FROM theme_assignments WHERE project_id = ?1", [&id])?;
         tx.execute(
-            "INSERT INTO theme_assignments (project_id, role_id, assignment_json)
+            "INSERT OR REPLACE INTO theme_assignments (project_id, role_id, assignment_json)
              SELECT ?1, key,
                CASE type
                  WHEN 'null' THEN 'null'
@@ -354,5 +354,31 @@ mod tests {
             .unwrap(),
             0
         );
+    }
+
+    #[test]
+    fn duplicate_assignment_keys_in_json_keep_last_value() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut repo = ThemeRepository::open(dir.path().join("dup_keys.db")).unwrap();
+        let mut project = SavedTheme {
+            id: String::new(),
+            name: "Duplicate keys".into(),
+            plugin_id: "fixture".into(),
+            plugin_version: "1".into(),
+            palette_id: None,
+            scene: "main".into(),
+            payload: r##"{"assignments":{"bg":"#111111","bg":"#222222"}}"##.into(),
+            dirty: false,
+        };
+        project.id = repo.save(&project).unwrap();
+        let indexed: String = repo
+            .connection
+            .query_row(
+                "SELECT assignment_json FROM theme_assignments WHERE project_id=?1 AND role_id='bg'",
+                [&project.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(indexed, r##""#222222""##);
     }
 }

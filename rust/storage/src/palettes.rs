@@ -45,23 +45,24 @@ impl PaletteRepository {
         let mut rows = statement.query([])?;
         let mut palettes = Vec::new();
         while let Some(row) = rows.next()? {
-            let id: String = row.get(0)?;
-            let name: String = row.get(1)?;
-            let (colors, locked) = read_colors(&self.connection, false, &id)?;
-            let swatch_names = read_swatch_names(&self.connection, &id)?;
-            if !(1..=64).contains(&colors.len())
-                || colors.len() != locked.len()
-                || colors.len() != swatch_names.len()
+            let id: String = row.get(0).map_err(decode_malformed)?;
+            let name: String = row.get(1).map_err(decode_malformed)?;
+            let stored = read_colors(&self.connection, false, &id)?;
+            let (swatch_positions, swatch_names) = read_swatch_names(&self.connection, &id)?;
+            if !(1..=64).contains(&stored.colors.len())
+                || stored.colors.len() != stored.locked.len()
+                || stored.positions != swatch_positions
             {
                 return Err(Error::Malformed(format!(
-                    "palette {id} has invalid color, lock, or swatch name count"
+                    "palette {id} has invalid color, lock, or swatch name positions"
                 )));
             }
+            validate_loaded_swatch_names(&id, &swatch_names)?;
             palettes.push(SavedPalette {
                 id,
                 name,
-                colors,
-                locked,
+                colors: stored.colors,
+                locked: stored.locked,
                 swatch_names,
             });
         }
@@ -76,7 +77,7 @@ impl PaletteRepository {
         locked: &[bool],
     ) -> Result<SavedPalette, Error> {
         let mut names = match id {
-            Some(id) => read_swatch_names(&self.connection, id)?,
+            Some(id) => read_swatch_names(&self.connection, id)?.1,
             None => Vec::new(),
         };
         names.truncate(colors.len());
@@ -175,23 +176,27 @@ impl PaletteRepository {
         let mut rows = statement.query([])?;
         let mut records = Vec::new();
         while let Some(row) = rows.next()? {
-            let id: String = row.get(0)?;
-            let description: String = row.get(1)?;
-            let (colors, locked) = read_colors(&self.connection, true, &id)?;
-            if !(1..=64).contains(&colors.len()) || colors.len() != locked.len() {
+            let id: String = row.get(0).map_err(decode_malformed)?;
+            let description: String = row.get(1).map_err(decode_malformed)?;
+            let stored = read_colors(&self.connection, true, &id)?;
+            if !(1..=64).contains(&stored.colors.len())
+                || stored.colors.len() != stored.locked.len()
+            {
                 return Err(Error::Malformed(format!(
                     "generation {id} has invalid color or lock count"
                 )));
             }
-            let swatch_names = (1..=colors.len()).map(|i| format!("Swatch {i}")).collect();
+            let swatch_names = (1..=stored.colors.len())
+                .map(|i| format!("Swatch {i}"))
+                .collect();
             records.push(GenerationRecord {
                 id,
                 description,
                 palette: SavedPalette {
                     id: String::new(),
                     name: String::new(),
-                    colors,
-                    locked,
+                    colors: stored.colors,
+                    locked: stored.locked,
                     swatch_names,
                 },
             });
@@ -257,37 +262,68 @@ fn insert_colors(
     Ok(())
 }
 
-fn read_swatch_names(connection: &Connection, id: &str) -> Result<Vec<String>, Error> {
-    let mut statement = connection
-        .prepare("SELECT name FROM palette_swatches WHERE palette_id = ?1 ORDER BY position")?;
-    let rows = statement.query_map([id], |row| row.get(0))?;
-    Ok(rows.collect::<Result<Vec<_>, _>>()?)
+fn decode_malformed(error: rusqlite::Error) -> Error {
+    Error::Malformed(error.to_string())
 }
 
-fn read_colors(
-    connection: &Connection,
-    generation: bool,
-    id: &str,
-) -> Result<(Vec<Rgba8>, Vec<bool>), Error> {
+fn validate_loaded_swatch_names(id: &str, swatch_names: &[String]) -> Result<(), Error> {
+    let mut unique_names = std::collections::HashSet::new();
+    if swatch_names.iter().any(|name| {
+        name.trim().is_empty() || name.chars().count() > 256 || !unique_names.insert(name)
+    }) {
+        return Err(Error::Malformed(format!(
+            "palette {id} has invalid or duplicate swatch names"
+        )));
+    }
+    Ok(())
+}
+
+fn read_swatch_names(connection: &Connection, id: &str) -> Result<(Vec<i64>, Vec<String>), Error> {
+    let mut statement = connection.prepare(
+        "SELECT position, name FROM palette_swatches WHERE palette_id = ?1 ORDER BY position",
+    )?;
+    let mut rows = statement.query([id])?;
+    let mut positions = Vec::new();
+    let mut names = Vec::new();
+    while let Some(row) = rows.next()? {
+        positions.push(row.get(0).map_err(decode_malformed)?);
+        names.push(row.get(1).map_err(decode_malformed)?);
+    }
+    Ok((positions, names))
+}
+
+struct StoredColors {
+    positions: Vec<i64>,
+    colors: Vec<Rgba8>,
+    locked: Vec<bool>,
+}
+
+fn read_colors(connection: &Connection, generation: bool, id: &str) -> Result<StoredColors, Error> {
     let sql = if generation {
-        "SELECT red, green, blue, alpha, locked FROM generation_colors WHERE generation_id = ?1 ORDER BY position"
+        "SELECT position, red, green, blue, alpha, locked FROM generation_colors WHERE generation_id = ?1 ORDER BY position"
     } else {
-        "SELECT red, green, blue, alpha, locked FROM palette_colors WHERE palette_id = ?1 ORDER BY position"
+        "SELECT position, red, green, blue, alpha, locked FROM palette_colors WHERE palette_id = ?1 ORDER BY position"
     };
     let mut statement = connection.prepare_cached(sql)?;
     let mut rows = statement.query([id])?;
+    let mut positions = Vec::new();
     let mut colors = Vec::new();
     let mut locked = Vec::new();
     while let Some(row) = rows.next()? {
+        positions.push(row.get(0).map_err(decode_malformed)?);
         colors.push(Rgba8 {
-            r: row.get(0)?,
-            g: row.get(1)?,
-            b: row.get(2)?,
-            a: row.get(3)?,
+            r: row.get(1).map_err(decode_malformed)?,
+            g: row.get(2).map_err(decode_malformed)?,
+            b: row.get(3).map_err(decode_malformed)?,
+            a: row.get(4).map_err(decode_malformed)?,
         });
-        locked.push(row.get(4)?);
+        locked.push(row.get(5).map_err(decode_malformed)?);
     }
-    Ok((colors, locked))
+    Ok(StoredColors {
+        positions,
+        colors,
+        locked,
+    })
 }
 
 #[cfg(test)]
@@ -430,5 +466,128 @@ mod tests {
                 .unwrap();
         }
         assert!(matches!(repo.list(), Err(Error::Malformed(_))));
+    }
+
+    #[test]
+    fn list_and_generations_reject_corrupt_types_mismatched_positions_and_invalid_swatch_names() {
+        // 1. REAL red channel in palette_colors -> Error::Malformed
+        {
+            let dir = tempfile::tempdir().unwrap();
+            let mut repo = PaletteRepository::open(dir.path().join("real_red.db")).unwrap();
+            let saved = repo.save(None, "Palette", &[color(1)], &[false]).unwrap();
+            repo.connection
+                .execute(
+                    "UPDATE palette_colors SET red = 1.5 WHERE palette_id = ?1 AND position = 0",
+                    [&saved.id],
+                )
+                .unwrap();
+            assert!(matches!(repo.list(), Err(Error::Malformed(_))));
+        }
+
+        // 2. REAL red channel and BLOB description in generations -> Error::Malformed
+        {
+            let dir = tempfile::tempdir().unwrap();
+            let mut repo = PaletteRepository::open(dir.path().join("gen_corrupt.db")).unwrap();
+            repo.record_generation("desc", &[color(1)], &[false])
+                .unwrap();
+            let gen_id = repo.generations().unwrap()[0].id.clone();
+            repo.connection
+                .execute(
+                    "UPDATE generation_colors SET red = 2.5 WHERE generation_id = ?1 AND position = 0",
+                    [&gen_id],
+                )
+                .unwrap();
+            assert!(matches!(repo.generations(), Err(Error::Malformed(_))));
+
+            repo.connection
+                .execute(
+                    "UPDATE generation_colors SET red = 2 WHERE generation_id = ?1 AND position = 0",
+                    [&gen_id],
+                )
+                .unwrap();
+            repo.connection
+                .execute(
+                    "UPDATE palette_generations SET description = X'deadbeef' WHERE id = ?1",
+                    [&gen_id],
+                )
+                .unwrap();
+            assert!(matches!(repo.generations(), Err(Error::Malformed(_))));
+        }
+
+        // 3. BLOB swatch name -> Error::Malformed
+        {
+            let dir = tempfile::tempdir().unwrap();
+            let mut repo = PaletteRepository::open(dir.path().join("blob_swatch.db")).unwrap();
+            let saved = repo.save(None, "Palette", &[color(1)], &[false]).unwrap();
+            repo.connection
+                .execute(
+                    "UPDATE palette_swatches SET name = X'6162' WHERE palette_id = ?1 AND position = 0",
+                    [&saved.id],
+                )
+                .unwrap();
+            assert!(matches!(repo.list(), Err(Error::Malformed(_))));
+        }
+
+        // 4. Mismatched palette_swatches positions ([0, 1] vs [1, 99]) -> Error::Malformed
+        {
+            let dir = tempfile::tempdir().unwrap();
+            let mut repo = PaletteRepository::open(dir.path().join("mismatch_pos.db")).unwrap();
+            let saved = repo
+                .save(None, "Two", &[color(1), color(2)], &[false, true])
+                .unwrap();
+            repo.connection
+                .pragma_update(None, "foreign_keys", "OFF")
+                .unwrap();
+            repo.connection
+                .execute(
+                    "UPDATE palette_swatches SET position = 99 WHERE palette_id = ?1 AND position = 0",
+                    [&saved.id],
+                )
+                .unwrap();
+            repo.connection
+                .pragma_update(None, "foreign_keys", "ON")
+                .unwrap();
+            assert!(matches!(repo.list(), Err(Error::Malformed(_))));
+        }
+
+        // 5. Blank, overly long, or duplicate swatch names -> Error::Malformed
+        {
+            let dir = tempfile::tempdir().unwrap();
+            let mut repo = PaletteRepository::open(dir.path().join("bad_names.db")).unwrap();
+            let saved = repo
+                .save(None, "Names", &[color(1), color(2)], &[false, false])
+                .unwrap();
+            repo.connection
+                .execute(
+                    "UPDATE palette_swatches SET name = '   ' WHERE palette_id = ?1 AND position = 0",
+                    [&saved.id],
+                )
+                .unwrap();
+            assert!(matches!(repo.list(), Err(Error::Malformed(_))));
+
+            let too_long = "a".repeat(257);
+            repo.connection
+                .execute(
+                    "UPDATE palette_swatches SET name = ?2 WHERE palette_id = ?1 AND position = 0",
+                    params![&saved.id, &too_long],
+                )
+                .unwrap();
+            assert!(matches!(repo.list(), Err(Error::Malformed(_))));
+
+            // Rebuild palette_swatches without UNIQUE(palette_id, name) to simulate corrupt duplicates.
+            repo.connection
+                .execute_batch(
+                    "DROP TABLE palette_swatches;
+                     CREATE TABLE palette_swatches (palette_id TEXT NOT NULL, position INTEGER NOT NULL, name TEXT NOT NULL);",
+                )
+                .unwrap();
+            repo.connection
+                .execute(
+                    "INSERT INTO palette_swatches (palette_id, position, name) VALUES (?1, 0, 'Dup'), (?1, 1, 'Dup')",
+                    [&saved.id],
+                )
+                .unwrap();
+            assert!(matches!(repo.list(), Err(Error::Malformed(_))));
+        }
     }
 }
