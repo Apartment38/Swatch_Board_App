@@ -375,6 +375,36 @@ mod tests {
     use std::process::Command as ProcessCommand;
     use std::time::Instant;
 
+    fn find_board_binary(exe: &std::path::Path) -> Option<PathBuf> {
+        exe.ancestors()
+            .skip(1)
+            .map(|dir| dir.join("swatch-board"))
+            .find(|candidate| candidate.is_file() && candidate.as_path() != exe)
+    }
+
+    #[test]
+    fn finds_board_binary_across_cargo_layouts() {
+        let root =
+            std::env::temp_dir().join(format!("swatch-board-binary-lookup-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let profile = root.join("target/debug");
+        let board = profile.join("swatch-board");
+        let deps_exe = profile.join("deps/swatch_board-abc123");
+        let build_out_exe = profile.join("build/swatch-board/abc123/out/swatch_board-abc123");
+        let build_out_same_name = profile.join("build/swatch-board/def456/out/swatch-board");
+
+        for file in [&board, &deps_exe, &build_out_exe, &build_out_same_name] {
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, b"").unwrap();
+        }
+
+        assert_eq!(find_board_binary(&deps_exe), Some(board.clone()));
+        assert_eq!(find_board_binary(&build_out_exe), Some(board.clone()));
+        assert_eq!(find_board_binary(&build_out_same_name), Some(board));
+
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     // A separate bus makes the name-ownership and activation test independent of
     // any Board or tray running in the user's session.
     #[test]
@@ -415,17 +445,8 @@ mod tests {
 
         let (commands, events) = start(false).expect("start the first Board worker");
         // Normal binary is built before tests so the theme worker is also present.
-        let board = std::env::current_exe()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("swatch-board");
-        assert!(
-            board.is_file(),
-            "build the workspace before running this test"
-        );
+        let exe = std::env::current_exe().unwrap();
+        let board = find_board_binary(&exe).expect("build the workspace before running this test");
         for (args, palette) in [(&["--palette"][..], true), (&[][..], false)] {
             let mut child = ProcessCommand::new(&board)
                 .args(args)

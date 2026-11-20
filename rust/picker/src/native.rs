@@ -1,29 +1,34 @@
 //! Prompt-free selection provided by the matching Swatch Board KWin effect.
 use zbus::{Connection, Error, Proxy};
 
+const PICKER_SERVICE: &str = "org.apartment38.SwatchBoard.Picker1";
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum Outcome {
     Selected(u32),
     Cancelled,
 }
 
-pub async fn pick(zoom: u32) -> zbus::Result<Outcome> {
-    use tokio::signal::unix::{SignalKind, signal};
+async fn acquire_picker_lock(connection: &Connection) -> zbus::Result<()> {
     use zbus::fdo::{RequestNameFlags, RequestNameReply};
 
-    let connection = Connection::session().await?;
-    if connection
-        .request_name_with_flags(
-            "org.apartment38.SwatchBoard.Picker1",
-            RequestNameFlags::DoNotQueue.into(),
-        )
-        .await?
-        != RequestNameReply::PrimaryOwner
+    match connection
+        .request_name_with_flags(PICKER_SERVICE, RequestNameFlags::DoNotQueue.into())
+        .await
     {
-        return Err(Error::Failure(
+        Ok(RequestNameReply::PrimaryOwner) => Ok(()),
+        Ok(_) | Err(Error::NameTaken) => Err(Error::Failure(
             "A Swatch Board pick is already in progress".into(),
-        ));
+        )),
+        Err(error) => Err(error),
     }
+}
+
+pub async fn pick(zoom: u32) -> zbus::Result<Outcome> {
+    use tokio::signal::unix::{SignalKind, signal};
+
+    let connection = Connection::session().await?;
+    acquire_picker_lock(&connection).await?;
     let mut terminate = signal(SignalKind::terminate()).map_err(Error::from)?;
     let mut interrupt = signal(SignalKind::interrupt()).map_err(Error::from)?;
     load_effect(&connection).await?;
@@ -155,5 +160,52 @@ mod tests {
             matches!(request(Err(false)).await, Err(Error::MethodError(name, _, _))
             if name.as_str() == "org.apartment38.SwatchBoard.Picker.Error.Failed")
         );
+    }
+
+    #[test]
+    fn concurrent_pick_reports_in_progress_message() {
+        const CHILD: &str = "SWATCH_PICKER_LOCK_TEST_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new("dbus-run-session")
+                .arg("--")
+                .arg(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "native::tests::concurrent_pick_reports_in_progress_message",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .output()
+                .expect("dbus-run-session is required for the picker lock test");
+            assert!(
+                output.status.success(),
+                "child failed:\n{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let first = Connection::session().await.unwrap();
+            acquire_picker_lock(&first).await.unwrap();
+
+            let second = Connection::session().await.unwrap();
+            let err = acquire_picker_lock(&second)
+                .await
+                .expect_err("second concurrent picker must be rejected");
+            match err {
+                Error::Failure(message) => {
+                    assert_eq!(message, "A Swatch Board pick is already in progress");
+                }
+                other => panic!("expected Error::Failure, got {other:?}"),
+            }
+
+            drop(first);
+        });
     }
 }

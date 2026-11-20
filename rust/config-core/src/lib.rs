@@ -10,6 +10,12 @@ use std::{
 use swatch_board_color::Format;
 
 const VERSION: u32 = 1;
+/// TOML integers and SQLite `LIMIT` values are signed 64-bit integers.
+pub const MAX_HISTORY_LIMIT: usize = if usize::BITS >= 64 {
+    i64::MAX as usize
+} else {
+    usize::MAX
+};
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -91,8 +97,10 @@ impl Config {
                 self.version
             ));
         }
-        if self.history_limit == 0 {
-            return Err("history_limit must be greater than zero".into());
+        if !(1..=MAX_HISTORY_LIMIT).contains(&self.history_limit) {
+            return Err(format!(
+                "history_limit must be between 1 and {MAX_HISTORY_LIMIT}"
+            ));
         }
         if !(1..=10_000).contains(&self.history_display_limit) {
             return Err("history_display_limit must be between 1 and 10000".into());
@@ -304,5 +312,96 @@ mod tests {
             assert!(Config::parse(&format!("{text}unknown_setting = 1\n")).is_err());
         }
         assert!(Config::parse("version = 2\nmagnifier_radius = 7").is_err());
+    }
+
+    #[test]
+    fn history_limit_boundaries_and_save_load_round_trip() {
+        const CHILD: &str = "SWATCH_CONFIG_CORE_HISTORY_LIMIT_TEST";
+        if env::var_os(CHILD).is_none() {
+            let root =
+                env::temp_dir().join(format!("swatch-config-core-limit-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&root);
+            fs::create_dir_all(&root).unwrap();
+            let output = std::process::Command::new(env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "tests::history_limit_boundaries_and_save_load_round_trip",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .env("XDG_CONFIG_HOME", &root)
+                .output()
+                .expect("run isolated config-core save/load test");
+            let _ = fs::remove_dir_all(&root);
+            assert!(
+                output.status.success(),
+                "child failed:\n{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+
+        let config_path = config_home().unwrap().join("swatch-board/config.toml");
+
+        let zero = Config {
+            history_limit: 0,
+            ..Config::default()
+        };
+        assert!(zero.validate().is_err());
+        assert!(zero.save().is_err());
+        assert!(!config_path.exists());
+
+        if let Some(above_max) = MAX_HISTORY_LIMIT.checked_add(1) {
+            let over = Config {
+                history_limit: above_max,
+                ..Config::default()
+            };
+            assert!(over.validate().is_err());
+            assert!(over.save().is_err());
+            assert!(
+                !config_path.exists(),
+                "save must reject history_limit > MAX_HISTORY_LIMIT before writing config.toml"
+            );
+
+            let max_u64 = Config {
+                history_limit: usize::MAX,
+                ..Config::default()
+            };
+            assert!(max_u64.validate().is_err());
+            assert!(max_u64.save().is_err());
+            assert!(
+                !config_path.exists(),
+                "save must reject usize::MAX before writing config.toml"
+            );
+        }
+
+        let at_max = Config {
+            history_limit: MAX_HISTORY_LIMIT,
+            ..Config::default()
+        };
+        assert!(at_max.validate().is_ok());
+        at_max.save().unwrap();
+        assert_eq!(Config::load().unwrap(), at_max);
+
+        // Rejecting an invalid save must not overwrite a valid config.toml on disk.
+        let before = fs::read_to_string(&config_path).unwrap();
+        if let Some(above_max) = MAX_HISTORY_LIMIT.checked_add(1) {
+            let over = Config {
+                history_limit: above_max,
+                ..Config::default()
+            };
+            assert!(over.save().is_err());
+            assert_eq!(fs::read_to_string(&config_path).unwrap(), before);
+            assert_eq!(Config::load().unwrap(), at_max);
+        }
+
+        assert_eq!(
+            Config::parse(&format!("history_limit = {MAX_HISTORY_LIMIT}\n"))
+                .unwrap()
+                .history_limit,
+            MAX_HISTORY_LIMIT
+        );
+        assert!(Config::parse("history_limit = 9223372036854775808\n").is_err());
     }
 }

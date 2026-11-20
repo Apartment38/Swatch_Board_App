@@ -1,9 +1,10 @@
 use serde_json::{Value, json};
 use std::{
+    num::IntErrorKind,
     sync::mpsc::{self, Receiver, Sender},
     time::{Duration, Instant},
 };
-use swatch_board_config_core::Config;
+use swatch_board_config_core::{Config, MAX_HISTORY_LIMIT};
 use swatch_board_ipc::SwatchBoardProxyBlocking;
 
 enum Reply {
@@ -25,6 +26,29 @@ struct Settings {
     next_status: Instant,
     tx: Sender<Reply>,
     rx: Receiver<Reply>,
+}
+
+fn parse_history_limit(value: &Value) -> Result<usize, String> {
+    let range_error = || format!("Stored history limit must be between 1 and {MAX_HISTORY_LIMIT}.");
+    let whole_number_error =
+        || format!("Enter a valid whole number between 1 and {MAX_HISTORY_LIMIT}.");
+    if let Some(text) = value.as_str() {
+        match text.parse::<usize>() {
+            Ok(limit) if (1..=MAX_HISTORY_LIMIT).contains(&limit) => Ok(limit),
+            Ok(_) => Err(range_error()),
+            Err(error) if *error.kind() == IntErrorKind::PosOverflow => Err(range_error()),
+            Err(_) => Err(whole_number_error()),
+        }
+    } else if let Some(limit) = value.as_u64() {
+        usize::try_from(limit)
+            .ok()
+            .filter(|limit| (1..=MAX_HISTORY_LIMIT).contains(limit))
+            .ok_or_else(range_error)
+    } else if value.as_i64().is_some() {
+        Err(range_error())
+    } else {
+        Err(whole_number_error())
+    }
 }
 
 fn call(
@@ -125,18 +149,12 @@ impl Settings {
                 self.validation_field = None;
                 self.message_detail.clear();
                 let mut value = request["config"].clone();
-                if let Some(text) = value["history_limit"].as_str() {
-                    match text.parse::<usize>() {
-                        Ok(limit) if limit > 0 => value["history_limit"] = json!(limit),
-                        Ok(_) => {
+                if let Some(raw_limit) = value.get("history_limit") {
+                    match parse_history_limit(raw_limit) {
+                        Ok(limit) => value["history_limit"] = json!(limit),
+                        Err(message) => {
                             self.validation_field = Some("history_limit".into());
-                            self.message = "Stored history limit must be greater than zero.".into();
-                            return self.snapshot();
-                        }
-                        Err(_) => {
-                            self.validation_field = Some("history_limit".into());
-                            self.message =
-                                "Enter a valid whole number for the stored history limit.".into();
+                            self.message = message;
                             return self.snapshot();
                         }
                     }
@@ -252,22 +270,42 @@ mod tests {
 
         let mut settings = Settings::new();
         settings.request(json!({"op": "init"}));
+        let range_message =
+            format!("Stored history limit must be between 1 and {MAX_HISTORY_LIMIT}.");
+        let whole_number_message =
+            format!("Enter a valid whole number between 1 and {MAX_HISTORY_LIMIT}.");
         let mut draft = settings.snapshot()["config"].clone();
         draft["history_limit"] = json!("0");
         let invalid = settings.request(json!({"op": "save", "config": draft}));
         assert_eq!(invalid["validation_field"], "history_limit");
-        assert_eq!(
-            invalid["message"],
-            "Stored history limit must be greater than zero."
-        );
+        assert_eq!(invalid["message"], range_message);
         assert_eq!(settings.config.history_limit, 100);
+        draft["history_limit"] = json!("abc");
+        let non_numeric = settings.request(json!({"op": "save", "config": draft}));
+        assert_eq!(non_numeric["validation_field"], "history_limit");
+        assert_eq!(non_numeric["message"], whole_number_message);
+        draft["history_limit"] = json!((MAX_HISTORY_LIMIT as u128 + 1).to_string());
+        let above_max = settings.request(json!({"op": "save", "config": draft}));
+        assert_eq!(above_max["validation_field"], "history_limit");
+        assert_eq!(above_max["message"], range_message);
+        assert_eq!(Config::load().unwrap().history_limit, 100);
+        draft["history_limit"] = json!(u64::MAX.to_string());
+        let max_u64 = settings.request(json!({"op": "save", "config": draft}));
+        assert_eq!(max_u64["validation_field"], "history_limit");
+        assert_eq!(max_u64["message"], range_message);
         draft["history_limit"] = json!("99999999999999999999");
         let overflow = settings.request(json!({"op": "save", "config": draft}));
         assert_eq!(overflow["validation_field"], "history_limit");
-        assert_eq!(
-            overflow["message"],
-            "Enter a valid whole number for the stored history limit."
-        );
+        assert_eq!(overflow["message"], range_message);
+        draft["history_limit"] = json!(MAX_HISTORY_LIMIT.to_string());
+        let at_max = settings.request(json!({"op": "save", "config": draft}));
+        assert!(at_max["validation_field"].is_null());
+        assert_eq!(Config::load().unwrap().history_limit, MAX_HISTORY_LIMIT);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while settings.busy && Instant::now() < deadline {
+            settings.request(json!({"op": "poll"}));
+            thread::sleep(Duration::from_millis(20));
+        }
         draft["history_limit"] = json!("101");
         let valid = settings.request(json!({"op": "save", "config": draft}));
         assert!(valid["validation_field"].is_null());
@@ -292,5 +330,23 @@ mod tests {
             .unwrap();
         await_status(&mut settings, "Global shortcuts ready");
         assert_eq!(settings.shortcut_status, "Global shortcuts ready");
+    }
+
+    #[test]
+    fn validates_history_limit_values() {
+        assert_eq!(parse_history_limit(&json!("1")), Ok(1));
+        assert_eq!(
+            parse_history_limit(&json!(MAX_HISTORY_LIMIT.to_string())),
+            Ok(MAX_HISTORY_LIMIT)
+        );
+        assert_eq!(parse_history_limit(&json!(42)), Ok(42));
+        assert!(parse_history_limit(&json!("0")).is_err());
+        assert!(parse_history_limit(&json!(0)).is_err());
+        assert!(parse_history_limit(&json!(-5)).is_err());
+        assert!(parse_history_limit(&json!((MAX_HISTORY_LIMIT as u128 + 1).to_string())).is_err());
+        assert!(parse_history_limit(&json!(u64::MAX)).is_err());
+        assert!(parse_history_limit(&json!(u64::MAX.to_string())).is_err());
+        assert!(parse_history_limit(&json!("99999999999999999999")).is_err());
+        assert!(parse_history_limit(&json!("not-a-number")).is_err());
     }
 }
