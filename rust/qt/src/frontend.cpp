@@ -141,6 +141,31 @@ protected:
   }
 };
 
+class InlineBanner : public QWidget {
+  QColor tintColor;
+  int fillAlpha;
+  int borderAlpha;
+
+public:
+  InlineBanner(const QColor &tint, int fillA = 24, int borderA = 145,
+               QWidget *parent = nullptr)
+      : QWidget(parent), tintColor(tint), fillAlpha(fillA),
+        borderAlpha(borderA) {}
+
+protected:
+  void paintEvent(QPaintEvent *) override {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    QColor fill = tintColor;
+    fill.setAlpha(fillAlpha);
+    QColor border = tintColor;
+    border.setAlpha(borderAlpha);
+    p.setBrush(fill);
+    p.setPen(QPen(border, 1.0));
+    p.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 4.0, 4.0);
+  }
+};
+
 class NavToolButton : public QToolButton {
   bool pointerHovered = false;
 
@@ -1638,6 +1663,9 @@ class Frontend : public QWidget {
   QVBoxLayout *boardContent = nullptr;
   QPushButton *configSave = nullptr, *configRebind = nullptr;
   QLabel *configStatus = nullptr, *shortcutStatus = nullptr, *limitError = nullptr;
+  QWidget *limitErrorBox = nullptr, *configStatusBox = nullptr,
+          *shortcutStatusBox = nullptr;
+  StatusDot *shortcutDot = nullptr;
   QLineEdit *configLimit = nullptr;
   QScrollArea *configScroll = nullptr;
   QList<QPushButton *> historyButtons;
@@ -4003,7 +4031,7 @@ public:
                                    : "Swatch Board History");
     setObjectName("swatch_" + m);
     root = new QVBoxLayout(this);
-    if (m == "board") {
+    if (m == "board" || m == "config" || m == "history") {
       root->setContentsMargins(0, 0, 0, 0);
       root->setSpacing(0);
     }
@@ -4011,7 +4039,7 @@ public:
       setWindowFlags(Qt::Popup);
       setAttribute(Qt::WA_NoMouseReplay);
     } else {
-      resize(900, 700);
+      resize(m == "config" ? QSize(580, 560) : QSize(900, 700));
       restoreGeometry(settings.value(m + "/geometry").toByteArray());
     }
     auto initial = request({{"op", "init"}});
@@ -5439,69 +5467,228 @@ QWidget *Frontend::themePage(Scene *reuse) {
 }
 
 void Frontend::renderConfig() {
+  auto updateShortcutDot = [this](const QString &statusText) {
+    if (!shortcutDot)
+      return;
+    if (statusText.contains("ready", Qt::CaseInsensitive))
+      shortcutDot->setColor(QColor(0x27, 0xAE, 0x60));
+    else if (statusText.contains("Checking", Qt::CaseInsensitive))
+      shortcutDot->setColor(QColor(0xF6, 0x74, 0x00));
+    else
+      shortcutDot->setColor(palette().color(QPalette::Mid));
+  };
   if (configSave) {
     configSave->setEnabled(state.value("load_error").isNull() &&
                            !state.value("busy").toBool());
     configRebind->setEnabled(!state.value("busy").toBool());
-    configStatus->setText(str(state, "validation_field").isEmpty() ? message() : QString());
-    configStatus->setVisible(!configStatus->text().isEmpty());
+    const QString statusMsg =
+        str(state, "validation_field").isEmpty() ? message() : QString();
+    configStatus->setText(statusMsg);
     configStatus->setToolTip(str(state, "message_detail"));
     configStatus->setAccessibleDescription(str(state, "message_detail"));
-    shortcutStatus->setText(str(state, "shortcut_status"));
+    if (configStatusBox)
+      configStatusBox->setVisible(!statusMsg.isEmpty());
+    const QString scStatus = str(state, "shortcut_status");
+    shortcutStatus->setText(scStatus);
     shortcutStatus->setToolTip(str(state, "shortcut_status_detail"));
-    shortcutStatus->setAccessibleDescription(str(state, "shortcut_status_detail"));
+    shortcutStatus->setAccessibleDescription(
+        str(state, "shortcut_status_detail"));
+    if (shortcutDot)
+      shortcutDot->setToolTip(str(state, "shortcut_status_detail"));
+    updateShortcutDot(scStatus);
+    if (shortcutStatusBox)
+      shortcutStatusBox->setVisible(!scStatus.isEmpty());
     limitError->setText(str(state, "message"));
-    limitError->setVisible(str(state, "validation_field") == "history_limit");
-    shortcutStatus->setVisible(!shortcutStatus->text().isEmpty());
+    if (limitErrorBox)
+      limitErrorBox->setVisible(str(state, "validation_field") ==
+                                "history_limit");
     return;
   }
   if (!configInitialized && state.value("config").isObject()) {
     configDraft = state.value("config").toObject();
     configInitialized = true;
   }
+
+  auto configRoot = new QWidget;
+  auto rootLayout = new QVBoxLayout(configRoot);
+  rootLayout->setContentsMargins(0, 0, 0, 0);
+  rootLayout->setSpacing(0);
+
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
-  auto f = new QFormLayout;
-  f->setRowWrapPolicy(QFormLayout::WrapLongRows);
-  f->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
+  l->setContentsMargins(16, 10, 16, 10);
+  l->setSpacing(9);
+
+  const QFontMetrics fm = w->fontMetrics();
+  int labelW = 0;
+  for (const auto &text : {QStringLiteral("Stored history limit:"),
+                           QStringLiteral("Displayed history limit:"),
+                           QStringLiteral("Popup grid:"),
+                           QStringLiteral("Picker zoom:"),
+                           QStringLiteral("Clipboard format:"),
+                           QStringLiteral("Pick shortcut:"),
+                           QStringLiteral("History shortcut:")})
+    labelW = qMax(labelW, fm.horizontalAdvance(text));
+  labelW += 6;
+
+  auto applyMuted = [](QLabel *label, int alpha = 155) {
+    QPalette pal = label->palette();
+    const QColor muted = mutedColor(pal, alpha);
+    pal.setColor(QPalette::WindowText, muted);
+    pal.setColor(QPalette::Text, muted);
+    label->setPalette(pal);
+  };
+  auto makeLabelSpacer = [labelW](QWidget *parent) {
+    auto *spacer = new QWidget(parent);
+    spacer->setFixedSize(labelW, 1);
+    spacer->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    return spacer;
+  };
+  auto makeSectionHeading = [w](const QString &title) {
+    auto *heading = new QLabel(title, w);
+    QFont hf = heading->font();
+    hf.setWeight(QFont::Bold);
+    if (hf.pointSizeF() > 0)
+      hf.setPointSizeF(hf.pointSizeF() + 1.0);
+    else if (hf.pixelSize() > 0)
+      hf.setPixelSize(hf.pixelSize() + 1);
+    heading->setFont(hf);
+    return heading;
+  };
+  auto addFormRow = [w, labelW, makeLabelSpacer](
+                        QVBoxLayout *section, const QString &labelText,
+                        QWidget *field, QWidget *buddy = nullptr,
+                        bool stretchField = false) {
+    auto *row = new QHBoxLayout;
+    row->setContentsMargins(0, 0, 0, 0);
+    row->setSpacing(10);
+    if (!labelText.isEmpty()) {
+      auto *lbl = new QLabel(labelText, w);
+      lbl->setFixedWidth(labelW);
+      lbl->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+      lbl->setBuddy(buddy ? buddy : field);
+      row->addWidget(lbl, 0, Qt::AlignVCenter);
+    } else {
+      row->addWidget(makeLabelSpacer(w), 0, Qt::AlignVCenter);
+    }
+    if (stretchField) {
+      row->addWidget(field, 1);
+    } else {
+      row->addWidget(field, 0, Qt::AlignLeft | Qt::AlignVCenter);
+      row->addStretch(1);
+    }
+    section->addLayout(row);
+  };
+
+  const int uniformSpinW = qMax(100, fm.horizontalAdvance("10000") + 44);
+  const int compactSpinW = qMax(62, fm.horizontalAdvance("12") + 38);
+
+  // Section 1: History
+  auto historySection = new QVBoxLayout;
+  historySection->setContentsMargins(0, 0, 0, 0);
+  historySection->setSpacing(6);
+  historySection->addWidget(makeSectionHeading("History"));
+
   auto limit =
       line("Stored history limit", str(configDraft, "history_limit"), w);
-  limit->setMaximumWidth(limit->fontMetrics().horizontalAdvance(QString(20, QLatin1Char('0'))) + 24);
+  limit->setFixedWidth(140);
   limit->setValidator(new QRegularExpressionValidator(
       QRegularExpression("[0-9]{1,20}"), limit));
   configLimit = limit;
-  f->addRow("Stored history limit", limit);
-  limitError = new QLabel("Stored history limit must be greater than zero.", w);
-  limitError->setWordWrap(true);
-  limitError->setStyleSheet("color: palette(link);");
-  limitError->setVisible(false);
-  f->addRow(QString(), limitError);
   connect(limit, &QLineEdit::textChanged, this,
           [this](const QString &v) { configDraft["history_limit"] = v; });
-  auto number = [&](const char *key, const QString &label, int min, int max) {
-    auto s = spin(label, configDraft.value(key).toInt(), min, max, w);
-    s->setMaximumWidth(s->sizeHint().width());
-    f->addRow(label, s);
-    connect(s, &QSpinBox::valueChanged, this,
-            [this, key](int v) { configDraft[key] = v; });
-  };
-  number("history_display_limit", "Displayed history limit", 1, 10000);
-  number("history_columns", "History columns", 1, 12);
-  number("history_rows", "History rows", 1, 12);
-  number("picker_zoom", "Picker zoom", 1, 32);
-  auto check = [&](const char *key, const QString &label) {
-    auto c = new QCheckBox(label, w);
-    c->setChecked(configDraft.value(key).toBool());
-    f->addRow(c);
-    connect(c, &QCheckBox::toggled, this,
-            [this, key](bool v) { configDraft[key] = v; });
-  };
-  check("auto_copy", "Automatically copy picked colors");
-  check("hide_board_while_picking", "Hide board while picking");
-  check("autostart", "Start automatically");
+  addFormRow(historySection, "Stored history limit:", limit);
+
+  limitErrorBox = new QWidget(w);
+  auto limitErrorRow = new QHBoxLayout(limitErrorBox);
+  limitErrorRow->setContentsMargins(0, 0, 0, 0);
+  limitErrorRow->setSpacing(10);
+  limitErrorRow->addWidget(makeLabelSpacer(limitErrorBox), 0, Qt::AlignVCenter);
+  auto limitBanner = new InlineBanner(QColor(218, 68, 83), 24, 145, limitErrorBox);
+  auto bannerLayout = new QHBoxLayout(limitBanner);
+  bannerLayout->setContentsMargins(8, 5, 8, 5);
+  bannerLayout->setSpacing(8);
+  auto errIconLabel = new QLabel(limitBanner);
+  QIcon errIcon = themedIcon(
+      {"dialog-error", "dialog-error-symbolic", "data-error"},
+      QStyle::SP_MessageBoxCritical);
+  errIconLabel->setPixmap(errIcon.pixmap(QSize(16, 16), devicePixelRatioF()));
+  errIconLabel->setFixedSize(16, 16);
+  errIconLabel->setAlignment(Qt::AlignCenter);
+  bannerLayout->addWidget(errIconLabel, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  const QString initialLimitMsg =
+      str(state, "validation_field") == "history_limit"
+          ? str(state, "message")
+          : QStringLiteral("Stored history limit must be greater than zero.");
+  limitError = new QLabel(initialLimitMsg, limitBanner);
+  limitError->setWordWrap(true);
+  limitError->setTextFormat(Qt::PlainText);
+  if (palette().color(QPalette::Window).lightness() >= 128) {
+    QPalette errPal = limitError->palette();
+    errPal.setColor(QPalette::WindowText, QColor(0xA6, 0x1D, 0x2B));
+    errPal.setColor(QPalette::Text, QColor(0xA6, 0x1D, 0x2B));
+    limitError->setPalette(errPal);
+  }
+  bannerLayout->addWidget(limitError, 1);
+  limitErrorRow->addWidget(limitBanner, 1);
+  limitErrorBox->setVisible(str(state, "validation_field") == "history_limit");
+  historySection->addWidget(limitErrorBox);
+
+  auto displayLimit =
+      spin("Displayed history limit",
+           configDraft.value("history_display_limit").toInt(), 1, 10000, w);
+  displayLimit->setFixedWidth(uniformSpinW);
+  connect(displayLimit, &QSpinBox::valueChanged, this, [this](int v) {
+    configDraft["history_display_limit"] = v;
+  });
+  addFormRow(historySection, "Displayed history limit:", displayLimit);
+
+  auto gridRow = new QWidget(w);
+  auto gridLayout = new QHBoxLayout(gridRow);
+  gridLayout->setContentsMargins(0, 0, 0, 0);
+  gridLayout->setSpacing(6);
+  auto cols = spin("History columns",
+                   configDraft.value("history_columns").toInt(), 1, 12, gridRow);
+  cols->setFixedWidth(compactSpinW);
+  connect(cols, &QSpinBox::valueChanged, this,
+          [this](int v) { configDraft["history_columns"] = v; });
+  auto timesLabel = new QLabel(QString::fromUtf8("\u00D7"), gridRow);
+  applyMuted(timesLabel, 160);
+  auto rows = spin("History rows", configDraft.value("history_rows").toInt(), 1,
+                   12, gridRow);
+  rows->setFixedWidth(compactSpinW);
+  connect(rows, &QSpinBox::valueChanged, this,
+          [this](int v) { configDraft["history_rows"] = v; });
+  auto gridHint =
+      new QLabel(QString::fromUtf8("(columns \u00D7 rows)"), gridRow);
+  applyMuted(gridHint, 145);
+  gridLayout->addWidget(cols);
+  gridLayout->addWidget(timesLabel);
+  gridLayout->addWidget(rows);
+  gridLayout->addWidget(gridHint);
+  addFormRow(historySection, "Popup grid:", gridRow, cols);
+
+  l->addLayout(historySection);
+  l->addWidget(new Hairline(w));
+
+  // Section 2: Picker & Clipboard
+  auto pickerSection = new QVBoxLayout;
+  pickerSection->setContentsMargins(0, 0, 0, 0);
+  pickerSection->setSpacing(6);
+  pickerSection->addWidget(makeSectionHeading("Picker & Clipboard"));
+
+  auto zoom = spin("Picker zoom", configDraft.value("picker_zoom").toInt(), 1,
+                   32, w);
+  zoom->setSuffix(QString::fromUtf8("\u00D7"));
+  zoom->setFixedWidth(uniformSpinW);
+  connect(zoom, &QSpinBox::valueChanged, this,
+          [this](int v) { configDraft["picker_zoom"] = v; });
+  addFormRow(pickerSection, "Picker zoom:", zoom);
+
   auto format = new QComboBox(w);
   format->setAccessibleName("Clipboard format");
   format->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+  format->setMinimumWidth(140);
   for (auto value : {"hex", "hex-rgba", "rgb", "rgba", "hsl", "hsv", "cmyk"})
     format->addItem(QString(value).toUpper(), value);
   format->setCurrentIndex(
@@ -5509,92 +5696,273 @@ void Frontend::renderConfig() {
   connect(format, &QComboBox::currentIndexChanged, this, [this, format] {
     configDraft["clipboard_format"] = format->currentData().toString();
   });
-  f->addRow("Clipboard format", format);
-  auto text = [&](const char *key, const QString &label) {
-    auto e = line(label, str(configDraft, key), w);
-    e->setMaximumWidth(e->fontMetrics().horizontalAdvance("Ctrl+Shift+Meta+F12") + 24);
-    f->addRow(label, e);
+  addFormRow(pickerSection, "Clipboard format:", format);
+
+  auto addCheck = [&](QVBoxLayout *section, const char *key,
+                      const QString &label) {
+    auto c = new QCheckBox(label, w);
+    c->setChecked(configDraft.value(key).toBool());
+    connect(c, &QCheckBox::toggled, this,
+            [this, key](bool v) { configDraft[key] = v; });
+    addFormRow(section, QString(), c);
+  };
+  addCheck(pickerSection, "auto_copy", "Automatically copy picked colors");
+  addCheck(pickerSection, "hide_board_while_picking",
+           "Hide board while picking");
+
+  l->addLayout(pickerSection);
+  l->addWidget(new Hairline(w));
+
+  // Section 3: Shortcuts & Startup
+  auto shortcutSection = new QVBoxLayout;
+  shortcutSection->setContentsMargins(0, 0, 0, 0);
+  shortcutSection->setSpacing(6);
+  shortcutSection->addWidget(makeSectionHeading("Shortcuts & Startup"));
+
+  auto addShortcutField = [&](const char *key, const QString &name,
+                              const QString &label) {
+    auto e = line(name, str(configDraft, key), w);
+    e->setFixedWidth(180);
     connect(e, &QLineEdit::textChanged, this,
             [this, key](const QString &v) { configDraft[key] = v; });
+    addFormRow(shortcutSection, label, e);
   };
-  text("pick_shortcut", "Pick shortcut");
-  text("history_shortcut", "History shortcut");
-  l->addLayout(f);
-  auto row = new QHBoxLayout;
-  configSave = button("Save settings", w, [this] {
+  addShortcutField("pick_shortcut", "Pick shortcut", "Pick shortcut:");
+  addShortcutField("history_shortcut", "History shortcut", "History shortcut:");
+  addCheck(shortcutSection, "autostart", "Start automatically");
+
+  shortcutStatusBox = new QWidget(w);
+  auto scRow = new QHBoxLayout(shortcutStatusBox);
+  scRow->setContentsMargins(0, 0, 0, 0);
+  scRow->setSpacing(10);
+  scRow->addWidget(makeLabelSpacer(shortcutStatusBox), 0, Qt::AlignVCenter);
+  auto scBanner =
+      new InlineBanner(palette().color(QPalette::Mid), 18, 95, shortcutStatusBox);
+  auto scBannerLayout = new QHBoxLayout(scBanner);
+  scBannerLayout->setContentsMargins(8, 4, 8, 4);
+  scBannerLayout->setSpacing(7);
+  shortcutDot = new StatusDot(scBanner);
+  shortcutDot->setToolTip(str(state, "shortcut_status_detail"));
+  scBannerLayout->addWidget(shortcutDot, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  shortcutStatus = new QLabel(str(state, "shortcut_status"), scBanner);
+  shortcutStatus->setToolTip(str(state, "shortcut_status_detail"));
+  shortcutStatus->setAccessibleDescription(
+      str(state, "shortcut_status_detail"));
+  shortcutStatus->setWordWrap(true);
+  shortcutStatus->setTextFormat(Qt::PlainText);
+  applyMuted(shortcutStatus, 200);
+  scBannerLayout->addWidget(shortcutStatus, 1);
+  scRow->addWidget(scBanner, 1);
+  updateShortcutDot(shortcutStatus->text());
+  shortcutStatusBox->setVisible(!shortcutStatus->text().isEmpty());
+  shortcutSection->addWidget(shortcutStatusBox);
+
+  l->addLayout(shortcutSection);
+  l->addStretch(1);
+
+  configScroll = static_cast<QScrollArea *>(scroll(w));
+  rootLayout->addWidget(configScroll, 1);
+
+  // Optional subtle inline feedback banner above the footer hairline
+  configStatusBox = new QWidget(configRoot);
+  auto statusBoxLayout = new QVBoxLayout(configStatusBox);
+  statusBoxLayout->setContentsMargins(0, 0, 0, 0);
+  statusBoxLayout->setSpacing(0);
+  statusBoxLayout->addWidget(new Hairline(configStatusBox));
+  auto statusInner = new QHBoxLayout;
+  statusInner->setContentsMargins(14, 7, 14, 7);
+  statusInner->setSpacing(8);
+  auto statusIcon = new QLabel(configStatusBox);
+  statusIcon->setPixmap(
+      themedIcon({"dialog-information-symbolic", "dialog-information"},
+                 QStyle::SP_MessageBoxInformation)
+          .pixmap(QSize(16, 16), devicePixelRatioF()));
+  statusIcon->setFixedSize(16, 16);
+  statusInner->addWidget(statusIcon, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  const QString initialStatus =
+      str(state, "validation_field").isEmpty() ? message() : QString();
+  configStatus = new QLabel(initialStatus, configStatusBox);
+  configStatus->setToolTip(str(state, "message_detail"));
+  configStatus->setAccessibleDescription(str(state, "message_detail"));
+  configStatus->setWordWrap(true);
+  configStatus->setTextFormat(Qt::PlainText);
+  statusInner->addWidget(configStatus, 1);
+  statusBoxLayout->addLayout(statusInner);
+  configStatusBox->setVisible(!initialStatus.isEmpty());
+  rootLayout->addWidget(configStatusBox);
+
+  // Pinned edge-to-edge KDE dialog footer bar
+  rootLayout->addWidget(new Hairline(configRoot));
+  auto footer = new QWidget(configRoot);
+  auto footerLayout = new QHBoxLayout(footer);
+  footerLayout->setContentsMargins(14, 9, 14, 9);
+  footerLayout->setSpacing(8);
+
+  configRebind =
+      new QPushButton(themedIcon({"configure-shortcuts-symbolic",
+                                  "configure-shortcuts", "view-refresh-symbolic",
+                                  "view-refresh"},
+                                 QStyle::SP_BrowserReload),
+                      "Rebind shortcuts", footer);
+  configRebind->setAccessibleName("Rebind shortcuts");
+  configRebind->setIconSize(QSize(16, 16));
+  configRebind->setEnabled(!state.value("busy").toBool());
+  connect(configRebind, &QPushButton::clicked, this,
+          [this] { send({{"op", "rebind"}}); });
+  footerLayout->addWidget(configRebind);
+
+  footerLayout->addStretch(1);
+
+  auto saveBtn = new PrimaryActionButton("Save settings", footer);
+  saveBtn->setAccessibleName("Save settings");
+  saveBtn->setIcon(themedIcon({"document-save-symbolic", "document-save"},
+                              QStyle::SP_DialogSaveButton));
+  saveBtn->setIconSize(QSize(16, 16));
+  saveBtn->setPrimary(true);
+  saveBtn->setEnabled(state.value("load_error").isNull() &&
+                      !state.value("busy").toBool());
+  connect(saveBtn, &QPushButton::clicked, this, [this] {
     send({{"op", "save"}, {"config", configDraft}});
     if (str(state, "validation_field") == "history_limit") {
       configLimit->setFocus();
       configScroll->ensureWidgetVisible(configLimit);
     }
   });
-  configSave->setEnabled(state.value("load_error").isNull() &&
-                         !state.value("busy").toBool());
-  configSave->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
-  row->addWidget(configSave);
-  configRebind =
-      button("Rebind shortcuts", w, [this] { send({{"op", "rebind"}}); });
-  configRebind->setEnabled(!state.value("busy").toBool());
-  configRebind->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
-  row->addWidget(configRebind);
-  auto closeButton = button("Close", w, [this] { close(); });
-  closeButton->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
-  row->addWidget(closeButton);
-  row->addStretch();
-  l->addLayout(row);
-  configStatus = new QLabel(message(), w);
-  configStatus->setWordWrap(true);
-  configStatus->setTextFormat(Qt::PlainText);
-  configStatus->setVisible(!configStatus->text().isEmpty());
-  configStatus->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-  l->addWidget(configStatus);
-  shortcutStatus = new QLabel(str(state, "shortcut_status"), w);
-  shortcutStatus->setToolTip(str(state, "shortcut_status_detail"));
-  shortcutStatus->setAccessibleDescription(str(state, "shortcut_status_detail"));
-  shortcutStatus->setWordWrap(true);
-  shortcutStatus->setTextFormat(Qt::PlainText);
-  shortcutStatus->setVisible(!shortcutStatus->text().isEmpty());
-  shortcutStatus->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
-  l->addWidget(shortcutStatus);
-  l->addStretch();
-  configScroll = static_cast<QScrollArea *>(scroll(w));
-  replace(configScroll);
+  configSave = saveBtn;
+  footerLayout->addWidget(configSave);
+
+  auto closeButton =
+      new QPushButton(themedIcon({"dialog-close-symbolic", "dialog-close",
+                                  "window-close-symbolic"},
+                                 QStyle::SP_DialogCloseButton),
+                      "Close", footer);
+  closeButton->setAccessibleName("Close");
+  closeButton->setIconSize(QSize(16, 16));
+  connect(closeButton, &QPushButton::clicked, this, [this] { close(); });
+  footerLayout->addWidget(closeButton);
+
+  rootLayout->addWidget(footer);
+  replace(configRoot);
 }
 void Frontend::renderHistory() {
   historyButtons.clear();
+  auto popup = new QFrame;
+  popup->setFrameShape(QFrame::StyledPanel);
+  popup->setFrameShadow(QFrame::Plain);
+  popup->setLineWidth(1);
+  auto popupLayout = new QVBoxLayout(popup);
+  popupLayout->setContentsMargins(0, 0, 0, 0);
+  popupLayout->setSpacing(0);
+
+  auto header = new QWidget(popup);
+  auto headerLayout = new QHBoxLayout(header);
+  headerLayout->setContentsMargins(10, 7, 10, 7);
+  headerLayout->setSpacing(10);
+  auto title = new QLabel("Color history", header);
+  QFont titleFont = title->font();
+  titleFont.setWeight(QFont::DemiBold);
+  title->setFont(titleFont);
+  headerLayout->addWidget(title);
+  headerLayout->addStretch(1);
+  auto hint = new QLabel(
+      QString::fromUtf8("Click to copy \u00B7 Esc to close"), header);
+  QFont hintFont = hint->font();
+  if (hintFont.pointSizeF() > 0)
+    hintFont.setPointSizeF(qMax(8.0, hintFont.pointSizeF() - 1.0));
+  else if (hintFont.pixelSize() > 0)
+    hintFont.setPixelSize(qMax(9, hintFont.pixelSize() - 1));
+  hint->setFont(hintFont);
+  QPalette hintPal = hint->palette();
+  const QColor hintFg = mutedColor(hintPal, 145);
+  hintPal.setColor(QPalette::WindowText, hintFg);
+  hintPal.setColor(QPalette::Text, hintFg);
+  hint->setPalette(hintPal);
+  headerLayout->addWidget(hint);
+  popupLayout->addWidget(header);
+  popupLayout->addWidget(new Hairline(popup));
+
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
-  auto grid = new QGridLayout;
-  int columns = qMax(1, state.value("columns").toInt(4));
-  int index = 0;
-  for (auto value : array(state, "entries")) {
-    auto o = value.toObject();
-    auto b = new Swatch(color(str(o, "color")), str(o, "text"), w);
-    b->setToolTip(str(o, "detail"));
-    b->installEventFilter(this);
-    historyButtons.append(b);
-    auto id = o.value("id");
-    connect(b, &QPushButton::clicked, this, [this, id] {
-      auto result = request({{"op", "select"}, {"id", id}});
-      if (result.isObject()) {
-        auto o = result.toObject();
-        if (o.value("close").toBool())
-          close();
-        else
-          updateState(o);
-      }
-    });
-    grid->addWidget(b, index / columns, index % columns);
-    ++index;
+  const auto entries = array(state, "entries");
+  const int columns = qMax(1, state.value("columns").toInt(4));
+  const int rows = qMax(1, state.value("rows").toInt(3));
+  if (entries.isEmpty()) {
+    l->setContentsMargins(16, 18, 16, 18);
+    l->setSpacing(6);
+    l->addStretch(1);
+    QIcon histIcon = themedIcon(
+        {"view-history-symbolic", "view-history", "document-open-recent"},
+        QStyle::SP_FileDialogListView);
+    if (!histIcon.isNull()) {
+      const int iconSz = 22;
+      QPixmap raw = histIcon.pixmap(QSize(iconSz, iconSz), devicePixelRatioF());
+      QPixmap tinted(raw.size());
+      tinted.setDevicePixelRatio(raw.devicePixelRatio());
+      tinted.fill(Qt::transparent);
+      QPainter tp(&tinted);
+      tp.drawPixmap(0, 0, raw);
+      tp.setCompositionMode(QPainter::CompositionMode_SourceIn);
+      tp.fillRect(tinted.rect(), mutedColor(palette(), 115));
+      tp.end();
+      auto iconLabel = new QLabel(w);
+      iconLabel->setPixmap(tinted);
+      iconLabel->setAlignment(Qt::AlignCenter);
+      l->addWidget(iconLabel, 0, Qt::AlignHCenter);
+    }
+    auto emptyLabel = new QLabel("No picked colors yet", w);
+    emptyLabel->setAlignment(Qt::AlignCenter);
+    QPalette emptyPal = emptyLabel->palette();
+    const QColor emptyFg = mutedColor(emptyPal, 145);
+    emptyPal.setColor(QPalette::WindowText, emptyFg);
+    emptyPal.setColor(QPalette::Text, emptyFg);
+    emptyLabel->setPalette(emptyPal);
+    l->addWidget(emptyLabel);
+    l->addStretch(1);
+  } else {
+    l->setContentsMargins(0, 0, 0, 0);
+    l->setSpacing(0);
+    auto grid = new QGridLayout;
+    grid->setContentsMargins(10, 10, 10, 10);
+    grid->setSpacing(6);
+    int index = 0;
+    for (auto value : entries) {
+      auto o = value.toObject();
+      auto b = new Swatch(color(str(o, "color")), str(o, "text"), w);
+      b->setTileMode(true, false);
+      b->setMinimumSize(104, 42);
+      b->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+      b->setToolTip(str(o, "detail"));
+      b->installEventFilter(this);
+      historyButtons.append(b);
+      auto id = o.value("id");
+      connect(b, &QPushButton::clicked, this, [this, id] {
+        auto result = request({{"op", "select"}, {"id", id}});
+        if (result.isObject()) {
+          auto o = result.toObject();
+          if (o.value("close").toBool())
+            close();
+          else
+            updateState(o);
+        }
+      });
+      grid->addWidget(b, index / columns, index % columns);
+      ++index;
+    }
+    l->addLayout(grid);
+    l->addStretch(1);
   }
-  l->addLayout(grid);
   auto error = new QLabel(str(state, "error"), w);
   error->setWordWrap(true);
+  error->setContentsMargins(10, 0, 10, 10);
+  error->setVisible(!error->text().isEmpty());
   l->addWidget(error);
+
   auto sc = scroll(w);
-  int rows = qMax(1, state.value("rows").toInt(3));
-  sc->setMinimumSize(qMin(900, columns * 110), qMin(650, rows * 55 + 35));
-  replace(sc);
+  sc->setMinimumSize(
+      qMin(900, columns * 110 + 20),
+      entries.isEmpty() ? 110 : qMin(650, rows * 48 + 24));
+  popupLayout->addWidget(sc, 1);
+  replace(popup);
   if (!historyButtons.isEmpty())
     historyButtons.first()->setFocus();
 }
