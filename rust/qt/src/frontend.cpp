@@ -875,11 +875,22 @@ protected:
 };
 class PrimaryActionButton : public QPushButton {
   bool updatingStyle = false;
+  bool primary = true;
+  QFont baseFont;
 
   void applyStyle() {
     if (updatingStyle)
       return;
     updatingStyle = true;
+    if (!primary) {
+      setFont(baseFont);
+      setStyleSheet(QString());
+      updatingStyle = false;
+      return;
+    }
+    QFont f = baseFont;
+    f.setWeight(QFont::DemiBold);
+    setFont(f);
     const QPalette basePal = QApplication::palette("QPushButton");
     const QColor hi = basePal.color(QPalette::Active, QPalette::Highlight);
     const QColor fg = basePal.color(QPalette::Active, QPalette::ButtonText);
@@ -917,12 +928,15 @@ class PrimaryActionButton : public QPushButton {
 
 public:
   explicit PrimaryActionButton(const QString &label, QWidget *parent = nullptr)
-      : QPushButton(label, parent) {
+      : QPushButton(label, parent), baseFont(font()) {
     setAccessibleName(label);
-    QFont f = font();
-    f.setWeight(QFont::DemiBold);
-    setFont(f);
     applyStyle();
+  }
+  void setPrimary(bool active) {
+    if (primary != active) {
+      primary = active;
+      applyStyle();
+    }
   }
 
 protected:
@@ -1150,7 +1164,9 @@ class Scene : public QWidget {
   QVector<QImage> images;
   std::function<void(QJsonObject)> send;
   bool topAligned = false;
+  bool compactMode = false;
   QString selectedRole;
+  QString selectedRoleTitle;
   int hoveredIndex = -1;
   bool dragHover = false;
 
@@ -1160,6 +1176,8 @@ public:
            h = scene.value("height").toDouble(1);
     if (w <= 0 || h <= 0)
       return {};
+    if (compactMode)
+      return QRectF(0, 0, width(), height());
     double scale = qMin(width() / w, height() / h);
     return QRectF((width() - w * scale) / 2, topAligned ? 0 : (height() - h * scale) / 2,
                   w * scale, h * scale);
@@ -1211,8 +1229,8 @@ private:
 public:
   Scene(QJsonObject data, std::function<void(QJsonObject)> f, QWidget *parent)
       : QWidget(parent), scene(data), send(f) {
-    setMinimumSize(140, 80);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    setMinimumSize(140, 68);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setAcceptDrops(true);
     setMouseTracking(true);
     setAccessibleName("Theme scene preview");
@@ -1230,14 +1248,27 @@ public:
       images.append(image);
     }
   }
-  QSize sizeHint() const override { return QSize(300, 180); }
+  QSize sizeHint() const override {
+    if (compactMode)
+      return QSize(420, 82);
+    return QSize(390, 214);
+  }
   void setTopAligned(bool aligned) {
     topAligned = aligned;
     update();
   }
-  void setSelectedRole(const QString &role) {
-    if (selectedRole != role) {
+  void setCompactMode(bool compact) {
+    if (compactMode != compact) {
+      compactMode = compact;
+      setMinimumSize(140, compact ? 64 : 68);
+      updateGeometry();
+      update();
+    }
+  }
+  void setSelectedRole(const QString &role, const QString &title = QString()) {
+    if (selectedRole != role || selectedRoleTitle != title) {
       selectedRole = role;
+      selectedRoleTitle = title;
       update();
     }
   }
@@ -1246,89 +1277,212 @@ protected:
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
+    p.setRenderHint(QPainter::TextAntialiasing, true);
     p.setRenderHint(QPainter::SmoothPixmapTransform, true);
     const QRectF r = targetRect();
     if (r.isEmpty())
       return;
     const QRectF frame = r.adjusted(0.5, 0.5, -0.5, -0.5);
-    const qreal radius = 3.0;
+    const qreal radius = compactMode ? 4.0 : 5.0;
     QPainterPath clip;
     clip.addRoundedRect(frame, radius, radius);
     const double sceneW = scene.value("width").toDouble(1);
     const double sceneH = scene.value("height").toDouble(1);
+    const double scaleX = r.width() / qMax(1.0, sceneW);
+    const double scaleY = r.height() / qMax(1.0, sceneH);
+    const double uniformScale = qMin(scaleX, scaleY);
+
+    auto elements = array(scene, "elements");
+    QColor baseBg = palette().color(QPalette::Window);
+    if (!elements.isEmpty()) {
+      const QColor c0 = color(str(elements[0].toObject(), "fill"));
+      if (c0.isValid() && c0.alpha() > 0)
+        baseBg = c0;
+    }
 
     p.save();
     p.setClipPath(clip);
-    p.translate(r.topLeft());
-    p.scale(r.width() / sceneW, r.height() / sceneH);
-    auto elements = array(scene, "elements");
+    bool backgroundSelected = false;
     QVector<QRectF> selectedBoxes;
     for (int i = 0; i < elements.size(); ++i) {
       auto e = elements[i].toObject();
       auto a = array(e, "rect");
       if (a.size() != 4)
         continue;
-      QRectF box(a[0].toDouble(), a[1].toDouble(), a[2].toDouble(),
-                 a[3].toDouble());
-      auto fill = color(str(e, "fill"));
-      if (fill.isValid())
-        p.fillRect(box, fill);
-      auto border = color(str(e, "border"));
-      if (border.isValid() && border.alpha()) {
-        p.setPen(border);
-        p.drawRect(box);
+      const QRectF box = elementWidgetRect(e, r);
+      if (box.isEmpty())
+        continue;
+      const auto fill = color(str(e, "fill"));
+      const bool hasFill = fill.isValid() && fill.alpha() > 0;
+      const qreal elemRadius = (i > 0) ? (compactMode ? 3.0 : 4.0) : 0.0;
+      if (hasFill) {
+        if (elemRadius > 0.0) {
+          p.setPen(Qt::NoPen);
+          p.setBrush(fill);
+          p.drawRoundedRect(box, elemRadius, elemRadius);
+        } else {
+          p.fillRect(box, fill);
+        }
       }
-      if (!images[i].isNull())
+      const auto elemBorder = color(str(e, "border"));
+      if (elemBorder.isValid() && elemBorder.alpha() > 0) {
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(elemBorder, 1.0));
+        if (elemRadius > 0.0)
+          p.drawRoundedRect(box.adjusted(0.5, 0.5, -0.5, -0.5), elemRadius,
+                            elemRadius);
+        else
+          p.drawRect(box.adjusted(0.5, 0.5, -0.5, -0.5));
+      }
+      if (i < images.size() && !images[i].isNull())
         p.drawImage(box, images[i]);
-      auto text = str(e, "text");
+
+      const auto text = str(e, "text");
       if (!text.isEmpty()) {
         p.setPen(color(str(e, "text_color")));
-        QFont font = p.font();
-        if (e.value("font_size").toDouble() > 0)
-          font.setPixelSize(qMax(1, int(e.value("font_size").toDouble())));
-        p.setFont(font);
-        p.drawText(box, Qt::AlignVCenter | Qt::AlignLeft | Qt::TextWordWrap,
+        const QString trimmed = text.trimmed();
+        const bool isCodeText = trimmed.startsWith('$') || trimmed.startsWith('>') ||
+                                trimmed.contains('=') || str(e, "kind") == "syntax";
+        QFont f = isCodeText
+                      ? QFontDatabase::systemFont(QFontDatabase::FixedFont)
+                      : font();
+        f.setStyleStrategy(QFont::PreferAntialias);
+        const double explicitPx = e.value("font_size").toDouble(0);
+        if (explicitPx > 0) {
+          f.setPixelSize(qMax(9, qRound(explicitPx * uniformScale)));
+        } else if (isCodeText) {
+          const int targetPx = compactMode
+                                   ? qBound(9, qRound(box.height() * 0.62), 12)
+                                   : qBound(11, qRound(box.height() * 0.38), 14);
+          f.setPixelSize(targetPx);
+        } else if (i > 0 && !hasFill) {
+          f.setWeight(QFont::DemiBold);
+          const int targetPx = compactMode
+                                   ? qBound(10, qRound(box.height() * 0.85), 13)
+                                   : qBound(12, qRound(box.height() * 0.56), 17);
+          f.setPixelSize(targetPx);
+        } else {
+          f.setPixelSize(qBound(9, qRound(box.height() * 0.45), 14));
+        }
+        p.setFont(f);
+        const qreal padX = qMin(10.0, qMax(0.0, (box.width() - 8.0) * 0.5));
+        const qreal padY =
+            compactMode ? 0.0 : qMin(2.0, qMax(0.0, (box.height() - 4.0) * 0.5));
+        QRectF textBox = box.adjusted(padX, padY, -padX, -padY);
+        if (!hasFill && textBox.height() < f.pixelSize() + 6) {
+          const qreal expand = (f.pixelSize() + 6 - textBox.height()) * 0.5;
+          textBox.adjust(0, -expand, 0, expand);
+        }
+        p.drawText(textBox, Qt::AlignVCenter | Qt::AlignLeft | Qt::TextWordWrap,
                    text);
       }
+
       if (!selectedRole.isEmpty() && e.value("enabled").toBool() &&
           str(e, "role") == selectedRole) {
-        const double coverage = (box.width() * box.height()) / qMax(1.0, sceneW * sceneH);
-        if (coverage < 0.85)
-          selectedBoxes.append(elementWidgetRect(e, r));
+        const double coverage =
+            (a[2].toDouble() * a[3].toDouble()) / qMax(1.0, sceneW * sceneH);
+        if (i == 0 || coverage >= 0.85)
+          backgroundSelected = true;
+        else
+          selectedBoxes.append(box);
       }
     }
-    p.restore();
+
+    // Subtle top sheen inside the scene frame for refined window depth
+    const qreal sheenH = qMin(20.0, r.height() * 0.16);
+    QLinearGradient topSheen(r.left(), r.top(), r.left(), r.top() + sheenH);
+    topSheen.setColorAt(
+        0.0, QColor(255, 255, 255, baseBg.lightness() < 128 ? 16 : 24));
+    topSheen.setColorAt(1.0, QColor(255, 255, 255, 0));
+    p.fillRect(QRectF(r.left(), r.top(), r.width(), sheenH), topSheen);
+    p.setPen(QPen(QColor(255, 255, 255, baseBg.lightness() < 128 ? 28 : 45), 1.0));
+    p.drawLine(QPointF(frame.left() + radius, frame.top() + 1.0),
+               QPointF(frame.right() - radius, frame.top() + 1.0));
 
     const QColor hi = palette().color(QPalette::Active, QPalette::Highlight);
-    if (!selectedBoxes.isEmpty()) {
-      p.save();
-      p.setClipPath(clip);
-      QColor selPen = hi;
-      selPen.setAlpha(155);
-      p.setPen(QPen(selPen, 1.0, Qt::DashLine));
+    if (backgroundSelected) {
+      p.setPen(QPen(hi, 2.0));
       p.setBrush(Qt::NoBrush);
-      for (const auto &sb : selectedBoxes)
-        p.drawRoundedRect(sb.adjusted(0.5, 0.5, -0.5, -0.5), 2.0, 2.0);
-      p.restore();
+      p.drawRoundedRect(r.adjusted(1.5, 1.5, -1.5, -1.5),
+                        qMax(1.5, radius - 1.0), qMax(1.5, radius - 1.0));
+    }
+    if (!selectedBoxes.isEmpty()) {
+      const qreal selRadius = compactMode ? 3.0 : 4.0;
+      p.setBrush(Qt::NoBrush);
+      for (const auto &sb : selectedBoxes) {
+        p.setPen(QPen(hi, 2.0));
+        p.drawRoundedRect(sb.adjusted(1.0, 1.0, -1.0, -1.0), selRadius,
+                          selRadius);
+      }
     }
     if (hoveredIndex >= 0 && hoveredIndex < elements.size()) {
       const auto e = elements[hoveredIndex].toObject();
       const QRectF hb = elementWidgetRect(e, r);
       if (!hb.isEmpty()) {
-        p.save();
-        p.setClipPath(clip);
         QColor hoverPen = hi;
-        hoverPen.setAlpha(dragHover ? 215 : 135);
-        p.setPen(QPen(hoverPen, dragHover ? 1.5 : 1.0));
+        hoverPen.setAlpha(dragHover ? 230 : 150);
+        p.setPen(QPen(hoverPen, dragHover ? 2.0 : 1.25));
         p.setBrush(Qt::NoBrush);
-        p.drawRoundedRect(hb.adjusted(1.0, 1.0, -1.0, -1.0), 2.0, 2.0);
-        p.restore();
+        p.drawRoundedRect(hb.adjusted(1.0, 1.0, -1.0, -1.0),
+                          compactMode ? 3.0 : 4.0, compactMode ? 3.0 : 4.0);
       }
     }
 
+    // Selected-role frosted pill badge in the bottom-right corner
+    if (!selectedRole.isEmpty() && r.width() >= 150 && r.height() >= 48) {
+      QString title = selectedRoleTitle;
+      if (title.isEmpty()) {
+        title = selectedRole;
+        title.replace('_', ' ');
+        if (!title.isEmpty())
+          title[0] = title[0].toUpper();
+      }
+      const QString badgeText = QStringLiteral("Selected: %1").arg(title);
+      QFont badgeFont = font();
+      badgeFont.setStyleStrategy(QFont::PreferAntialias);
+      badgeFont.setPointSizeF(compactMode ? 8.0 : 8.5);
+      badgeFont.setWeight(QFont::DemiBold);
+      const QFontMetricsF bfm(badgeFont);
+      const qreal dotDia = 6.0;
+      const qreal dotGap = 5.0;
+      const qreal hPad = 8.0;
+      const qreal vPad = compactMode ? 2.5 : 3.5;
+      const qreal textW = bfm.horizontalAdvance(badgeText);
+      const qreal pillW = hPad + dotDia + dotGap + textW + hPad;
+      const qreal pillH = bfm.height() + vPad * 2.0;
+      const qreal margin = compactMode ? 6.0 : 9.0;
+      if (pillW <= r.width() - margin * 2.0) {
+        const QRectF pillRect(r.right() - margin - pillW,
+                              r.bottom() - margin - pillH, pillW, pillH);
+        const bool darkScene = baseBg.lightness() < 128;
+        const QColor pillBg = darkScene ? QColor(14, 19, 27, 204)
+                                        : QColor(248, 250, 252, 224);
+        const QColor pillFg = darkScene ? QColor(240, 245, 250, 242)
+                                        : QColor(22, 27, 34, 242);
+        QColor pillBorder = hi;
+        pillBorder.setAlpha(darkScene ? 175 : 190);
+        p.setBrush(pillBg);
+        p.setPen(QPen(pillBorder, 1.0));
+        p.drawRoundedRect(pillRect, pillH * 0.5, pillH * 0.5);
+
+        const QPointF dotCenter(pillRect.left() + hPad + dotDia * 0.5,
+                                pillRect.center().y());
+        p.setPen(Qt::NoPen);
+        p.setBrush(hi);
+        p.drawEllipse(dotCenter, dotDia * 0.5, dotDia * 0.5);
+
+        p.setFont(badgeFont);
+        p.setPen(pillFg);
+        const QRectF badgeTextRect(pillRect.left() + hPad + dotDia + dotGap,
+                                   pillRect.top(), textW + 2.0, pillH);
+        p.drawText(badgeTextRect, Qt::AlignVCenter | Qt::AlignLeft, badgeText);
+      }
+    }
+    p.restore();
+
     const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
     QColor border =
-        darkSurface ? QColor(255, 255, 255, 55) : QColor(0, 0, 0, 65);
+        darkSurface ? QColor(255, 255, 255, 58) : QColor(0, 0, 0, 72);
     qreal borderWidth = 1.0;
     if (dragHover || hasFocus()) {
       border = hi;
@@ -1582,7 +1736,7 @@ class Frontend : public QWidget {
     if (!splitter || !historyPanel || !historyPanel->isVisible())
       return;
     const bool narrow = width() < 680;
-    if (narrow && !compactHistory)
+    if (!narrow && !compactHistory)
       normalHistoryWidth =
           qMax(compactHistoryWidth, splitter->sizes().value(0, 124));
     if (narrow != compactHistory) {
@@ -4420,8 +4574,30 @@ QWidget *Frontend::palettePage() {
   return page;
 }
 
+class ThemeSplitter : public QSplitter {
+  bool applying = false;
+
+public:
+  QList<int> pendingSizes;
+  using QSplitter::QSplitter;
+
+protected:
+  bool event(QEvent *e) override {
+    const bool res = QSplitter::event(e);
+    if (!applying && !pendingSizes.isEmpty() &&
+        orientation() == Qt::Horizontal && width() >= 680 &&
+        (e->type() == QEvent::LayoutRequest || e->type() == QEvent::Resize)) {
+      applying = true;
+      setSizes(pendingSizes);
+      applying = false;
+    }
+    return res;
+  }
+};
+
 void Frontend::layoutThemePage(QWidget *page, int width, bool initialize) {
-  auto panes = page->findChild<QSplitter *>("themePanes");
+  auto panes = dynamic_cast<ThemeSplitter *>(
+      page->findChild<QSplitter *>("themePanes"));
   if (!panes)
     return;
   auto preview = panes->widget(0);
@@ -4430,6 +4606,9 @@ void Frontend::layoutThemePage(QWidget *page, int width, bool initialize) {
   auto rightLine = preview->findChild<QWidget *>("themePreviewRightLine");
   auto bottomLine = preview->findChild<QWidget *>("themePreviewBottomLine");
   auto canvas = static_cast<Scene *>(preview->findChild<QWidget *>("themeScene"));
+  auto renderedBox = page->findChild<QWidget *>("themeRenderedPreviewBox");
+  auto inspectorContent = page->findChild<QWidget *>("themeInspectorContent");
+  auto exportHairline = page->findChild<QWidget *>("themeExportHairline");
   auto toggle = page->findChild<QAction *>("themePreviewAction");
   auto contextSpacer = page->findChild<QAction *>("themeContextSpacerAction");
   auto contextAction = page->findChild<QAction *>("themeContextAction");
@@ -4456,24 +4635,79 @@ void Frontend::layoutThemePage(QWidget *page, int width, bool initialize) {
   panes->setHandleWidth(compact ? 0 : style()->pixelMetric(QStyle::PM_SplitterWidth));
   panes->handle(1)->setEnabled(!compact);
   inspector->setMinimumWidth(compact ? 0 : 200);
-  if (previewBody) {
-    auto previewLayout = static_cast<QBoxLayout *>(previewBody->layout());
-    previewLayout->setDirection(compact ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
-    previewLayout->setContentsMargins(compact ? 10 : 12, compact ? 6 : 10, 10,
+  auto previewLayout =
+      previewBody ? static_cast<QBoxLayout *>(previewBody->layout()) : nullptr;
+  if (previewLayout) {
+    previewLayout->setDirection(QBoxLayout::TopToBottom);
+    previewLayout->setContentsMargins(compact ? 10 : 12, compact ? 4 : 10, 10,
                                       compact ? 6 : 10);
-    previewLayout->setSpacing(compact ? 10 : 8);
+    previewLayout->setSpacing(compact ? 4 : 10);
   }
-  preview->setMaximumHeight(compact ? page->fontMetrics().height() * 6 : QWIDGETSIZE_MAX);
+  preview->setMaximumHeight(compact ? 118 : QWIDGETSIZE_MAX);
   if (canvas) {
-    canvas->setMaximumWidth(compact ? page->fontMetrics().height() * 16 : QWIDGETSIZE_MAX);
+    canvas->setMaximumWidth(QWIDGETSIZE_MAX);
     canvas->setTopAligned(!compact);
+    canvas->setCompactMode(compact);
   }
+
+  const bool previewInLeft = !compact && canvas && previewBody && previewLayout;
+  if (renderedBox) {
+    auto inspectorLayout =
+        inspectorContent
+            ? qobject_cast<QVBoxLayout *>(inspectorContent->layout())
+            : nullptr;
+    if (previewInLeft) {
+      if (inspectorLayout)
+        inspectorLayout->removeWidget(renderedBox);
+      if (renderedBox->parentWidget() != previewBody)
+        renderedBox->setParent(previewBody);
+      if (previewLayout->indexOf(renderedBox) < 0)
+        previewLayout->addWidget(renderedBox, 2);
+      else
+        previewLayout->setStretchFactor(renderedBox, 2);
+      if (canvas)
+        previewLayout->setStretchFactor(canvas, 3);
+      for (auto *te : renderedBox->findChildren<QPlainTextEdit *>()) {
+        te->setMinimumHeight(40);
+        te->setMaximumHeight(QWIDGETSIZE_MAX);
+      }
+      renderedBox->show();
+    } else if (inspectorContent && inspectorLayout) {
+      if (previewLayout)
+        previewLayout->removeWidget(renderedBox);
+      if (renderedBox->parentWidget() != inspectorContent)
+        renderedBox->setParent(inspectorContent);
+      if (inspectorLayout->indexOf(renderedBox) < 0) {
+        const int idx = exportHairline
+                            ? inspectorLayout->indexOf(exportHairline)
+                            : inspectorLayout->count();
+        inspectorLayout->insertWidget(idx >= 0 ? idx : inspectorLayout->count(),
+                                      renderedBox);
+      }
+      if (canvas && previewLayout)
+        previewLayout->setStretchFactor(canvas, 1);
+      for (auto *te : renderedBox->findChildren<QPlainTextEdit *>()) {
+        const int h = te->property("compactHeight").toInt();
+        te->setFixedHeight(h > 0 ? h : 96);
+      }
+      renderedBox->show();
+    }
+  } else if (canvas && previewLayout) {
+    previewLayout->setStretchFactor(canvas, 1);
+  }
+
   if (compact) {
-    panes->setSizes({0, page->height()});
+    panes->pendingSizes.clear();
+    const int previewH =
+        (canvas && compactThemePreview) ? preview->maximumHeight() : 0;
+    panes->setSizes({previewH, qMax(1, page->height() - previewH)});
   } else {
     const auto saved = settings.value("board/themeSplitter").toList();
-    panes->setSizes(saved.size() == 2 ? QList<int>{saved[0].toInt(), saved[1].toInt()}
-                                      : QList<int>{416, 364});
+    const QList<int> target =
+        saved.size() == 2 ? QList<int>{saved[0].toInt(), saved[1].toInt()}
+                          : QList<int>{416, 364};
+    panes->pendingSizes = target;
+    panes->setSizes(target);
   }
 }
 
@@ -4557,7 +4791,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
   const bool hasSaved = !savedEntries.isEmpty();
   auto saved = combo("Saved themes", savedEntries, projectDialog,
                      themeDraft.value("saved").toString());
-  saved->setMinimumContentsLength(10);
+  saved->setMinimumContentsLength(12);
   saved->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
   if (!hasSaved) {
     saved->addItem("No saved themes");
@@ -4573,19 +4807,28 @@ QWidget *Frontend::themePage(Scene *reuse) {
   savedLayout->setSpacing(6);
   savedLayout->addWidget(saved, 1);
   auto openBtn = makeDialogButton(
-      "Open theme", {"document-open-symbolic", "document-open"},
+      "Open", {"document-open-symbolic", "document-open"},
       QStyle::SP_DialogOpenButton, savedRow, [this, saved, discard] {
         if (discard())
           send({{"op", "theme_open"},
                 {"id", saved->currentData().toString()},
                 {"discard", true}});
       });
+  openBtn->setAccessibleName("Open theme");
   openBtn->setEnabled(hasSaved);
   savedLayout->addWidget(openBtn);
-  savedLayout->addWidget(makeDialogButton(
-      "Reload", {"view-refresh-symbolic", "view-refresh"},
-      QStyle::SP_BrowserReload, savedRow,
-      [this] { send({{"op", "theme_reload"}}); }));
+  auto reloadBtn = new QToolButton(savedRow);
+  reloadBtn->setIcon(themedIcon({"view-refresh-symbolic", "view-refresh"},
+                                QStyle::SP_BrowserReload));
+  reloadBtn->setIconSize(QSize(16, 16));
+  reloadBtn->setAutoRaise(false);
+  const int reloadSide = qMax(28, saved->sizeHint().height());
+  reloadBtn->setFixedSize(reloadSide, reloadSide);
+  reloadBtn->setAccessibleName("Reload");
+  reloadBtn->setToolTip("Reload themes and plugins");
+  connect(reloadBtn, &QToolButton::clicked, this,
+          [this] { send({{"op", "theme_reload"}}); });
+  savedLayout->addWidget(reloadBtn);
   selection->addRow("Saved:", savedRow);
 
   auto name = line("Theme name", str(project, "name"), projectDialog);
@@ -4642,8 +4885,9 @@ QWidget *Frontend::themePage(Scene *reuse) {
   };
 
   addThemeAction("Project",
-                 {"document-properties-symbolic", "document-properties"},
-                 QStyle::SP_FileDialogInfoView, "Theme project settings",
+                 {"project-open-symbolic", "document-open-folder-symbolic",
+                  "folder-open"},
+                 QStyle::SP_DirOpenIcon, "Theme project settings",
                  [this, projectDialog] {
                    themeProjectVisible = true;
                    projectDialog->show();
@@ -4725,21 +4969,25 @@ QWidget *Frontend::themePage(Scene *reuse) {
   outerLayout->addWidget(actionsLine);
 
   // Split Preview & Inspector
-  auto panes = new QSplitter(Qt::Vertical, outer);
+  auto panes = new ThemeSplitter(Qt::Vertical, outer);
   panes->setObjectName("themePanes");
   panes->setChildrenCollapsible(false);
 
   auto previewContainer = new QWidget(panes);
   previewContainer->setObjectName("themePreviewContainer");
+  previewContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+  previewContainer->setMinimumHeight(0);
   auto previewGrid = new QGridLayout(previewContainer);
   previewGrid->setContentsMargins(0, 0, 0, 0);
   previewGrid->setSpacing(0);
 
   auto previewBody = new QWidget(previewContainer);
   previewBody->setObjectName("themePreviewBody");
+  previewBody->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+  previewBody->setMinimumHeight(0);
   auto previewLayout = new QBoxLayout(QBoxLayout::TopToBottom, previewBody);
   previewLayout->setContentsMargins(12, 10, 10, 10);
-  previewLayout->setSpacing(8);
+  previewLayout->setSpacing(10);
 
   auto scene = combo("Preview scene", array(t, "scenes"), previewBody,
                      str(project, "scene"));
@@ -4759,6 +5007,17 @@ QWidget *Frontend::themePage(Scene *reuse) {
   sceneControls->addStretch();
   previewLayout->addWidget(sceneSelector, 0, Qt::AlignTop);
 
+  const auto roleList = array(t, "roles");
+  const QString selectedId = str(t, "selected");
+  QString selectedTitle;
+  for (const auto &rv : roleList) {
+    const auto ro = rv.toObject();
+    if (str(ro, "id") == selectedId) {
+      selectedTitle = str(ro, "name");
+      break;
+    }
+  }
+
   if (t.value("scene").isObject()) {
     Scene *preview;
     if (reuse) {
@@ -4769,7 +5028,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
           t.value("scene").toObject(), [this](QJsonObject o) { send(o); },
           previewBody);
     }
-    preview->setSelectedRole(str(t, "selected"));
+    preview->setSelectedRole(selectedId, selectedTitle);
     preview->setObjectName("themeScene");
     previewLayout->addWidget(preview, 1);
   }
@@ -4785,17 +5044,22 @@ QWidget *Frontend::themePage(Scene *reuse) {
   previewGrid->setColumnStretch(0, 1);
 
   connect(previewToggleAction, &QAction::toggled, this,
-          [this, previewContainer](bool visible) {
+          [this, previewContainer, panes](bool visible) {
             compactThemePreview = visible;
             previewContainer->setVisible(visible);
+            if (panes->orientation() == Qt::Vertical) {
+              const int h = visible ? previewContainer->maximumHeight() : 0;
+              panes->setSizes({h, qMax(1, panes->height() - h)});
+            }
           });
   if (themeProjectVisible)
     projectDialog->show();
 
   // Flat KDE HIG Inspector
   auto w = new QWidget;
+  w->setObjectName("themeInspectorContent");
   auto l = new QVBoxLayout(w);
-  l->setContentsMargins(12, 10, 12, 14);
+  l->setContentsMargins(12, 10, 12, 12);
   l->setSpacing(10);
 
   // Section 1: Theme roles
@@ -4813,7 +5077,6 @@ QWidget *Frontend::themePage(Scene *reuse) {
   rolesHeading->setFont(rolesHeadingFont);
   rolesSection->addWidget(rolesHeading);
 
-  const auto roleList = array(t, "roles");
   if (roleList.isEmpty()) {
     auto emptyRoles = new QLabel("Open Project to create or load a theme.", w);
     emptyRoles->setWordWrap(true);
@@ -4828,7 +5091,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
         rolesListLayout->addWidget(new Hairline(w));
       auto o = roleList[roleIdx].toObject();
       auto id = str(o, "id");
-      const bool selected = str(t, "selected") == id;
+      const bool selected = selectedId == id;
       auto row = new ThemeRoleCard(
           selected, [this, id] { send({{"op", "theme_select"}, {"role", id}}); },
           w);
@@ -4876,8 +5139,12 @@ QWidget *Frontend::themePage(Scene *reuse) {
       auto link = new QComboBox(row);
       link->setAccessibleName("Palette swatch link");
       link->setEditable(true);
-      if (auto *le = link->lineEdit())
-        le->setPlaceholderText("None (unlinked)");
+      if (auto *le = link->lineEdit()) {
+        le->setPlaceholderText("Unlinked");
+        QPalette lePal = le->palette();
+        lePal.setColor(QPalette::PlaceholderText, mutedColor(lePal, 185));
+        le->setPalette(lePal);
+      }
       for (auto v : array(t, "palette_swatches"))
         link->addItem(str(v.toObject(), "name"));
       link->setEditText(str(o, "link"));
@@ -4888,10 +5155,18 @@ QWidget *Frontend::themePage(Scene *reuse) {
       bottomRow->addWidget(linkLabel, 0, Qt::AlignLeft | Qt::AlignVCenter);
       bottomRow->addWidget(link, 1);
 
-      auto defaultBtn = button("Default", row, [this, id] {
+      auto defaultBtn = new QToolButton(row);
+      defaultBtn->setIcon(themedIcon({"edit-undo-symbolic", "edit-undo"},
+                                     QStyle::SP_ArrowBack));
+      defaultBtn->setIconSize(QSize(16, 16));
+      defaultBtn->setAutoRaise(true);
+      defaultBtn->setFixedSize(26, 26);
+      defaultBtn->setAccessibleName("Default");
+      defaultBtn->setToolTip("Reset role to default");
+      defaultBtn->setEnabled(str(o, "assignment") != "default");
+      connect(defaultBtn, &QToolButton::clicked, this, [this, id] {
         send({{"op", "theme_default"}, {"role", id}});
       });
-      defaultBtn->setToolTip("Reset role to plugin default");
       bottomRow->addWidget(defaultBtn, 0, Qt::AlignRight | Qt::AlignVCenter);
       r->addLayout(bottomRow);
 
@@ -4910,28 +5185,33 @@ QWidget *Frontend::themePage(Scene *reuse) {
   }
   l->addLayout(rolesSection);
 
-  // Section 2: Rendered Output Preview
+  // Section 2: Rendered Output Preview (left pane at wide widths, inspector in compact mode)
   const auto previews = array(t, "preview");
   if (!previews.isEmpty()) {
-    l->addWidget(new Hairline(w));
+    auto renderedPreviewBox = new QWidget(w);
+    renderedPreviewBox->setObjectName("themeRenderedPreviewBox");
+    auto renderedLayout = new QVBoxLayout(renderedPreviewBox);
+    renderedLayout->setContentsMargins(0, 0, 0, 0);
+    renderedLayout->setSpacing(6);
+    renderedLayout->addWidget(new Hairline(renderedPreviewBox));
     for (int i = 0; i < previews.size(); ++i) {
       if (i > 0)
-        l->addWidget(new Hairline(w));
+        renderedLayout->addWidget(new Hairline(renderedPreviewBox));
       auto o = previews[i].toObject();
       auto previewSection = new QVBoxLayout;
       previewSection->setContentsMargins(0, 0, 0, 0);
-      previewSection->setSpacing(6);
+      previewSection->setSpacing(5);
 
       auto headerRow = new QHBoxLayout;
       headerRow->setContentsMargins(0, 0, 0, 0);
       headerRow->setSpacing(8);
-      auto pathLabel = new QLabel(str(o, "path"), w);
+      auto pathLabel = new QLabel(str(o, "path"), renderedPreviewBox);
       QFont pathFont = pathLabel->font();
       pathFont.setWeight(QFont::DemiBold);
       pathLabel->setFont(pathFont);
       headerRow->addWidget(pathLabel);
       headerRow->addStretch(1);
-      auto badge = new QLabel("Preview", w);
+      auto badge = new QLabel("Preview", renderedPreviewBox);
       QFont badgeFont = badge->font();
       if (badgeFont.pointSizeF() > 0)
         badgeFont.setPointSizeF(qMax(8.0, badgeFont.pointSizeF() - 1.0));
@@ -4943,7 +5223,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
       previewSection->addLayout(headerRow);
 
       const QString content = str(o, "content");
-      auto text = new QPlainTextEdit(content, w);
+      auto text = new QPlainTextEdit(content, renderedPreviewBox);
       text->setReadOnly(true);
       text->setTabChangesFocus(true);
       text->setAccessibleName("Rendered " + str(o, "path"));
@@ -4952,14 +5232,19 @@ QWidget *Frontend::themePage(Scene *reuse) {
       text->setFrameShape(QFrame::StyledPanel);
       const int lineCount =
           qMax(1, content.count('\n') + (content.endsWith('\n') ? 0 : 1));
-      text->setFixedHeight(qBound(86, lineCount * monoFm.lineSpacing() + 30, 136));
-      previewSection->addWidget(text);
-      l->addLayout(previewSection);
+      const int compactH = qBound(86, lineCount * monoFm.lineSpacing() + 30, 136);
+      text->setProperty("compactHeight", compactH);
+      text->setFixedHeight(compactH);
+      previewSection->addWidget(text, 1);
+      renderedLayout->addLayout(previewSection, 1);
     }
+    l->addWidget(renderedPreviewBox);
   }
 
   // Section 3: Export
-  l->addWidget(new Hairline(w));
+  auto exportHairline = new Hairline(w);
+  exportHairline->setObjectName("themeExportHairline");
+  l->addWidget(exportHairline);
   auto exportSection = new QVBoxLayout;
   exportSection->setContentsMargins(0, 0, 0, 0);
   exportSection->setSpacing(6);
@@ -4975,17 +5260,18 @@ QWidget *Frontend::themePage(Scene *reuse) {
   exportDirRow->setSpacing(6);
   auto dir =
       line("Export directory", themeDraft.value("directory").toString(), w);
-  dir->setPlaceholderText("Choose export folder…");
+  dir->setPlaceholderText(QString::fromUtf8("Export folder path\u2026"));
   dir->setMinimumWidth(80);
   connect(dir, &QLineEdit::textChanged, this,
           [this](const QString &value) { themeDraft["directory"] = value; });
   exportDirRow->addWidget(dir, 1);
-  auto chooseBtn = button("Choose directory", w, [this, dir] {
+  auto chooseBtn = button(QString::fromUtf8("Browse\u2026"), w, [this, dir] {
     auto path =
         QFileDialog::getExistingDirectory(this, "Export theme", dir->text());
     if (!path.isEmpty())
       dir->setText(path);
   });
+  chooseBtn->setAccessibleName("Choose directory");
   chooseBtn->setIcon(
       themedIcon({"folder-open-symbolic", "folder-open"}, QStyle::SP_DirOpenIcon));
   chooseBtn->setIconSize(QSize(16, 16));
@@ -5006,6 +5292,11 @@ QWidget *Frontend::themePage(Scene *reuse) {
   exportBtn->setIcon(themedIcon({"document-export-symbolic", "document-export"},
                                 QStyle::SP_DialogSaveButton));
   exportBtn->setIconSize(QSize(16, 16));
+  exportBtn->setPrimary(!dir->text().trimmed().isEmpty());
+  connect(dir, &QLineEdit::textChanged, exportBtn,
+          [exportBtn](const QString &value) {
+            exportBtn->setPrimary(!value.trimmed().isEmpty());
+          });
   connect(exportBtn, &QPushButton::clicked, this, [this, dir, overwrite] {
     if (dir->text().trimmed().isEmpty()) {
       QMessageBox::warning(this, "Export theme", "Choose an export directory.");
@@ -5033,6 +5324,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
   panes->addWidget(controlsScroll);
   connect(panes, &QSplitter::splitterMoved, this, [this, panes] {
     if (panes->orientation() == Qt::Horizontal) {
+      panes->pendingSizes.clear();
       const auto sizes = panes->sizes();
       settings.setValue("board/themeSplitter", QVariantList{sizes[0], sizes[1]});
     }
