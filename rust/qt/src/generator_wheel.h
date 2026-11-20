@@ -97,31 +97,52 @@ protected:
     p.setRenderHint(QPainter::SmoothPixmapTransform, true);
     p.drawImage(r.topLeft(), image);
     const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
-    p.setPen(QPen(darkSurface ? QColor(255, 255, 255, 58) : QColor(0, 0, 0, 42), 1.0));
+    p.setPen(QPen(darkSurface ? QColor(255, 255, 255, 65) : QColor(0, 0, 0, 68), 1.0));
     p.setBrush(Qt::NoBrush);
     p.drawEllipse(r.adjusted(0.5, 0.5, -0.5, -0.5));
     QColor spoke = palette().color(QPalette::Text);
-    spoke.setAlpha(135);
-    p.setPen(QPen(spoke, 1.1));
+    spoke.setAlpha(125);
+    p.setPen(QPen(spoke, 1.0));
     for (const auto &c : colors) p.drawLine(r.center(), marker(c));
+    const QPointF basePoint = marker(selected);
+    if (QLineF(r.center(), basePoint).length() > 1.0) {
+      QColor baseSpoke = darkSurface ? QColor(255, 255, 255, 165) : QColor(0, 0, 0, 145);
+      QPen dashPen(baseSpoke, 1.0, Qt::DashLine);
+      dashPen.setDashPattern({3.0, 3.0});
+      p.setPen(dashPen);
+      p.drawLine(r.center(), basePoint);
+    }
     for (int i = 0; i < colors.size(); ++i) {
       const auto &c = colors[i];
       const auto point = marker(c);
+      p.setPen(Qt::NoPen);
       p.setBrush(c);
-      p.setPen(QPen(QColor(0, 0, 0, 210), 1.8));
-      p.drawEllipse(point, 7.5, 7.5);
+      p.drawEllipse(point, 5.0, 5.0);
       p.setBrush(Qt::NoBrush);
-      p.setPen(QPen(Qt::white, 1.4));
-      p.drawEllipse(point, 6.3, 6.3);
+      p.setPen(QPen(Qt::white, 2.0));
+      p.drawEllipse(point, 5.5, 5.5);
+      p.setPen(QPen(QColor(0, 0, 0, 210), 1.0));
+      p.drawEllipse(point, 6.5, 6.5);
     }
-    const QPointF basePoint = marker(selected);
-    p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(QColor(0, 0, 0, 225), 1.5));
-    p.drawEllipse(basePoint, 5.8, 5.8);
-    p.setPen(QPen(Qt::white, 1.6));
-    p.drawEllipse(basePoint, 4.6, 4.6);
-    p.setPen(QPen(QColor(0, 0, 0, 190), 1.0));
-    p.drawEllipse(basePoint, 3.4, 3.4);
+    // Base color anchor: hollow diamond with crosshair ticks so the exact hue
+    // underneath remains visible and distinct from filled harmony markers.
+    const qreal d = 6.5;
+    QPolygonF diamond;
+    diamond << (basePoint + QPointF(0.0, -d))
+            << (basePoint + QPointF(d, 0.0))
+            << (basePoint + QPointF(0.0, d))
+            << (basePoint + QPointF(-d, 0.0));
+    auto drawAnchor = [&](const QPen &pen) {
+      p.setBrush(Qt::NoBrush);
+      p.setPen(pen);
+      p.drawPolygon(diamond);
+      p.drawLine(basePoint + QPointF(0.0, -(d + 1.5)), basePoint + QPointF(0.0, -(d + 4.0)));
+      p.drawLine(basePoint + QPointF(0.0, (d + 1.5)), basePoint + QPointF(0.0, (d + 4.0)));
+      p.drawLine(basePoint + QPointF(-(d + 1.5), 0.0), basePoint + QPointF(-(d + 4.0), 0.0));
+      p.drawLine(basePoint + QPointF((d + 1.5), 0.0), basePoint + QPointF((d + 4.0), 0.0));
+    };
+    drawAnchor(QPen(QColor(0, 0, 0, 225), 2.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    drawAnchor(QPen(Qt::white, 1.3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     if (hasFocus()) {
       p.setPen(QPen(palette().color(QPalette::Highlight), 2.0));
       p.setBrush(Qt::NoBrush);

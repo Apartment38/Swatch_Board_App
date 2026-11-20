@@ -712,18 +712,17 @@ protected:
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
     const QRect r = rect();
-    const QRectF frameRect = QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5);
-    const qreal radius = 4.0;
-    QPainterPath clip;
-    clip.addRoundedRect(frameRect, radius, radius);
-
     const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
-    QColor border = darkSurface ? QColor(255, 255, 255, 65)
-                                : palette().color(QPalette::Mid);
-    if (!darkSurface)
-      border.setAlpha(180);
 
     if (stripColors.isEmpty()) {
+      const QRectF frameRect = QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5);
+      const qreal radius = 4.0;
+      QPainterPath clip;
+      clip.addRoundedRect(frameRect, radius, radius);
+      QColor border = darkSurface ? QColor(255, 255, 255, 65)
+                                  : palette().color(QPalette::Mid);
+      if (!darkSurface)
+        border.setAlpha(180);
       p.save();
       p.setClipPath(clip);
       p.fillRect(r, palette().color(QPalette::Base));
@@ -737,6 +736,14 @@ protected:
     }
 
     const int n = stripColors.size();
+    const int gap = (n > 1 && r.width() >= n * 8) ? 3 : 0;
+    const double availW = qMax<double>(n, r.width() - gap * (n - 1));
+    auto tileIntRect = [&](int i) {
+      const int x0 = qRound(i * availW / n) + i * gap;
+      const int x1 = (i == n - 1) ? r.width() : qRound((i + 1) * availW / n) + i * gap;
+      return QRect(x0, r.top(), qMax(1, x1 - x0), r.height());
+    };
+
     QFont labelFont = font();
     labelFont.setBold(true);
     if (labelFont.pointSizeF() > 0)
@@ -748,36 +755,35 @@ protected:
     bool showFull = true;
     bool showShort = true;
     for (int i = 0; i < n; ++i) {
-      const int x0 = qRound(i * r.width() / double(n));
-      const int x1 = qRound((i + 1) * r.width() / double(n));
-      const int segW = qMax(1, x1 - x0);
+      const int segW = tileIntRect(i).width();
       const QString full = labelFor(i);
-      if (segW < fm.horizontalAdvance(full) + 10)
+      if (segW < fm.horizontalAdvance(full) + 8)
         showFull = false;
       const QString shortLabel =
           (stripColors[i].alpha() == 255 && full.size() == 9) ? full.left(7)
                                                                : full;
-      if (segW < fm.horizontalAdvance(shortLabel) + 10)
+      if (segW < fm.horizontalAdvance(shortLabel) + 8)
         showShort = false;
     }
 
-    p.save();
-    p.setClipPath(clip);
+    const QColor tileBorder =
+        darkSurface ? QColor(255, 255, 255, 65) : QColor(0, 0, 0, 72);
     p.setFont(labelFont);
     for (int i = 0; i < n; ++i) {
-      const int x0 = qRound(i * r.width() / double(n));
-      const int x1 = qRound((i + 1) * r.width() / double(n));
-      const QRect segRect(x0, r.top(), qMax(1, x1 - x0), r.height());
+      const QRect segRect = tileIntRect(i);
+      const QRectF tileRect = QRectF(segRect).adjusted(0.5, 0.5, -0.5, -0.5);
+      const qreal tileRadius = qMin<qreal>(3.5, tileRect.width() / 2.0);
       const QColor &c = stripColors[i];
       const bool translucent = c.alpha() < 255;
+
+      QPainterPath tileClip;
+      tileClip.addRoundedRect(tileRect, tileRadius, tileRadius);
+      p.save();
+      p.setClipPath(tileClip);
       if (translucent)
         paintCheckerboard(p, segRect, 6);
       p.fillRect(segRect, c);
-      if (i > 0) {
-        p.fillRect(QRect(x0, r.top(), 1, r.height()),
-                   darkSurface ? QColor(255, 255, 255, 36)
-                               : QColor(0, 0, 0, 34));
-      }
+
       if (showFull || showShort) {
         const QString full = labelFor(i);
         const QString text =
@@ -794,7 +800,7 @@ protected:
         if (translucent) {
           QRectF bounds = p.boundingRect(textRect, Qt::AlignCenter, text);
           QRectF pill = bounds.adjusted(-4.0, -1.5, 4.0, 1.5)
-                            .intersected(QRectF(segRect).adjusted(2.0, 2.0, -2.0, -2.0));
+                            .intersected(tileRect.adjusted(2.0, 2.0, -2.0, -2.0));
           p.setPen(QPen(QColor(0, 0, 0, 40), 1.0));
           p.setBrush(QColor(255, 255, 255, 225));
           p.drawRoundedRect(pill, 3.0, 3.0);
@@ -805,11 +811,127 @@ protected:
           p.drawText(textRect, Qt::AlignCenter, text);
         }
       }
+      p.restore();
+
+      p.setPen(QPen(tileBorder, 1.0));
+      p.setBrush(Qt::NoBrush);
+      p.drawRoundedRect(tileRect, tileRadius, tileRadius);
+    }
+  }
+};
+class ColorChip : public QWidget {
+  QColor chipColor;
+
+  void updateToolTip() {
+    setToolTip(chipColor.isValid()
+                   ? QStringLiteral("Base color: %1").arg(hex(chipColor))
+                   : QStringLiteral("Invalid base color"));
+  }
+
+public:
+  explicit ColorChip(const QColor &initial = {}, QWidget *parent = nullptr)
+      : QWidget(parent), chipColor(initial) {
+    setFixedSize(24, 24);
+    setAccessibleName("Base color preview");
+    updateToolTip();
+  }
+  void setColor(const QColor &value) {
+    if (chipColor != value) {
+      chipColor = value;
+      updateToolTip();
+      update();
+    }
+  }
+
+protected:
+  void paintEvent(QPaintEvent *) override {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    const QRect r = rect();
+    const QRectF frame = QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5);
+    const qreal radius = 3.5;
+    QPainterPath clip;
+    clip.addRoundedRect(frame, radius, radius);
+    p.save();
+    p.setClipPath(clip);
+    if (chipColor.isValid()) {
+      if (chipColor.alpha() < 255)
+        paintCheckerboard(p, r, 6);
+      p.fillRect(r, chipColor);
+    } else {
+      p.fillRect(r, palette().color(QPalette::Base));
+      p.setPen(QPen(mutedColor(palette(), 145), 1.2));
+      p.drawLine(r.topLeft() + QPoint(5, 5), r.bottomRight() - QPoint(5, 5));
+      p.drawLine(r.topRight() + QPoint(-5, 5), r.bottomLeft() + QPoint(5, -5));
     }
     p.restore();
+    const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
+    const QColor border =
+        darkSurface ? QColor(255, 255, 255, 65) : QColor(0, 0, 0, 72);
     p.setPen(QPen(border, 1.0));
     p.setBrush(Qt::NoBrush);
-    p.drawRoundedRect(frameRect, radius, radius);
+    p.drawRoundedRect(frame, radius, radius);
+  }
+};
+class PrimaryActionButton : public QPushButton {
+  bool updatingStyle = false;
+
+  void applyStyle() {
+    if (updatingStyle)
+      return;
+    updatingStyle = true;
+    const QPalette basePal = QApplication::palette("QPushButton");
+    const QColor hi = basePal.color(QPalette::Active, QPalette::Highlight);
+    const QColor fg = basePal.color(QPalette::Active, QPalette::ButtonText);
+    const auto rgba = [](const QColor &c, int a) {
+      return QString("rgba(%1, %2, %3, %4)")
+          .arg(c.red())
+          .arg(c.green())
+          .arg(c.blue())
+          .arg(a);
+    };
+    setStyleSheet(QString(
+                      "QPushButton {"
+                      "  background-color: %1;"
+                      "  border: 1px solid %2;"
+                      "  border-radius: 4px;"
+                      "  padding: 5px 18px;"
+                      "  color: %3;"
+                      "}"
+                      "QPushButton:hover {"
+                      "  background-color: %4;"
+                      "  border: 1px solid %5;"
+                      "}"
+                      "QPushButton:pressed {"
+                      "  background-color: %6;"
+                      "  border: 1px solid %7;"
+                      "}"
+                      "QPushButton:focus {"
+                      "  border: 1px solid %7;"
+                      "}")
+                      .arg(rgba(hi, 34), rgba(hi, 175), fg.name(),
+                           rgba(hi, 52), rgba(hi, 210),
+                           rgba(hi, 74), rgba(hi, 235)));
+    updatingStyle = false;
+  }
+
+public:
+  explicit PrimaryActionButton(const QString &label, QWidget *parent = nullptr)
+      : QPushButton(label, parent) {
+    setAccessibleName(label);
+    QFont f = font();
+    f.setWeight(QFont::DemiBold);
+    setFont(f);
+    applyStyle();
+  }
+
+protected:
+  void changeEvent(QEvent *e) override {
+    QPushButton::changeEvent(e);
+    if (!updatingStyle &&
+        (e->type() == QEvent::PaletteChange ||
+         e->type() == QEvent::ApplicationPaletteChange))
+      applyStyle();
   }
 };
 class Spectrum : public QWidget {
@@ -2500,51 +2622,108 @@ class Frontend : public QWidget {
     auto lock = nameRow->findChild<QCheckBox *>();
     if (!box || !lock)
       return;
-    const bool stacked = width > 0 && width < (150 + 12 + lock->sizeHint().width());
+    const bool stacked = width > 0 && width < (120 + 12 + lock->sizeHint().width());
     if (nameRow->property("stackedMode").isValid() &&
         nameRow->property("stackedMode").toBool() == stacked)
       return;
     nameRow->setProperty("stackedMode", stacked);
     box->setDirection(stacked ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
     box->setSpacing(stacked ? 4 : 12);
+    nameRow->updateGeometry();
+    if (auto *p = nameRow->parentWidget()) {
+      p->updateGeometry();
+      if (p->layout())
+        p->layout()->invalidate();
+    }
   }
   void layoutPaletteGenerator(QWidget *gen, int width) {
-    if (!gen || gen->objectName() != "paletteGenerator")
+    if (!gen || gen->objectName() != "paletteGenerator" || width <= 0)
       return;
-    auto columns = qobject_cast<QBoxLayout *>(gen->layout());
-    auto parameters = gen->findChild<QWidget *>("paletteParameters", Qt::FindDirectChildrenOnly);
-    auto selector = gen->findChild<QWidget *>("paletteSelector", Qt::FindDirectChildrenOnly);
-    if (!columns || !parameters || !selector)
-      return;
-    const bool compact = width < 620;
-    if (gen->property("compactMode").isValid() &&
-        gen->property("compactMode").toBool() == compact)
-      return;
-    gen->setProperty("compactMode", compact);
-    columns->setDirection(compact ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
-    columns->setSpacing(compact ? 10 : 16);
-    columns->removeWidget(parameters);
-    columns->removeWidget(selector);
-    if (compact) {
-      selector->setMinimumWidth(0);
-      selector->setMaximumWidth(QWIDGETSIZE_MAX);
-      selector->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-      if (auto *sl = qobject_cast<QVBoxLayout *>(selector->layout()))
-        sl->setSpacing(4);
-      if (auto *wheel = selector->findChild<QWidget *>("paletteWheel"))
-        wheel->setFixedSize(124, 124);
-      columns->addWidget(selector, 0);
-      columns->addWidget(parameters, 0);
-    } else {
-      selector->setMinimumWidth(208);
-      selector->setMaximumWidth(216);
-      selector->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
-      if (auto *sl = qobject_cast<QVBoxLayout *>(selector->layout()))
-        sl->setSpacing(8);
-      if (auto *wheel = selector->findChild<QWidget *>("paletteWheel"))
-        wheel->setFixedSize(160, 160);
-      columns->addWidget(parameters, 1, Qt::AlignTop);
-      columns->addWidget(selector, 0, Qt::AlignTop);
+    bool changed = false;
+    auto genRoot = qobject_cast<QVBoxLayout *>(gen->layout());
+    auto columns = gen->findChild<QBoxLayout *>("paletteGeneratorColumns");
+    auto parameters =
+        gen->findChild<QWidget *>("paletteParameters", Qt::FindDirectChildrenOnly);
+    auto selector =
+        gen->findChild<QWidget *>("paletteSelector", Qt::FindDirectChildrenOnly);
+    if (columns && parameters && selector) {
+      const bool compact = width < 640;
+      if (!gen->property("compactMode").isValid() ||
+          gen->property("compactMode").toBool() != compact) {
+        changed = true;
+        gen->setProperty("compactMode", compact);
+        if (genRoot)
+          genRoot->setSpacing(compact ? 8 : 10);
+        if (auto *parentWidget = gen->parentWidget()) {
+          if (auto *genSection =
+                  parentWidget->findChild<QVBoxLayout *>("paletteGenSection"))
+            genSection->setSpacing(compact ? 2 : 6);
+        }
+        while (columns->count() > 0)
+          delete columns->takeAt(0);
+        columns->setDirection(compact ? QBoxLayout::TopToBottom
+                                      : QBoxLayout::LeftToRight);
+        columns->setSpacing(compact ? 10 : 24);
+        if (compact) {
+          parameters->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+          selector->setMinimumWidth(0);
+          selector->setMaximumWidth(QWIDGETSIZE_MAX);
+          selector->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+          if (auto *sl = qobject_cast<QVBoxLayout *>(selector->layout()))
+            sl->setSpacing(4);
+          if (auto *wheel = selector->findChild<QWidget *>("paletteWheel"))
+            wheel->setFixedSize(124, 124);
+          if (auto *strip = selector->findChild<QWidget *>("palettePreviewStrip"))
+            strip->setFixedHeight(32);
+          columns->addWidget(selector, 0);
+          columns->addWidget(parameters, 0);
+        } else {
+          parameters->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+          selector->setMinimumWidth(260);
+          selector->setMaximumWidth(268);
+          selector->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+          if (auto *sl = qobject_cast<QVBoxLayout *>(selector->layout()))
+            sl->setSpacing(8);
+          if (auto *wheel = selector->findChild<QWidget *>("paletteWheel"))
+            wheel->setFixedSize(168, 168);
+          if (auto *strip = selector->findChild<QWidget *>("palettePreviewStrip"))
+            strip->setFixedHeight(36);
+          columns->addWidget(parameters, 0, Qt::AlignTop);
+          columns->addWidget(selector, 0, Qt::AlignTop);
+          columns->addStretch(1);
+        }
+      }
+    }
+    auto footer = gen->findChild<QWidget *>("savedGenerationFooter",
+                                            Qt::FindDirectChildrenOnly);
+    auto footerLayout = footer ? qobject_cast<QBoxLayout *>(footer->layout()) : nullptr;
+    auto savedLabel =
+        footer ? footer->findChild<QLabel *>("savedGenerationLabel") : nullptr;
+    auto savedRow =
+        footer ? footer->findChild<QWidget *>("savedGenerationRow") : nullptr;
+    if (footer && footerLayout && savedLabel && savedRow) {
+      const bool stackedFooter = width < 520;
+      if (!gen->property("stackedFooterMode").isValid() ||
+          gen->property("stackedFooterMode").toBool() != stackedFooter) {
+        changed = true;
+        gen->setProperty("stackedFooterMode", stackedFooter);
+        footerLayout->setDirection(stackedFooter ? QBoxLayout::TopToBottom
+                                                 : QBoxLayout::LeftToRight);
+        footerLayout->setSpacing(stackedFooter ? 4 : 8);
+        footerLayout->setAlignment(
+            savedLabel, stackedFooter ? Qt::AlignLeft : Qt::AlignVCenter);
+        footerLayout->setStretchFactor(savedLabel, 0);
+        footerLayout->setStretchFactor(savedRow, stackedFooter ? 0 : 1);
+        footer->updateGeometry();
+      }
+    }
+    if (changed) {
+      gen->updateGeometry();
+      if (auto *p = gen->parentWidget()) {
+        p->updateGeometry();
+        if (p->layout())
+          p->layout()->invalidate();
+      }
     }
   }
   QWidget *palettePage();
@@ -3564,6 +3743,30 @@ QWidget *Frontend::palettePage() {
   l->setSpacing(10);
 
   const QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+  const QStringList alignedLabels = {
+      "Name:", "Library:", "Mode:", "Base color:", "Count:",
+      "Hue range:", "Lightness:", "Chroma:", "Contrast:"};
+  int labelW = fontMetrics().horizontalAdvance("Base color:") + 6;
+  for (const auto &lbl : alignedLabels)
+    labelW = qMax(labelW, fontMetrics().horizontalAdvance(lbl) + 6);
+  auto addAlignedRow = [labelW](QFormLayout *form, QWidget *labelParent,
+                                const QString &text, QWidget *field,
+                                QWidget *buddy = nullptr) {
+    auto *lbl = new QLabel(text, labelParent);
+    lbl->setMinimumWidth(labelW);
+    lbl->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    if (buddy)
+      lbl->setBuddy(buddy);
+    form->addRow(lbl, field);
+    return lbl;
+  };
+  auto applyMuted = [](QLabel *label, int alpha = 165) {
+    QPalette pal = label->palette();
+    const QColor muted = mutedColor(pal, alpha);
+    pal.setColor(QPalette::WindowText, muted);
+    pal.setColor(QPalette::Text, muted);
+    label->setPalette(pal);
+  };
 
   // Section 1: Palette & Library
   auto metaForm = new QFormLayout;
@@ -3582,7 +3785,7 @@ QWidget *Frontend::palettePage() {
   nameRowLayout->setSpacing(12);
   auto name = line("Palette name", str(p, "name"), nameRow);
   name->setPlaceholderText("Untitled");
-  name->setMinimumWidth(140);
+  name->setMinimumWidth(110);
   name->setMaximumWidth(260);
   name->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   connect(name, &QLineEdit::editingFinished, this, [this, name] {
@@ -3597,7 +3800,7 @@ QWidget *Frontend::palettePage() {
   });
   nameRowLayout->addWidget(name, 1);
   nameRowLayout->addWidget(historyLock, 0, Qt::AlignVCenter);
-  metaForm->addRow("Name:", nameRow);
+  addAlignedRow(metaForm, w, "Name:", nameRow, name);
 
   auto libRow = new QWidget(w);
   auto libLayout = new QHBoxLayout(libRow);
@@ -3612,7 +3815,7 @@ QWidget *Frontend::palettePage() {
   saved->completer()->setFilterMode(Qt::MatchContains);
   saved->completer()->setCompletionMode(QCompleter::PopupCompletion);
   saved->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-  saved->setMinimumContentsLength(14);
+  saved->setMinimumContentsLength(6);
   saved->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   libLayout->addWidget(saved, 1);
 
@@ -3639,28 +3842,42 @@ QWidget *Frontend::palettePage() {
   deleteBtn->setEnabled(hasSaved);
   libLayout->addWidget(deleteBtn, 0);
 
-  metaForm->addRow("Library:", libRow);
+  addAlignedRow(metaForm, w, "Library:", libRow, saved);
   l->addLayout(metaForm);
 
   l->addWidget(new Hairline(w));
 
   // Section 2: Generate palette
+  auto genSection = new QVBoxLayout;
+  genSection->setObjectName("paletteGenSection");
+  genSection->setContentsMargins(0, 0, 0, 0);
+  genSection->setSpacing(6);
+
   auto genTitle = new QLabel("Generate palette", w);
   QFont genTitleFont = genTitle->font();
-  genTitleFont.setWeight(QFont::DemiBold);
+  genTitleFont.setWeight(QFont::Bold);
+  if (genTitleFont.pointSizeF() > 0)
+    genTitleFont.setPointSizeF(genTitleFont.pointSizeF() + 1.5);
+  else if (genTitleFont.pixelSize() > 0)
+    genTitleFont.setPixelSize(genTitleFont.pixelSize() + 2);
   genTitle->setFont(genTitleFont);
-  l->addWidget(genTitle);
+  genSection->addWidget(genTitle);
 
   auto gen = new QWidget(w);
   gen->setObjectName("paletteGenerator");
   gen->installEventFilter(this);
-  auto columns = new QBoxLayout(QBoxLayout::LeftToRight, gen);
+  auto genRoot = new QVBoxLayout(gen);
+  genRoot->setContentsMargins(0, 0, 0, 0);
+  genRoot->setSpacing(10);
+
+  auto columns = new QBoxLayout(QBoxLayout::LeftToRight);
+  columns->setObjectName("paletteGeneratorColumns");
   columns->setContentsMargins(0, 0, 0, 0);
-  columns->setSpacing(16);
+  columns->setSpacing(24);
 
   auto parameters = new QWidget(gen);
   parameters->setObjectName("paletteParameters");
-  parameters->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+  parameters->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
   auto f = new QFormLayout(parameters);
   f->setContentsMargins(0, 0, 0, 0);
   f->setHorizontalSpacing(8);
@@ -3671,55 +3888,21 @@ QWidget *Frontend::palettePage() {
 
   auto selector = new QWidget(gen);
   selector->setObjectName("paletteSelector");
-  selector->setMinimumWidth(208);
-  selector->setMaximumWidth(216);
+  selector->setMinimumWidth(260);
+  selector->setMaximumWidth(268);
   selector->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
   auto selectorLayout = new QVBoxLayout(selector);
   selectorLayout->setContentsMargins(0, 0, 0, 0);
   selectorLayout->setSpacing(8);
 
-  columns->addWidget(parameters, 1, Qt::AlignTop);
+  columns->addWidget(parameters, 0, Qt::AlignTop);
   columns->addWidget(selector, 0, Qt::AlignTop);
+  columns->addStretch(1);
+  genRoot->addLayout(columns);
 
-  auto generationRow = new QWidget(parameters);
-  generationRow->setObjectName("savedGenerationRow");
-  auto generationLayout = new QHBoxLayout(generationRow);
-  generationLayout->setContentsMargins(0, 0, 0, 0);
-  generationLayout->setSpacing(6);
-  auto generations =
-      combo("Palette generations", array(p, "generations"), generationRow);
-  generations->setSizeAdjustPolicy(
-      QComboBox::AdjustToMinimumContentsLengthWithIcon);
-  generations->setMinimumContentsLength(20);
-  // Compact layouts can shrink the selector while wider layouts fit its text.
-  generations->setMinimumWidth(generations->minimumSizeHint().width());
-  generations->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-  int generationIndex =
-      generations->findData(generationDraft.value("generation").toString());
-  if (generationIndex >= 0)
-    generations->setCurrentIndex(generationIndex);
-  connect(
-      generations, &QComboBox::currentIndexChanged, this, [this, generations] {
-        generationDraft["generation"] = generations->currentData().toString();
-      });
-  auto load = toolButton("Load generation",
-                         {"document-open-recent-symbolic", "document-open-recent"},
-                         generationRow, [this, generations] {
-                           send({{"op", "palette_generation"},
-                                 {"id", generations->currentData().toString()}});
-                         });
-  load->setIconSize(QSize(16, 16));
-  bool hasGenerations = generations->count() > 0;
-  if (!hasGenerations) {
-    generations->addItem("No saved generations");
-    generations->setEnabled(false);
-  }
-  load->setEnabled(hasGenerations);
-  generationLayout->addWidget(generations, 1);
-  generationLayout->addWidget(load, 0);
-  f->addRow("Saved generations:", generationRow);
-  f->labelForField(generationRow)->setObjectName("savedGenerationLabel");
+  const int fieldW = 248;
 
+  // Basic parameters group
   auto mode = new QComboBox(parameters);
   mode->setAccessibleName("Generation mode");
   for (auto entry : QList<QPair<QString, QString>>{
@@ -3735,53 +3918,82 @@ QWidget *Frontend::palettePage() {
   int modeIndex = mode->findData(generationDraft.value("mode").toString());
   if (modeIndex >= 0)
     mode->setCurrentIndex(modeIndex);
-  mode->setMaximumWidth(240);
+  mode->setFixedWidth(fieldW);
   connect(mode, &QComboBox::currentIndexChanged, this, [this, mode] {
     generationDraft["mode"] = mode->currentData().toString();
   });
-  f->addRow("Mode:", mode);
+  addAlignedRow(f, parameters, "Mode:", mode, mode);
 
-  auto count =
-      spin("Count", generationDraft.value("count").toInt(5), 1, 64, parameters);
-  count->setMaximumWidth(96);
-  connect(count, &QSpinBox::valueChanged, this,
-          [this](int value) { generationDraft["count"] = value; });
-  f->addRow("Count:", count);
-
-  auto seed =
-      line("Random seed", generationDraft.value("seed").toString("0"), parameters);
-  seed->setFont(monoFont);
-  seed->setPlaceholderText("0");
-  seed->setMaximumWidth(160);
-  connect(seed, &QLineEdit::textChanged, this,
-          [this](const QString &value) { generationDraft["seed"] = value; });
-  f->addRow("Seed:", seed);
-
+  auto resolveBaseColor = [this](const QString &text) {
+    return color(text.isEmpty() ? str(object(state.value("mixer")), "current")
+                                : text);
+  };
+  auto baseRow = new QWidget(parameters);
+  baseRow->setFixedWidth(fieldW);
+  auto baseRowLayout = new QHBoxLayout(baseRow);
+  baseRowLayout->setContentsMargins(0, 0, 0, 0);
+  baseRowLayout->setSpacing(6);
   auto base = line("Base color (empty for current)",
-                   generationDraft.value("base").toString(), parameters);
+                   generationDraft.value("base").toString(), baseRow);
   base->setFont(monoFont);
   base->setPlaceholderText("Current mixer color");
-  base->setMaximumWidth(210);
+  base->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  const QColor initialBase = resolveBaseColor(base->text());
+  auto baseChip = new ColorChip(initialBase, baseRow);
+  baseRowLayout->addWidget(baseChip, 0, Qt::AlignVCenter);
+  baseRowLayout->addWidget(base, 1);
   connect(base, &QLineEdit::textChanged, this,
-          [this](const QString &value) { generationDraft["base"] = value; });
-  f->addRow("Base color:", base);
-
-  QColor initialBase = color(base->text().isEmpty()
-                                 ? str(object(state.value("mixer")), "current")
-                                 : base->text());
-  auto wheel = new GeneratorWheel(
-      initialBase, [base](QColor c) { base->setText(hex(c)); }, selector);
-  wheel->setObjectName("paletteWheel");
-  connect(base, &QLineEdit::textChanged, wheel,
-          [this, wheel](const QString &text) {
-            wheel->setColor(
-                color(text.isEmpty()
-                          ? str(object(state.value("mixer")), "current")
-                          : text));
+          [this, baseChip, resolveBaseColor](const QString &value) {
+            generationDraft["base"] = value;
+            baseChip->setColor(resolveBaseColor(value));
           });
-  wheel->setFixedSize(160, 160);
-  selectorLayout->addWidget(wheel, 0, Qt::AlignHCenter);
+  addAlignedRow(f, parameters, "Base color:", baseRow, base);
 
+  auto countSeedRow = new QWidget(parameters);
+  countSeedRow->setFixedWidth(fieldW);
+  auto countSeedLayout = new QHBoxLayout(countSeedRow);
+  countSeedLayout->setContentsMargins(0, 0, 0, 0);
+  countSeedLayout->setSpacing(0);
+  auto count = spin("Count", generationDraft.value("count").toInt(5), 1, 64,
+                    countSeedRow);
+  count->setFixedWidth(qMax(58, count->sizeHint().width()));
+  connect(count, &QSpinBox::valueChanged, this,
+          [this](int value) { generationDraft["count"] = value; });
+  auto seedLabel = new QLabel("Seed:", countSeedRow);
+  applyMuted(seedLabel, 175);
+  auto seed = line("Random seed", generationDraft.value("seed").toString("0"),
+                   countSeedRow);
+  seed->setFont(monoFont);
+  seed->setPlaceholderText("0");
+  seed->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  seedLabel->setBuddy(seed);
+  connect(seed, &QLineEdit::textChanged, this,
+          [this](const QString &value) { generationDraft["seed"] = value; });
+  auto randomSeedBtn = new QToolButton(countSeedRow);
+  randomSeedBtn->setAutoRaise(true);
+  randomSeedBtn->setFixedSize(26, 26);
+  randomSeedBtn->setIcon(themedIcon(
+      {"roll-symbolic", "roll", "view-refresh-symbolic", "view-refresh"},
+      QStyle::SP_BrowserReload));
+  randomSeedBtn->setIconSize(QSize(16, 16));
+  randomSeedBtn->setToolTip("Randomize seed");
+  randomSeedBtn->setAccessibleName("Randomize seed");
+  connect(randomSeedBtn, &QToolButton::clicked, this, [seed] {
+    seed->setText(QString::number(QRandomGenerator::global()->generate()));
+  });
+  countSeedLayout->addWidget(count, 0, Qt::AlignVCenter);
+  countSeedLayout->addSpacing(10);
+  countSeedLayout->addWidget(seedLabel, 0, Qt::AlignVCenter);
+  countSeedLayout->addSpacing(6);
+  countSeedLayout->addWidget(seed, 1);
+  countSeedLayout->addSpacing(4);
+  countSeedLayout->addWidget(randomSeedBtn, 0, Qt::AlignVCenter);
+  addAlignedRow(f, parameters, "Count:", countSeedRow, count);
+
+  // Subtle 8px extra vertical breathing space before constraint tuning
+  f->addItem(new QSpacerItem(0, 2, QSizePolicy::Minimum, QSizePolicy::Fixed));
+
+  // Range & contrast tuning group
   auto hmin = decimal("Minimum hue", generationDraft.value("hmin").toDouble(0),
                       0, 360, parameters),
        hmax = decimal("Maximum hue",
@@ -3815,49 +4027,66 @@ QWidget *Frontend::palettePage() {
   cmin->setValue(generationDraft.value("cmin").toDouble(0));
   cmax->setValue(generationDraft.value("cmax").toDouble(.4));
 
-  const int rangeSpinW = qMax(hmax->sizeHint().width(), 88);
   for (auto pair : QList<QPair<QDoubleSpinBox *, QString>>{{hmin, "hmin"},
                                                            {hmax, "hmax"},
                                                            {lmin, "lmin"},
                                                            {lmax, "lmax"},
                                                            {cmin, "cmin"},
                                                            {cmax, "cmax"}}) {
-    pair.first->setFixedWidth(rangeSpinW);
+    pair.first->setMinimumWidth(0);
+    pair.first->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     connect(
         pair.first, &QDoubleSpinBox::valueChanged, this,
         [this, pair](double value) { generationDraft[pair.second] = value; });
   }
-  auto makeRangeRow = [parameters](QDoubleSpinBox *lo, QDoubleSpinBox *hi) {
+  auto makeRangeRow = [parameters, fieldW, applyMuted](QDoubleSpinBox *lo,
+                                                       QDoubleSpinBox *hi) {
     auto row = new QWidget(parameters);
+    row->setFixedWidth(fieldW);
     auto rowLayout = new QHBoxLayout(row);
     rowLayout->setContentsMargins(0, 0, 0, 0);
     rowLayout->setSpacing(6);
     lo->setParent(row);
     hi->setParent(row);
     auto dash = new QLabel(QString::fromUtf8("–"), row);
-    QPalette pal = dash->palette();
-    const QColor muted = mutedColor(pal, 165);
-    pal.setColor(QPalette::WindowText, muted);
-    pal.setColor(QPalette::Text, muted);
-    dash->setPalette(pal);
-    rowLayout->addWidget(lo);
-    rowLayout->addWidget(dash);
-    rowLayout->addWidget(hi);
-    rowLayout->addStretch(1);
+    applyMuted(dash, 165);
+    rowLayout->addWidget(lo, 1);
+    rowLayout->addWidget(dash, 0, Qt::AlignCenter);
+    rowLayout->addWidget(hi, 1);
     return row;
   };
-  f->addRow("Hue range:", makeRangeRow(hmin, hmax));
-  f->addRow("Lightness:", makeRangeRow(lmin, lmax));
-  f->addRow("Chroma:", makeRangeRow(cmin, cmax));
+  addAlignedRow(f, parameters, "Hue range:", makeRangeRow(hmin, hmax), hmin);
+  addAlignedRow(f, parameters, "Lightness:", makeRangeRow(lmin, lmax), lmin);
+  addAlignedRow(f, parameters, "Chroma:", makeRangeRow(cmin, cmax), cmin);
 
+  auto contrastRow = new QWidget(parameters);
+  contrastRow->setFixedWidth(fieldW);
+  auto contrastLayout = new QHBoxLayout(contrastRow);
+  contrastLayout->setContentsMargins(0, 0, 0, 0);
+  contrastLayout->setSpacing(4);
   auto contrast = line("Contrast (optional)",
-                       generationDraft.value("contrast").toString(), parameters);
+                       generationDraft.value("contrast").toString(),
+                       contrastRow);
   contrast->setPlaceholderText("Optional (e.g. 4.5)");
-  contrast->setMaximumWidth(210);
+  contrast->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   connect(
       contrast, &QLineEdit::textChanged, this,
       [this](const QString &value) { generationDraft["contrast"] = value; });
-  f->addRow("Contrast:", contrast);
+  auto ratioLabel = new QLabel(":1", contrastRow);
+  applyMuted(ratioLabel, 165);
+  contrastLayout->addWidget(contrast, 1);
+  contrastLayout->addWidget(ratioLabel, 0, Qt::AlignVCenter);
+  addAlignedRow(f, parameters, "Contrast:", contrastRow, contrast);
+
+  auto wheel = new GeneratorWheel(
+      initialBase, [base](QColor c) { base->setText(hex(c)); }, selector);
+  wheel->setObjectName("paletteWheel");
+  connect(base, &QLineEdit::textChanged, wheel,
+          [wheel, resolveBaseColor](const QString &text) {
+            wheel->setColor(resolveBaseColor(text));
+          });
+  wheel->setFixedSize(168, 168);
+  selectorLayout->addWidget(wheel, 0, Qt::AlignHCenter);
 
   auto previewStrip = new PreviewStrip(selector);
   previewStrip->setObjectName("palettePreviewStrip");
@@ -3930,7 +4159,8 @@ QWidget *Frontend::palettePage() {
 
   updatePreview();
 
-  auto generateBtn = button("Generate", selector, [=, this] {
+  auto generateBtn = new PrimaryActionButton("Generate", selector);
+  connect(generateBtn, &QPushButton::clicked, selector, [=, this] {
     auto req = makeRequest("palette_generate");
     if (req.isEmpty()) {
       QMessageBox::warning(
@@ -3941,19 +4171,82 @@ QWidget *Frontend::palettePage() {
     send(req);
   });
   generateBtn->setIcon(themedIcon(
-      {"color-fill-symbolic", "view-refresh-symbolic", "color-fill"},
+      {"tools-wizard-symbolic", "tools-wizard", "view-refresh-symbolic",
+       "view-refresh"},
       QStyle::SP_BrowserReload));
   generateBtn->setIconSize(QSize(16, 16));
   generateBtn->setToolTip("Generate a new palette using these settings");
-  selectorLayout->addWidget(generateBtn);
+  generateBtn->setFixedWidth(qMax(168, generateBtn->sizeHint().width()));
+  selectorLayout->addWidget(generateBtn, 0, Qt::AlignHCenter);
 
-  l->addWidget(gen);
+  // Saved generations recall footer spanning full generator width
+  genRoot->addWidget(new Hairline(gen));
+
+  auto savedFooter = new QWidget(gen);
+  savedFooter->setObjectName("savedGenerationFooter");
+  auto savedFooterLayout = new QBoxLayout(QBoxLayout::LeftToRight, savedFooter);
+  savedFooterLayout->setContentsMargins(0, 0, 0, 0);
+  savedFooterLayout->setSpacing(8);
+
+  auto savedLabel = new QLabel("Saved generations:", savedFooter);
+  savedLabel->setObjectName("savedGenerationLabel");
+  applyMuted(savedLabel, 205);
+
+  auto generationRow = new QWidget(savedFooter);
+  generationRow->setObjectName("savedGenerationRow");
+  generationRow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  auto generationLayout = new QHBoxLayout(generationRow);
+  generationLayout->setContentsMargins(0, 0, 0, 0);
+  generationLayout->setSpacing(6);
+  auto generations =
+      combo("Palette generations", array(p, "generations"), generationRow);
+  generations->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  generations->setSizeAdjustPolicy(
+      QComboBox::AdjustToMinimumContentsLengthWithIcon);
+  generations->setMinimumContentsLength(8);
+  int generationIndex =
+      generations->findData(generationDraft.value("generation").toString());
+  if (generationIndex >= 0)
+    generations->setCurrentIndex(generationIndex);
+  connect(
+      generations, &QComboBox::currentIndexChanged, this, [this, generations] {
+        generationDraft["generation"] = generations->currentData().toString();
+      });
+  savedLabel->setBuddy(generations);
+  auto load = toolButton("Load generation",
+                         {"document-open-recent-symbolic", "document-open-recent"},
+                         generationRow, [this, generations] {
+                           send({{"op", "palette_generation"},
+                                 {"id", generations->currentData().toString()}});
+                         });
+  load->setIconSize(QSize(16, 16));
+  bool hasGenerations = generations->count() > 0;
+  if (!hasGenerations) {
+    generations->addItem("No saved generations");
+    generations->setEnabled(false);
+  }
+  load->setEnabled(hasGenerations);
+  generationLayout->addWidget(generations, 1);
+  generationLayout->addWidget(load, 0);
+
+  savedFooterLayout->addWidget(savedLabel, 0, Qt::AlignVCenter);
+  savedFooterLayout->addWidget(generationRow, 1);
+  genRoot->addWidget(savedFooter);
+
+  genSection->addWidget(gen);
+  l->addLayout(genSection);
   auto status = new QLabel(
       str(p, "error").isEmpty() ? str(p, "status") : str(p, "error"), w);
   status->setWordWrap(true);
   status->setVisible(!status->text().isEmpty());
   l->addWidget(status);
   l->addStretch();
+
+  if (tabs && tabs->width() > 0) {
+    const int availW = qMax(1, tabs->width() - 36);
+    layoutPaletteGenerator(gen, availW);
+    layoutPaletteNameRow(nameRow, qMax(1, availW - labelW - 8));
+  }
 
   pageLayout->addWidget(scroll(w), 1);
   return page;
