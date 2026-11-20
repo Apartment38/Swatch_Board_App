@@ -332,25 +332,27 @@ protected:
     else if (underMouse())
       p.fillRect(r, dark ? QColor(255, 255, 255, 18) : QColor(0, 0, 0, 14));
     p.restore();
-    QFont f = font();
-    f.setBold(true);
-    p.setFont(f);
     const bool compactTile = r.height() < 44;
-    const QRect textRect =
-        r.adjusted(6, 2, (tileLocked && compactTile) ? -22 : -6, -2);
-    if (translucent) {
-      QRectF textBounds = p.boundingRect(textRect, Qt::AlignCenter, text());
-      QRectF pill = textBounds.adjusted(-6.0, -2.0, 6.0, 2.0);
-      const QRectF pillLimit = tileRect.adjusted(3.0, 2.0, -3.0, -2.0);
-      pill = pill.intersected(pillLimit);
-      p.setPen(QPen(QColor(0, 0, 0, 40), 1.0));
-      p.setBrush(QColor(255, 255, 255, 225));
-      p.drawRoundedRect(pill, 3.0, 3.0);
-      p.setPen(QColor(0x1B, 0x1E, 0x20));
-      p.drawText(textRect, Qt::AlignCenter, text());
-    } else {
-      p.setPen(fg);
-      p.drawText(textRect, Qt::AlignCenter, text());
+    if (!text().isEmpty()) {
+      QFont f = font();
+      f.setBold(true);
+      p.setFont(f);
+      const QRect textRect =
+          r.adjusted(6, 2, (tileLocked && compactTile) ? -22 : -6, -2);
+      if (translucent) {
+        QRectF textBounds = p.boundingRect(textRect, Qt::AlignCenter, text());
+        QRectF pill = textBounds.adjusted(-6.0, -2.0, 6.0, 2.0);
+        const QRectF pillLimit = tileRect.adjusted(3.0, 2.0, -3.0, -2.0);
+        pill = pill.intersected(pillLimit);
+        p.setPen(QPen(QColor(0, 0, 0, 40), 1.0));
+        p.setBrush(QColor(255, 255, 255, 225));
+        p.drawRoundedRect(pill, 3.0, 3.0);
+        p.setPen(QColor(0x1B, 0x1E, 0x20));
+        p.drawText(textRect, Qt::AlignCenter, text());
+      } else {
+        p.setPen(fg);
+        p.drawText(textRect, Qt::AlignCenter, text());
+      }
     }
     if (tileLocked) {
       const int sz = 14;
@@ -391,7 +393,8 @@ protected:
       }
     }
     if (hasFocus()) {
-      QPen focusPen(fg, 2.0);
+      QPen focusPen(text().isEmpty() ? palette().color(QPalette::Highlight) : fg,
+                    2.0);
       p.setPen(focusPen);
       p.setBrush(Qt::NoBrush);
       p.drawRoundedRect(tileRect.adjusted(1.0, 1.0, -1.0, -1.0), radius - 1.0,
@@ -448,6 +451,130 @@ protected:
     }
     dropped(index, e->mimeData()->text());
     e->acceptProposedAction();
+  }
+};
+class CurrentColorBanner : public QWidget {
+  std::function<void(QString)> dropped;
+  QLabel *hintLabel = nullptr;
+  bool dragHover = false;
+
+  void updateHintVisibility() {
+    if (hintLabel)
+      hintLabel->setVisible(width() >= 520);
+  }
+
+public:
+  CurrentColorBanner(const QColor &value, const QString &currentHex,
+                     const QString &outputText,
+                     std::function<void(QString)> onDrop,
+                     QWidget *parent = nullptr)
+      : QWidget(parent), dropped(std::move(onDrop)) {
+    setAcceptDrops(true);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    auto outer = new QVBoxLayout(this);
+    outer->setContentsMargins(0, 0, 0, 0);
+    outer->setSpacing(0);
+
+    auto row = new QHBoxLayout;
+    row->setContentsMargins(10, 6, 10, 6);
+    row->setSpacing(10);
+
+    auto chip = new Swatch(value, "Current color", this);
+    chip->setText(QString());
+    chip->setFixedSize(52, 26);
+    chip->setTileMode(true, false);
+    chip->setToolTip(
+        "Current color — drag to palette or theme, or drop a color here");
+    chip->paletteDrop(-1, [this](int, QString c) {
+      if (dropped && color(c).isValid())
+        dropped(c);
+    });
+    row->addWidget(chip, 0, Qt::AlignVCenter);
+
+    const QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    auto hexLabel = new QLabel(currentHex, this);
+    QFont hexFont = monoFont;
+    hexFont.setBold(true);
+    hexLabel->setFont(hexFont);
+    hexLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    row->addWidget(hexLabel, 0, Qt::AlignVCenter);
+
+    auto makeMuted = [this](const QString &text, int alpha, bool smaller = false) {
+      auto l = new QLabel(text, this);
+      if (smaller) {
+        QFont f = l->font();
+        if (f.pointSizeF() > 0)
+          f.setPointSizeF(qMax(8.5, f.pointSizeF() - 1.0));
+        else if (f.pixelSize() > 0)
+          f.setPixelSize(qMax(10, f.pixelSize() - 1));
+        l->setFont(f);
+      }
+      QPalette pal = l->palette();
+      const QColor muted = mutedColor(pal, alpha);
+      pal.setColor(QPalette::WindowText, muted);
+      pal.setColor(QPalette::Text, muted);
+      l->setPalette(pal);
+      return l;
+    };
+
+    if (!outputText.isEmpty()) {
+      row->addWidget(makeMuted(QString::fromUtf8("·"), 120), 0, Qt::AlignVCenter);
+      auto outLabel = makeMuted("Output: " + outputText, 175);
+      outLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+      outLabel->setMinimumWidth(0);
+      row->addWidget(outLabel, 0, Qt::AlignVCenter);
+    }
+
+    row->addStretch(1);
+
+    hintLabel = makeMuted(
+        QString::fromUtf8("Drag swatch to palette or theme · Drop color here"),
+        130, true);
+    hintLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    row->addWidget(hintLabel, 0, Qt::AlignVCenter);
+
+    outer->addLayout(row);
+    outer->addWidget(new Hairline(this));
+    updateHintVisibility();
+  }
+  QSize minimumSizeHint() const override {
+    return QSize(0, QWidget::minimumSizeHint().height());
+  }
+
+protected:
+  void resizeEvent(QResizeEvent *e) override {
+    QWidget::resizeEvent(e);
+    updateHintVisibility();
+  }
+  void paintEvent(QPaintEvent *e) override {
+    QWidget::paintEvent(e);
+    if (dragHover) {
+      QPainter p(this);
+      QColor fill = palette().color(QPalette::Highlight);
+      fill.setAlpha(24);
+      p.fillRect(rect(), fill);
+    }
+  }
+  void dragEnterEvent(QDragEnterEvent *e) override {
+    if (dropped && e->mimeData()->hasText() &&
+        color(e->mimeData()->text()).isValid()) {
+      dragHover = true;
+      update();
+      e->acceptProposedAction();
+    }
+  }
+  void dragLeaveEvent(QDragLeaveEvent *) override {
+    dragHover = false;
+    update();
+  }
+  void dropEvent(QDropEvent *e) override {
+    dragHover = false;
+    update();
+    if (dropped && e->mimeData()->hasText() &&
+        color(e->mimeData()->text()).isValid()) {
+      dropped(e->mimeData()->text());
+      e->acceptProposedAction();
+    }
   }
 };
 // A dropped swatch replaces the complete color value rather than being inserted
@@ -553,6 +680,7 @@ public:
       : QWidget(parent), h(hue), s(sat), v(val), changed(f) {
     setFixedSize(156, 156);
     setFocusPolicy(Qt::StrongFocus);
+    setCursor(Qt::CrossCursor);
     setAccessibleName("Saturation and value spectrum; arrow keys adjust");
   }
   void setHsv(double hue, double sat, double val) {
@@ -564,20 +692,56 @@ public:
 protected:
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    const QRectF bounds = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+    const qreal radius = 3.0;
+    QPainterPath clip;
+    clip.addRoundedRect(bounds, radius, radius);
+    p.save();
+    p.setClipPath(clip);
+    const double hueNorm = std::fmod(std::fmod(h, 360.0) + 360.0, 360.0) / 360.0;
     QLinearGradient a(0, 0, width(), 0);
     a.setColorAt(0, Qt::white);
-    a.setColorAt(1, QColor::fromHsvF(std::fmod(h, 360.0) / 360.0, 1, 1));
+    a.setColorAt(1, QColor::fromHsvF(hueNorm, 1.0, 1.0));
     p.fillRect(rect(), a);
     QLinearGradient b(0, 0, 0, height());
     b.setColorAt(0, Qt::transparent);
     b.setColorAt(1, Qt::black);
     p.fillRect(rect(), b);
-    p.setPen(Qt::white);
-    p.drawEllipse(
-        QPoint(qRound(s * (width() - 1) / 100), qRound((100 - v) * (height() - 1) / 100)), 5,
-        5);
+    p.restore();
+
+    QColor border = palette().color(QPalette::Mid);
+    border.setAlpha(185);
+    p.setPen(QPen(border, 1.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(bounds, radius, radius);
+
+    const qreal reticleR = 5.5;
+    const qreal pad = reticleR + 2.0;
+    const qreal rawX = s * (width() - 1) / 100.0;
+    const qreal rawY = (100.0 - v) * (height() - 1) / 100.0;
+    const QPointF center(
+        qBound(pad, rawX, qMax(pad, width() - 1.0 - pad)),
+        qBound(pad, rawY, qMax(pad, height() - 1.0 - pad)));
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(QColor(0, 0, 0, 210), 2.5));
+    p.drawEllipse(center, reticleR, reticleR);
+    p.setPen(QPen(Qt::white, 1.5));
+    p.drawEllipse(center, reticleR, reticleR);
+
+    if (hasFocus()) {
+      p.setPen(QPen(palette().color(QPalette::Highlight), 2.0));
+      p.setBrush(Qt::NoBrush);
+      p.drawRoundedRect(QRectF(rect()).adjusted(1.0, 1.0, -1.0, -1.0), radius,
+                        radius);
+    }
   }
-  void mousePressEvent(QMouseEvent *e) override { choose(e->pos(), false); }
+  void mousePressEvent(QMouseEvent *e) override {
+    if (e->button() == Qt::LeftButton) {
+      setFocus(Qt::MouseFocusReason);
+      choose(e->pos(), false);
+    }
+  }
   void mouseMoveEvent(QMouseEvent *e) override {
     if (e->buttons() & Qt::LeftButton)
       choose(e->pos(), false);
@@ -630,6 +794,7 @@ public:
     setFixedSize(120, 120);
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     setFocusPolicy(Qt::StrongFocus);
+    setCursor(Qt::CrossCursor);
     setAccessibleName("Mixer color wheel; arrow keys adjust hue and saturation");
   }
   void setHsv(double hue, double sat, double val) {
@@ -640,27 +805,50 @@ public:
 protected:
   void paintEvent(QPaintEvent *) override {
     const auto r = wheelRect();
-    const int side = qMax(1, int(r.width()));
+    const qreal dpr = devicePixelRatioF();
+    const int side = qMax(1, qRound(r.width() * dpr));
     QImage image(side, side, QImage::Format_ARGB32_Premultiplied);
+    image.setDevicePixelRatio(dpr);
     image.fill(Qt::transparent);
     const double radius = side / 2.0;
-    for (int y = 0; y < side; ++y) for (int x = 0; x < side; ++x) {
-      double dx = x + .5 - radius, dy = y + .5 - radius;
-      double sat = std::hypot(dx, dy) / radius;
-      if (sat <= 1) {
-        double hue = std::atan2(-dy, dx) / (2 * M_PI);
-        if (hue < 0) hue += 1;
-        image.setPixelColor(x, y, QColor::fromHsvF(hue, sat, 1));
+    const double aaBand = qMax(1.0, dpr);
+    for (int y = 0; y < side; ++y) {
+      for (int x = 0; x < side; ++x) {
+        const double dx = x + 0.5 - radius;
+        const double dy = y + 0.5 - radius;
+        const double dist = std::hypot(dx, dy);
+        if (dist <= radius + 0.5) {
+          const double sat = qBound(0.0, dist / radius, 1.0);
+          double hue = std::atan2(-dy, dx) / (2.0 * M_PI);
+          if (hue < 0.0) hue += 1.0;
+          const double edgeAlpha =
+              qBound(0.0, (radius + 0.5 - dist) / aaBand, 1.0);
+          QColor px = QColor::fromHsvF(hue, sat, 1.0);
+          px.setAlphaF(edgeAlpha);
+          image.setPixelColor(x, y, px);
+        }
       }
     }
     QPainter p(this);
-    p.setRenderHint(QPainter::Antialiasing);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setRenderHint(QPainter::SmoothPixmapTransform, true);
     p.drawImage(r.topLeft(), image);
+    p.setPen(QPen(QColor(0, 0, 0, 42), 1.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawEllipse(r.adjusted(0.5, 0.5, -0.5, -0.5));
     const double angle = h * M_PI / 180.0;
-    const QPointF marker = r.center() + QPointF(std::cos(angle), -std::sin(angle)) * (s * r.width() / 200.0);
-    p.setPen(QPen(Qt::black, 3)); p.drawEllipse(marker, 6, 6);
-    p.setPen(QPen(Qt::white, 1.5)); p.drawEllipse(marker, 6, 6);
-    if (hasFocus()) { p.setPen(QPen(palette().color(QPalette::Highlight), 2)); p.drawRect(rect().adjusted(1, 1, -2, -2)); }
+    const QPointF marker =
+        r.center() + QPointF(std::cos(angle), -std::sin(angle)) *
+                         (s * r.width() / 200.0);
+    p.setPen(QPen(QColor(0, 0, 0, 210), 2.5));
+    p.drawEllipse(marker, 5.5, 5.5);
+    p.setPen(QPen(Qt::white, 1.5));
+    p.drawEllipse(marker, 5.5, 5.5);
+    if (hasFocus()) {
+      p.setPen(QPen(palette().color(QPalette::Highlight), 2.0));
+      p.drawRoundedRect(QRectF(rect()).adjusted(1.0, 1.0, -1.0, -1.0), 3.0,
+                        3.0);
+    }
   }
   void mousePressEvent(QMouseEvent *e) override {
     if (e->button() == Qt::LeftButton) { setFocus(Qt::MouseFocusReason); choose(e->position(), false); }
@@ -1073,32 +1261,48 @@ class Frontend : public QWidget {
     return c;
   }
   QString actionHint(const QString &label, const QString &iconName) const {
-    if (iconName != "edit-undo" && iconName != "edit-redo")
+    if (!iconName.startsWith("edit-undo") && !iconName.startsWith("edit-redo"))
       return label;
-    auto key = iconName == "edit-undo" ? QKeySequence::Undo : QKeySequence::Redo;
+    auto key = iconName.startsWith("edit-undo") ? QKeySequence::Undo
+                                                : QKeySequence::Redo;
     return label + " (" + QKeySequence(key).toString(QKeySequence::NativeText) + ")";
   }
-  QToolButton *toolButton(const QString &label, const QString &iconName,
+  QToolButton *toolButton(const QString &label, const QStringList &iconNames,
                           QWidget *parent, const std::function<void()> &action) {
     auto b = new QToolButton(parent);
     b->setText(label);
     b->setAccessibleName(label);
-    b->setToolTip(actionHint(label, iconName));
+    b->setToolTip(actionHint(label, iconNames.value(0)));
     b->setProperty("boardAction", true);
-    b->setIcon(QIcon::fromTheme(iconName, style()->standardIcon(QStyle::SP_FileIcon)));
+    b->setIcon(themedIcon(iconNames, QStyle::SP_FileIcon));
     b->setToolButtonStyle(settings.value("board/toolbarLabels", true).toBool()
                               ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
     connect(b, &QToolButton::clicked, this, action);
     return b;
   }
-  QString actionIcon(const QString &op) const {
-    if (op.contains("undo")) return "edit-undo";
-    if (op.contains("redo")) return "edit-redo";
-    if (op.contains("copy")) return "edit-copy";
-    if (op.contains("save")) return "document-save";
-    if (op.contains("new")) return "document-new";
-    if (op.contains("mix")) return "applications-graphics";
-    return "list-add";
+  QToolButton *toolButton(const QString &label, const QString &iconName,
+                          QWidget *parent, const std::function<void()> &action) {
+    return toolButton(label, QStringList{iconName}, parent, action);
+  }
+  QStringList actionIcon(const QString &op) const {
+    if (op == "mixer_copy" || op.contains("copy"))
+      return {"edit-copy-symbolic", "edit-copy"};
+    if (op == "palette_add_current" || op == "mixer_source_add")
+      return {"list-add-symbolic", "list-add"};
+    if (op.contains("undo"))
+      return {"edit-undo-symbolic", "edit-undo"};
+    if (op.contains("redo"))
+      return {"edit-redo-symbolic", "edit-redo"};
+    if (op == "mixer_mix")
+      return {"merge-symbolic", "merge", "color-mode-black-white-symbolic",
+              "color-mode-black-white"};
+    if (op.contains("duplicate"))
+      return {"edit-duplicate-symbolic", "edit-duplicate"};
+    if (op.contains("save"))
+      return {"document-save-symbolic", "document-save"};
+    if (op.contains("new"))
+      return {"document-new-symbolic", "document-new"};
+    return {"list-add-symbolic", "list-add"};
   }
   QIcon themedIcon(const QStringList &names,
                    QStyle::StandardPixmap fallback) const {
@@ -1407,6 +1611,7 @@ class Frontend : public QWidget {
       auto content = new QWidget(splitter);
       boardContent = new QVBoxLayout(content);
       boardContent->setContentsMargins(0, 0, 0, 0);
+      boardContent->setSpacing(0);
       pinnedCurrent = currentColor();
       boardContent->addWidget(pinnedCurrent);
       boardContent->addWidget(tabs, 1);
@@ -1657,13 +1862,14 @@ class Frontend : public QWidget {
     }
   }
   QWidget *currentColor() {
-    auto current = new Swatch(color(str(object(state.value("mixer")), "current")), "Current color");
-    current->setText("Current color  " + str(object(state.value("mixer")), "current"));
-    current->paletteDrop(-1, [this](int, QString c) {
-      if (color(c).isValid())
-        send({{"op", "mixer_select"}, {"color", c}});
-    });
-    return current;
+    auto m = object(state.value("mixer"));
+    const QString currentHex = str(m, "current");
+    const QString outputText = str(m, "output");
+    return new CurrentColorBanner(
+        color(currentHex), currentHex, outputText, [this](QString c) {
+          if (color(c).isValid())
+            send({{"op", "mixer_select"}, {"color", c}});
+        });
   }
   QWidget *mixerPage() {
     auto page = new QWidget;
@@ -1671,7 +1877,11 @@ class Frontend : public QWidget {
     auto layout = new QVBoxLayout(page);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
-    layout->addWidget(scroll(mixer()));
+    auto pinnedLine = new Hairline(page);
+    pinnedLine->setObjectName("mixerActionsHairline");
+    pinnedLine->hide();
+    layout->addWidget(pinnedLine);
+    layout->addWidget(scroll(mixer()), 1);
     layoutMixerActions(page);
     page->installEventFilter(this);
     return page;
@@ -1680,8 +1890,12 @@ class Frontend : public QWidget {
     if (!page || page->objectName() != "mixerPage") return;
     auto actions = page->findChild<QToolBar *>("mixerActions");
     auto viewport = page->findChild<QScrollArea *>();
-    auto content = viewport->widget();
+    auto content = viewport ? viewport->widget() : nullptr;
+    if (!actions || !content) return;
     const bool pinned = shortMixer();
+    actions->setContentsMargins(pinned ? 6 : 0, 2, pinned ? 6 : 0, 2);
+    if (auto line = page->findChild<QWidget *>("mixerActionsHairline"))
+      line->setVisible(pinned);
     auto parent = pinned ? page : content;
     if (actions->parentWidget() == parent) return;
     auto layout = qobject_cast<QBoxLayout *>(parent->layout());
@@ -1698,11 +1912,29 @@ class Frontend : public QWidget {
     auto w = new QWidget;
     w->setObjectName("mixerContent");
     auto l = new QVBoxLayout(w);
+    l->setContentsMargins(10, 10, 10, 10);
+    l->setSpacing(8);
+    const QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    auto channelLabel = [](const QString &text, QWidget *parent) {
+      auto lbl = new QLabel(text, parent);
+      QPalette pal = lbl->palette();
+      const QColor muted = mutedColor(pal, 165);
+      pal.setColor(QPalette::WindowText, muted);
+      pal.setColor(QPalette::Text, muted);
+      lbl->setPalette(pal);
+      return lbl;
+    };
     auto hsv = array(m, "hsv"), rgba = array(m, "rgba");
     double h = hsv[0].toDouble(), s = hsv[1].toDouble(), v = hsv[2].toDouble();
     auto columns = new QVBoxLayout;
     columns->setObjectName("mixerColumns");
-    auto controls = new QHBoxLayout;
+    columns->setSpacing(12);
+    auto selectorsBox = new QWidget(w);
+    selectorsBox->setObjectName("mixerSelectors");
+    selectorsBox->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+    auto controls = new QHBoxLayout(selectorsBox);
+    controls->setContentsMargins(0, 0, 0, 0);
+    controls->setSpacing(14);
     auto changed = [this](double h, double s, double v, bool final) {
           spectrumDragging = true;
           send({{"op", "mixer_hsv"}, {"h", h}, {"s", s}, {"v", v}});
@@ -1713,39 +1945,59 @@ class Frontend : public QWidget {
             renderBoard(previous);
           }
         };
-    auto wheelArea = new QWidget(w);
+    auto wheelArea = new QWidget(selectorsBox);
     auto wheelLayout = new QVBoxLayout(wheelArea);
     wheelLayout->setContentsMargins(0, 0, 0, 0);
-    wheelLayout->setSpacing(0);
+    wheelLayout->setSpacing(3);
     mixerWheel = new MixerWheel(h, s, v, changed, wheelArea);
+    mixerWheel->setObjectName("mixerWheel");
     mixerReadout = new QLabel(mixerHsvReadout(h, s, v), wheelArea);
     mixerReadout->setObjectName("mixerHsvReadout");
+    QFont readoutFont = monoFont;
+    if (readoutFont.pointSizeF() > 0)
+      readoutFont.setPointSizeF(qMax(8.5, readoutFont.pointSizeF() - 1.0));
+    else if (readoutFont.pixelSize() > 0)
+      readoutFont.setPixelSize(qMax(10, readoutFont.pixelSize() - 1));
+    mixerReadout->setFont(readoutFont);
+    QPalette readoutPal = mixerReadout->palette();
+    const QColor readoutFg = mutedColor(readoutPal, 200);
+    readoutPal.setColor(QPalette::WindowText, readoutFg);
+    readoutPal.setColor(QPalette::Text, readoutFg);
+    mixerReadout->setPalette(readoutPal);
     mixerReadout->setVisible(shortMixer());
     wheelLayout->addWidget(mixerWheel, 0, Qt::AlignHCenter);
     wheelLayout->addWidget(mixerReadout, 0, Qt::AlignHCenter);
-    mixerSpectrum = new Spectrum(h, s, v, changed, w);
+    mixerSpectrum = new Spectrum(h, s, v, changed, selectorsBox);
+    mixerSpectrum->setObjectName("mixerSpectrum");
     controls->addWidget(mixerSpectrum, 0, Qt::AlignTop);
     controls->addWidget(wheelArea, 0, Qt::AlignTop);
-    columns->addLayout(controls);
+    columns->addWidget(selectorsBox, 0, Qt::AlignHCenter | Qt::AlignTop);
     l->addLayout(columns);
     auto inputs = new QWidget(w);
+    inputs->setObjectName("mixerInputs");
     auto form = new QFormLayout(inputs);
     form->setContentsMargins(0, 0, 0, 0);
+    form->setHorizontalSpacing(8);
+    form->setVerticalSpacing(6);
+    form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
-    auto hbox = new QWidget(w);
+    auto hbox = new QWidget(inputs);
     auto hl = new QHBoxLayout(hbox);
     hl->setContentsMargins(0, 0, 0, 0);
+    hl->setSpacing(4);
     auto hh = decimal("Hue", h, 0, 360, hbox),
          ss = decimal("Saturation", s, 0, 100, hbox),
          vv = decimal("Value", v, 0, 100, hbox);
     for (auto x : {hh, ss, vv}) {
+      if (x != hh)
+        hl->addSpacing(4);
       x->setDecimals(1);
       x->setValue(x == hh ? h : x == ss ? s : v);
       x->setSingleStep(.1);
       x->setSuffix(x == hh ? QString::fromUtf8("°") : "%");
       x->setMaximumWidth(x->sizeHint().width());
-      auto label = new QLabel(x == hh ? "H" : x == ss ? "S" : "V", hbox);
+      auto label = channelLabel(x == hh ? "H" : x == ss ? "S" : "V", hbox);
       label->setBuddy(x);
       hl->addWidget(label);
       hl->addWidget(x);
@@ -1767,17 +2019,20 @@ class Frontend : public QWidget {
               });
     }
     hl->addStretch();
-    form->addRow("HSV", hbox);
-    auto rw = new QWidget(w);
+    form->addRow("HSV:", hbox);
+    auto rw = new QWidget(inputs);
     auto rl = new QHBoxLayout(rw);
     rl->setContentsMargins(0, 0, 0, 0);
+    rl->setSpacing(4);
     QList<QSpinBox *> channels;
     const char *names[] = {"Red", "Green", "Blue", "Alpha"};
     for (int i = 0; i < 4; i++) {
+      if (i > 0)
+        rl->addSpacing(2);
       auto x = spin(names[i], rgba[i].toInt(), 0, 255, rw);
       x->setMaximumWidth(x->sizeHint().width());
       channels << x;
-      auto label = new QLabel(QString(names[i]).left(1), rw);
+      auto label = channelLabel(QString(names[i]).left(1), rw);
       label->setBuddy(x);
       rl->addWidget(label);
       rl->addWidget(x);
@@ -1791,17 +2046,20 @@ class Frontend : public QWidget {
               {"b", channels[2]->value()},
               {"a", channels[3]->value()}});
       });
-    form->addRow("RGBA", rw);
+    form->addRow("RGBA:", rw);
     auto fields = array(m, "fields");
-    auto formatRow = new QWidget(w);
+    auto formatRow = new QWidget(inputs);
     auto formatLayout = new QHBoxLayout(formatRow);
     formatLayout->setContentsMargins(0, 0, 0, 0);
+    formatLayout->setSpacing(6);
     auto format = new QComboBox(formatRow);
     format->setAccessibleName("Color format");
     format->addItems({"HEX", "RGB", "RGBA", "HSL", "HSV"});
     format->setCurrentIndex(mixerFormat);
     auto value = line("Color value", fields[mixerFormat].toString(), formatRow);
-    value->setMinimumWidth(value->fontMetrics().horizontalAdvance(QString(18, QLatin1Char('0'))) + 20);
+    value->setFont(monoFont);
+    value->setMinimumWidth(
+        value->fontMetrics().horizontalAdvance(QString(16, QLatin1Char('0'))) + 16);
     auto apply = [this, value] {
       value->setModified(false);
       send({{"op", "mixer_apply"}, {"index", mixerFormat}, {"text", value->text()}});
@@ -1812,33 +2070,49 @@ class Frontend : public QWidget {
               value->setText(fields[index].toString());
             });
     connect(value, &QLineEdit::returnPressed, this, apply);
+    auto applyBtn = button("Apply", formatRow, apply);
+    applyBtn->setIcon(themedIcon({"dialog-ok-apply-symbolic", "dialog-ok-apply"},
+                                 QStyle::SP_DialogApplyButton));
+    applyBtn->setIconSize(QSize(16, 16));
     formatLayout->addWidget(format);
     formatLayout->addWidget(value);
-    formatLayout->addWidget(button("Apply", formatRow, apply));
-    auto formatLabel = new QLabel("Format", w);
+    formatLayout->addWidget(applyBtn);
+    auto formatLabel = new QLabel("Format:", inputs);
     formatLabel->setBuddy(format);
     form->addRow(formatLabel, formatRow);
-    form->addRow("CMYK", new QLabel(str(m, "cmyk"), w));
-    form->addRow("Output", new QLabel(str(m, "output"), w));
+    auto cmykLabel = new QLabel(str(m, "cmyk"), inputs);
+    cmykLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    form->addRow("CMYK:", cmykLabel);
+    auto outputLabel = new QLabel(str(m, "output"), inputs);
+    outputLabel->setFont(monoFont);
+    outputLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    form->addRow("Output:", outputLabel);
     columns->addWidget(inputs, 1, Qt::AlignTop);
     setTabOrder(mixerSpectrum, mixerWheel);
     auto actions = new QToolBar(w);
     actions->setObjectName("mixerActions");
     actions->setMovable(false);
+    actions->setFloatable(false);
+    actions->setIconSize(QSize(16, 16));
+    actions->setContentsMargins(0, 2, 0, 2);
     actions->setProperty("boardAction", true);
     actions->setToolButtonStyle(settings.value("board/toolbarLabels", true).toBool()
                                     ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
-    for (auto pair : QList<QPair<QString, QString>>{
-             {"Copy", "mixer_copy"},
-             {"Add to palette", "palette_add_current"},
-             {"Undo", "mixer_undo"},
-             {"Redo", "mixer_redo"},
-             {"Add source", "mixer_source_add"},
-             {"Mix", "mixer_mix"}}) {
-      const auto iconName = actionIcon(pair.second);
-      auto icon = QIcon::fromTheme(iconName, style()->standardIcon(QStyle::SP_FileIcon));
+    const QList<QPair<QString, QString>> actionItems{
+        {"Copy", "mixer_copy"},
+        {"Add to palette", "palette_add_current"},
+        {"Undo", "mixer_undo"},
+        {"Redo", "mixer_redo"},
+        {"Add source", "mixer_source_add"},
+        {"Mix", "mixer_mix"}};
+    for (int idx = 0; idx < actionItems.size(); ++idx) {
+      if (idx == 2 || idx == 4)
+        actions->addSeparator();
+      const auto &pair = actionItems[idx];
+      const auto icons = actionIcon(pair.second);
+      auto icon = themedIcon(icons, QStyle::SP_FileIcon);
       auto action = actions->addAction(icon, pair.first);
-      action->setToolTip(actionHint(pair.first, iconName));
+      action->setToolTip(actionHint(pair.first, icons.value(0)));
       actions->widgetForAction(action)->setAccessibleName(pair.first);
       connect(action, &QAction::triggered, this, [this, pair] { send({{"op", pair.second}}); });
       if (pair.second == "mixer_undo")
@@ -1847,29 +2121,61 @@ class Frontend : public QWidget {
         action->setEnabled(m.value("can_redo").toBool());
     }
     l->addWidget(actions);
-    auto space = new QComboBox(w);
+    l->addWidget(new Hairline(w));
+    auto mixHeader = new QWidget(w);
+    auto mixHeaderLayout = new QHBoxLayout(mixHeader);
+    mixHeaderLayout->setContentsMargins(0, 2, 0, 0);
+    mixHeaderLayout->setSpacing(8);
+    auto mixTitle = new QLabel("Color mixing", mixHeader);
+    QFont mixTitleFont = mixTitle->font();
+    mixTitleFont.setWeight(QFont::DemiBold);
+    mixTitle->setFont(mixTitleFont);
+    mixHeaderLayout->addWidget(mixTitle);
+    mixHeaderLayout->addSpacing(8);
+    auto spaceLabel = channelLabel("Space:", mixHeader);
+    auto space = new QComboBox(mixHeader);
     space->setAccessibleName("Mixing color space");
     space->addItem("sRGB", "srgb");
     space->addItem("OKLCH", "oklch");
     space->setCurrentIndex(qMax(0, space->findData(str(m, "space"))));
     space->setSizeAdjustPolicy(QComboBox::AdjustToContents);
     space->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
+    spaceLabel->setBuddy(space);
     connect(space, &QComboBox::currentIndexChanged, this, [this, space] {
       send({{"op", "mixer_space"}, {"space", space->currentData().toString()}});
     });
-    l->addWidget(space);
+    mixHeaderLayout->addWidget(spaceLabel);
+    mixHeaderLayout->addWidget(space);
+    mixHeaderLayout->addStretch(1);
+    l->addWidget(mixHeader);
     int i = 0;
     for (auto value : array(m, "sources")) {
       auto o = value.toObject();
       int index = i++;
       auto row = new QWidget(w);
       auto r = new QHBoxLayout(row);
+      r->setContentsMargins(0, 2, 0, 2);
+      r->setSpacing(8);
+      auto source = new Swatch(color(str(o, "color")),
+                               QStringLiteral("Source %1").arg(index + 1), row);
+      source->setIconSize(QSize(18, 18));
+      source->setToolTip("Drop a color here to replace this mixing source");
       auto c = line("Source color", str(o, "color"), row);
-      c->setMaximumWidth(c->fontMetrics().horizontalAdvance(QString(12, QLatin1Char('M'))) + 20);
+      c->setFont(monoFont);
+      c->setMaximumWidth(
+          c->fontMetrics().horizontalAdvance(QStringLiteral("#AABBCCFF")) + 22);
+      c->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+      auto weightBox = new QWidget(row);
+      auto weightLayout = new QHBoxLayout(weightBox);
+      weightLayout->setContentsMargins(0, 0, 0, 0);
+      weightLayout->setSpacing(4);
+      auto weightLabel = channelLabel("Weight:", weightBox);
       auto weight =
-          decimal("Source weight", o.value("weight").toDouble(), 0, 1, row);
+          decimal("Source weight", o.value("weight").toDouble(), 0, 1, weightBox);
       weight->setMaximumWidth(weight->sizeHint().width());
-      auto source = new Swatch(color(str(o, "color")), "Source", row);
+      weightLabel->setBuddy(weight);
+      weightLayout->addWidget(weightLabel);
+      weightLayout->addWidget(weight);
       source->paletteDrop(-1, [this, index, weight](int, QString c) {
         if (color(c).isValid())
           send({{"op", "mixer_source"},
@@ -1878,8 +2184,8 @@ class Frontend : public QWidget {
                 {"weight", weight->value()}});
       });
       r->addWidget(source);
-      r->addWidget(c);
-      r->addWidget(weight);
+      r->addWidget(c, 1);
+      r->addWidget(weightBox);
       auto apply = [this, index, c, weight] {
         send({{"op", "mixer_source"},
               {"index", index},
@@ -1888,14 +2194,20 @@ class Frontend : public QWidget {
       };
       connect(c, &QLineEdit::editingFinished, this, apply);
       connect(weight, &QDoubleSpinBox::editingFinished, this, apply);
-      r->addWidget(button("Remove", row, [this, index] {
+      auto removeBtn = button("Remove", row, [this, index] {
         send({{"op", "mixer_source_remove"}, {"index", index}});
-      }));
-      r->addStretch();
+      });
+      removeBtn->setIcon(themedIcon(
+          {"list-remove-symbolic", "edit-delete-symbolic", "list-remove"},
+          QStyle::SP_TrashIcon));
+      removeBtn->setIconSize(QSize(16, 16));
+      r->addWidget(removeBtn);
+      r->addStretch(0);
       l->addWidget(row);
     }
     auto error = new QLabel(str(m, "error"), w);
     error->setWordWrap(true);
+    error->setVisible(!error->text().isEmpty());
     l->addWidget(error);
     l->addStretch();
     return w;
@@ -1932,24 +2244,42 @@ protected:
           scroll->widget()->objectName() == "mixerContent") {
         auto mixer = scroll->widget();
         auto columns = mixer->findChild<QBoxLayout *>("mixerColumns");
-        auto selectors = columns->itemAt(0)->layout();
-        auto spectrum = selectors->itemAt(0)->widget();
-        auto inputs = columns->itemAt(1)->widget();
-        auto wheelArea = selectors->itemAt(1)->widget();
-        const auto margins = mixer->layout()->contentsMargins();
-        const int widePlane = 208;
-        const int wideWheel = 120;
-        const bool shortView = shortMixer();
-        wheelArea->layout()->itemAt(0)->widget()->setFixedSize(shortView ? 112 : wideWheel,
-                                                            shortView ? 112 : wideWheel);
-        wheelArea->findChild<QLabel *>("mixerHsvReadout")->setVisible(shortView);
-        const int width = static_cast<QResizeEvent *>(event)->size().width();
-        const bool wide = width >= margins.left() + margins.right() + widePlane +
-                                      wideWheel + inputs->sizeHint().width() +
-                                      selectors->spacing() + columns->spacing();
-        columns->setDirection(wide ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
-        const int side = shortView ? 132 : wide ? widePlane : 156;
-        spectrum->setFixedSize(side, side);
+        auto selectorsBox = mixer->findChild<QWidget *>("mixerSelectors");
+        auto selectors =
+            selectorsBox ? qobject_cast<QHBoxLayout *>(selectorsBox->layout())
+                         : nullptr;
+        auto inputs = mixer->findChild<QWidget *>("mixerInputs");
+        auto spectrum =
+            selectorsBox ? selectorsBox->findChild<QWidget *>("mixerSpectrum")
+                         : nullptr;
+        auto wheel =
+            selectorsBox ? selectorsBox->findChild<QWidget *>("mixerWheel")
+                         : nullptr;
+        auto readout =
+            selectorsBox ? selectorsBox->findChild<QLabel *>("mixerHsvReadout")
+                         : nullptr;
+        if (columns && selectorsBox && selectors && inputs && spectrum && wheel) {
+          const auto margins = mixer->layout()->contentsMargins();
+          const int widePlane = 208;
+          const int wideWheel = 120;
+          const bool shortView = shortMixer();
+          wheel->setFixedSize(shortView ? 112 : wideWheel,
+                              shortView ? 112 : wideWheel);
+          if (readout)
+            readout->setVisible(shortView);
+          const int width = static_cast<QResizeEvent *>(event)->size().width();
+          const bool wide = width >= margins.left() + margins.right() + widePlane +
+                                        wideWheel + inputs->sizeHint().width() +
+                                        selectors->spacing() + columns->spacing();
+          columns->setDirection(wide ? QBoxLayout::LeftToRight
+                                     : QBoxLayout::TopToBottom);
+          columns->setAlignment(selectorsBox,
+                                wide ? (Qt::AlignLeft | Qt::AlignTop)
+                                     : (Qt::AlignHCenter | Qt::AlignTop));
+          const int side = shortView ? 132 : wide ? widePlane : 156;
+          spectrum->setFixedSize(side, side);
+          selectorsBox->updateGeometry();
+        }
       }
       if (page && page->objectName() == "paletteGenerator") {
         auto columns = qobject_cast<QBoxLayout *>(page->layout());
