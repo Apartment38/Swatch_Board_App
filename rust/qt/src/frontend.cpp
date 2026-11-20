@@ -172,6 +172,59 @@ protected:
   }
 };
 
+static QString formatWrappableText(const QString &raw) {
+  QString out;
+  out.reserve(raw.size() + 16);
+  for (int i = 0; i < raw.size(); ++i) {
+    const QChar ch = raw[i];
+    out.append(ch);
+    if ((ch == QLatin1Char('.') || ch == QLatin1Char('/')) &&
+        i + 1 < raw.size() && !raw[i + 1].isSpace())
+      out.append(QChar(0x200B));
+  }
+  return out;
+}
+
+class ElidingLabel : public QLabel {
+  Qt::TextElideMode elideMode = Qt::ElideMiddle;
+
+public:
+  explicit ElidingLabel(const QString &text, QWidget *parent = nullptr,
+                        Qt::TextElideMode mode = Qt::ElideMiddle)
+      : QLabel(text, parent), elideMode(mode) {
+    setToolTip(text);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+  }
+  QSize minimumSizeHint() const override {
+    const auto m = contentsMargins();
+    const QFontMetrics fm = fontMetrics();
+    const int fullW = fm.horizontalAdvance(text());
+    return QSize(qMin(fullW, 40) + m.left() + m.right(),
+                 fm.height() + m.top() + m.bottom());
+  }
+  QSize sizeHint() const override {
+    const auto m = contentsMargins();
+    const QFontMetrics fm = fontMetrics();
+    const int fullW = fm.horizontalAdvance(text());
+    return QSize(qMin(fullW, 80) + m.left() + m.right(),
+                 fm.height() + m.top() + m.bottom());
+  }
+
+protected:
+  void paintEvent(QPaintEvent *) override {
+    QPainter p(this);
+    const QRect cr = contentsRect();
+    if (cr.isEmpty() || text().isEmpty())
+      return;
+    const QString elided =
+        fontMetrics().elidedText(text(), elideMode, cr.width());
+    p.setPen(palette().color(
+        isEnabled() ? QPalette::Active : QPalette::Disabled,
+        QPalette::WindowText));
+    p.drawText(cr, alignment(), elided);
+  }
+};
+
 class HistoryLimitSpinBox : public QAbstractSpinBox {
   static constexpr quint64 kMaxHistoryLimit = 9223372036854775807ULL;
   bool invalid = false;
@@ -1963,6 +2016,11 @@ class Frontend : public QWidget {
   QList<QPushButton *> historyButtons;
   bool hiddenForPick = false, spectrumDragging = false;
   bool renderingBoard = false, hasPendingBoardRender = false;
+  bool deferRenderWhileMouseDown = false;
+  bool pendingDeferredBoardRender = false;
+  bool deferredBoardRenderScheduled = false;
+  bool mouseButtonDown = false;
+  QJsonObject deferredRenderPrevState;
   int mixerFormat = 0;
   QPointer<Spectrum> mixerSpectrum;
   QPointer<MixerWheel> mixerWheel;
@@ -1998,9 +2056,31 @@ class Frontend : public QWidget {
       edit->clearFocus();
       if (!wasModified && guarded)
         QMetaObject::invokeMethod(guarded, "editingFinished");
+      if (guarded)
+        guarded->setModified(false);
+    } else if (auto *combo = qobject_cast<QComboBox *>(focused)) {
+      if (combo->isEditable() && combo->lineEdit()) {
+        QPointer<QLineEdit> le(combo->lineEdit());
+        combo->clearFocus();
+        if (le) {
+          le->setModified(false);
+          QMetaObject::invokeMethod(le, "editingFinished");
+        }
+      }
     } else if (auto *spin = qobject_cast<QAbstractSpinBox *>(focused)) {
       spin->interpretText();
       spin->clearFocus();
+    }
+  }
+  void discardFocusedEdits() {
+    auto *focused = QApplication::focusWidget();
+    if (!focused)
+      return;
+    if (auto *edit = qobject_cast<QLineEdit *>(focused)) {
+      edit->setModified(false);
+    } else if (auto *combo = qobject_cast<QComboBox *>(focused)) {
+      if (combo->isEditable() && combo->lineEdit())
+        combo->lineEdit()->setModified(false);
     }
   }
   QJsonValue request(QJsonObject req) {
@@ -2020,10 +2100,35 @@ class Frontend : public QWidget {
     }
     return doc.isObject() ? QJsonValue(doc.object()) : QJsonValue();
   }
-  void send(QJsonObject req, bool forceUpdate = false) {
+  void send(QJsonObject req, bool forceUpdate = false,
+            bool deferRebuildIfMouseDown = false) {
+    const bool prevDefer = deferRenderWhileMouseDown;
+    if (deferRebuildIfMouseDown)
+      deferRenderWhileMouseDown = true;
     auto result = request(req);
     if (result.isObject())
       updateState(result.toObject(), forceUpdate);
+    deferRenderWhileMouseDown = prevDefer;
+  }
+  void scheduleDeferredBoardRender() {
+    if (!pendingDeferredBoardRender || deferredBoardRenderScheduled ||
+        mode != "board")
+      return;
+    deferredBoardRenderScheduled = true;
+    QTimer::singleShot(0, this, [this] {
+      deferredBoardRenderScheduled = false;
+      if (!pendingDeferredBoardRender || mode != "board")
+        return;
+      if (mouseButtonDown || QApplication::mouseButtons() != Qt::NoButton)
+        return;
+      const QJsonObject prev = deferredRenderPrevState;
+      deferredRenderPrevState = QJsonObject();
+      pendingDeferredBoardRender = false;
+      renderBoard(prev);
+      if (state.value("show_palette").toBool() && tabs)
+        tabs->setCurrentIndex(1);
+      updateUndoShortcuts();
+    });
   }
   QString activeEditor() const {
     static const QStringList editors = {"mixer", "palette", "theme"};
@@ -2058,7 +2163,21 @@ class Frontend : public QWidget {
         raise();
         activateWindow();
       }
-      renderBoard(previous);
+      const bool mouseDown =
+          mouseButtonDown || QApplication::mouseButtons() != Qt::NoButton;
+      if ((deferRenderWhileMouseDown || pendingDeferredBoardRender) &&
+          mouseDown) {
+        if (!pendingDeferredBoardRender)
+          deferredRenderPrevState = previous;
+        pendingDeferredBoardRender = true;
+        updateUndoShortcuts();
+        return;
+      }
+      const QJsonObject effectivePrevious =
+          pendingDeferredBoardRender ? deferredRenderPrevState : previous;
+      pendingDeferredBoardRender = false;
+      deferredRenderPrevState = QJsonObject();
+      renderBoard(effectivePrevious);
       if (state.value("show_palette").toBool() && tabs)
         tabs->setCurrentIndex(1);
       updateUndoShortcuts();
@@ -2119,9 +2238,9 @@ class Frontend : public QWidget {
     if (!splitter || !historyPanel || !historyPanel->isVisible())
       return;
     const bool narrow = width() < 680;
-    if (!narrow && !compactHistory)
-      normalHistoryWidth =
-          qMax(compactHistoryWidth, splitter->sizes().value(0, 124));
+    const int currentW = splitter->sizes().value(0, 0);
+    if (!narrow && !compactHistory && currentW > 0)
+      normalHistoryWidth = qMax(compactHistoryWidth, currentW);
     if (narrow != compactHistory) {
       const int target = narrow ? compactHistoryWidth : normalHistoryWidth;
       splitter->setSizes({target, qMax(1, splitter->width() - target)});
@@ -2678,8 +2797,15 @@ class Frontend : public QWidget {
       historyOuter->addWidget(new Hairline(Qt::Vertical, historyPanel));
       historyPanel->setVisible(toggle->isChecked());
       connect(toggle, &QAction::toggled, this, [this](bool visible) {
+        if (!visible && splitter && !compactHistory) {
+          const int currentW = splitter->sizes().value(0, 0);
+          if (currentW >= compactHistoryWidth)
+            normalHistoryWidth = currentW;
+        }
         historyPanel->setVisible(visible);
         settings.setValue("board/historyVisible", visible);
+        if (visible)
+          sizeHistorySidebar();
       });
       splitter->addWidget(historyPanel);
       tabs = new QTabWidget(outer);
@@ -2692,9 +2818,11 @@ class Frontend : public QWidget {
       redoShortcut = new QShortcut(this);
       redoShortcut->setKeys(QKeySequence::keyBindings(QKeySequence::Redo));
       connect(undoShortcut, &QShortcut::activated, this, [this] {
+        discardFocusedEdits();
         send({{"op", activeEditor() + "_undo"}});
       });
       connect(redoShortcut, &QShortcut::activated, this, [this] {
+        discardFocusedEdits();
         send({{"op", activeEditor() + "_redo"}});
       });
       tabs->addTab(mixerPage(), "Mixer");
@@ -3008,8 +3136,11 @@ class Frontend : public QWidget {
       auto action = actions->addAction(icon, pair.first);
       action->setToolTip(actionHint(pair.first, icons.value(0)));
       actions->widgetForAction(action)->setAccessibleName(pair.first);
-      connect(action, &QAction::triggered, this,
-              [this, pair] { send({{"op", pair.second}}); });
+      connect(action, &QAction::triggered, this, [this, pair] {
+        if (pair.second == "mixer_undo" || pair.second == "mixer_redo")
+          discardFocusedEdits();
+        send({{"op", pair.second}});
+      });
       if (pair.second == "mixer_undo")
         action->setEnabled(m.value("can_undo").toBool());
       if (pair.second == "mixer_redo")
@@ -3062,12 +3193,17 @@ class Frontend : public QWidget {
     controls->setVerticalSpacing(6);
     auto changed = [this](double h, double s, double v, bool final) {
           spectrumDragging = true;
-          send({{"op", "mixer_hsv"}, {"h", h}, {"s", s}, {"v", v}});
+          send({{"op", "mixer_hsv"},
+                {"h", h},
+                {"s", s},
+                {"v", v},
+                {"final", final}});
           if (final) {
             spectrumDragging = false;
             auto previous = state;
             previous.remove("mixer");
             renderBoard(previous);
+            updateUndoShortcuts();
           }
         };
     mixerSpectrum = new Spectrum(h, s, v, changed, selectorsBox);
@@ -3140,7 +3276,8 @@ class Frontend : public QWidget {
                 send({{"op", "mixer_hsv"},
                       {"h", changedH ? hh->value() : h},
                       {"s", changedS ? ss->value() : s},
-                      {"v", changedV ? vv->value() : v}});
+                      {"v", changedV ? vv->value() : v}},
+                     false, true);
               });
     }
     form->addRow("HSV:", hbox);
@@ -3168,7 +3305,8 @@ class Frontend : public QWidget {
               {"r", channels[0]->value()},
               {"g", channels[1]->value()},
               {"b", channels[2]->value()},
-              {"a", channels[3]->value()}});
+              {"a", channels[3]->value()}},
+             false, true);
       });
     form->addRow("RGBA:", rw);
     auto fields = array(m, "fields");
@@ -3319,10 +3457,12 @@ class Frontend : public QWidget {
         const bool weightChanged = weight->value() != displayedWeight;
         if (!colorChanged && !weightChanged)
           return;
+        c->setModified(false);
         send({{"op", "mixer_source"},
               {"index", index},
               {"color", colorChanged ? c->text() : initialColor},
-              {"weight", weightChanged ? weight->value() : initialWeight}});
+              {"weight", weightChanged ? weight->value() : initialWeight}},
+             false, true);
       };
       connect(c, &QLineEdit::editingFinished, this, apply);
       connect(weight, &QDoubleSpinBox::editingFinished, this, apply);
@@ -3573,6 +3713,28 @@ protected:
     }
   }
   bool eventFilter(QObject *watched, QEvent *event) override {
+    if (mode == "board") {
+      if (event->type() == QEvent::MouseButtonPress) {
+        mouseButtonDown = true;
+      } else if (event->type() == QEvent::MouseMove) {
+        if (static_cast<QMouseEvent *>(event)->buttons() == Qt::NoButton)
+          mouseButtonDown = false;
+      } else if (event->type() == QEvent::MouseButtonRelease) {
+        auto *me = static_cast<QMouseEvent *>(event);
+        if ((me->buttons() & ~me->button()) == Qt::NoButton) {
+          mouseButtonDown = false;
+          scheduleDeferredBoardRender();
+        }
+      } else if (event->type() == QEvent::Drop ||
+                 event->type() == QEvent::ApplicationDeactivate ||
+                 event->type() == QEvent::WindowDeactivate ||
+                 event->type() == QEvent::KeyPress) {
+        if (QApplication::mouseButtons() == Qt::NoButton) {
+          mouseButtonDown = false;
+          scheduleDeferredBoardRender();
+        }
+      }
+    }
     if (event->type() == QEvent::Show || event->type() == QEvent::Move) {
       if (auto page = qobject_cast<QWidget *>(watched)) {
         if (page->objectName() == "palettePage")
@@ -3686,6 +3848,24 @@ public:
           }
         failures.append("Missing button " + name);
         return false;
+      };
+      auto realClick = [&](QWidget *target) {
+        if (!target || !windowHandle()) {
+          failures.append("Missing real-click target or window handle");
+          return false;
+        }
+        settleLayout();
+        const QPoint localCenter = target->rect().center();
+        const QPointF winPos = target->mapTo(this, localCenter);
+        const QPointF globalPos = target->mapToGlobal(localCenter);
+        QMouseEvent press(QEvent::MouseButtonPress, winPos, globalPos,
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(windowHandle(), &press);
+        QMouseEvent release(QEvent::MouseButtonRelease, winPos, globalPos,
+                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(windowHandle(), &release);
+        settleLayout();
+        return true;
       };
       auto edit = [&](QWidget *root, const QString &name,
                       const QString &value) {
@@ -3910,6 +4090,26 @@ public:
         QSize mixerSize = size();
         resize(900, 700);
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        // Round 2 Bug 6 regression: toggling History off, resizing across 680px,
+        // and toggling History back on restores the correct width for current size.
+        if (historyToggle && historyPanel) {
+          settleLayout();
+          const int wideHistW = normalHistoryWidth;
+          historyToggle->setChecked(false);
+          resize(540, 360);
+          settleLayout();
+          historyToggle->setChecked(true);
+          settleLayout();
+          check(historyPanel->width() == compactHistoryWidth,
+                "Reopening History at compact size uses compact width");
+          historyToggle->setChecked(false);
+          resize(900, 700);
+          settleLayout();
+          historyToggle->setChecked(true);
+          settleLayout();
+          check(historyPanel->width() == wideHistW,
+                "Reopening History at wide size uses normal width");
+        }
         auto mixerPage = tabs->widget(0);
         auto mixerScroll = mixerPage->findChild<QScrollArea *>();
         auto boundsInMixer = [mixerScroll](QWidget *widget) {
@@ -4033,6 +4233,56 @@ public:
         check(array(object(state.value("mixer")), "sources").size() == sourcesBefore &&
                   str(object(state.value("mixer")), "current") == beforeMix,
               "Undo restores sources after Add source");
+        // Round 2 Bug 4 regression: Source 1 Enter -> Mixer Undo -> blur keeps
+        // the undone value without corrupting or re-applying on blur.
+        {
+          const QString origSourceColor =
+              str(array(object(state.value("mixer")), "sources")[0].toObject(),
+                  "color");
+          const QString editedSourceColor =
+              origSourceColor.compare("#00FF00FF", Qt::CaseInsensitive) == 0
+                  ? QStringLiteral("#0000FFFF")
+                  : QStringLiteral("#00FF00FF");
+          QLineEdit *src1 = nullptr;
+          for (auto field : tabs->widget(0)->findChildren<QLineEdit *>())
+            if (field->accessibleName() == "Source color") {
+              src1 = field;
+              break;
+            }
+          check(src1 != nullptr, "Source 1 field available for Undo test");
+          if (src1) {
+            activateWindow();
+            settleLayout();
+            src1->setFocus(Qt::OtherFocusReason);
+            src1->setText(editedSourceColor);
+            src1->setModified(true);
+            QKeyEvent enter(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+            QApplication::sendEvent(src1, &enter);
+            settleLayout();
+            check(str(array(object(state.value("mixer")), "sources")[0].toObject(),
+                      "color") == editedSourceColor,
+                  "Source 1 Enter commits edited color");
+            click(tabs->widget(0), "Undo");
+            settleLayout();
+            QLineEdit *src1AfterUndo = nullptr;
+            for (auto field : tabs->widget(0)->findChildren<QLineEdit *>())
+              if (field->accessibleName() == "Source color") {
+                src1AfterUndo = field;
+                break;
+              }
+            check(src1AfterUndo && src1AfterUndo->text() == origSourceColor &&
+                      str(array(object(state.value("mixer")), "sources")[0].toObject(),
+                          "color") == origSourceColor,
+                  "Mixer Undo restores Source 1 field text and model state");
+            if (src1AfterUndo) {
+              tabs->setFocus(Qt::OtherFocusReason);
+              settleLayout();
+              check(str(array(object(state.value("mixer")), "sources")[0].toObject(),
+                        "color") == origSourceColor,
+                    "Blurring Source 1 after Mixer Undo does not re-apply undone edit");
+            }
+          }
+        }
         mixerPage = tabs->widget(0);
         if (emptyDrop) {
           QMimeData mime;
@@ -4222,6 +4472,38 @@ public:
         click(tabs->widget(1), "Open");
         check(str(object(state.value("palette")), "id") == id,
               "Reopen palette");
+        // Round 2 Bug 1 regression: real QWindow mouse click on Palette Save
+        // after editing Palette name without Enter saves on the first click.
+        {
+          activateWindow();
+          settleLayout();
+          QLineEdit *palName = nullptr;
+          for (auto e : tabs->widget(1)->findChildren<QLineEdit *>())
+            if (e->accessibleName() == "Palette name") {
+              palName = e;
+              break;
+            }
+          QAbstractButton *palSave = nullptr;
+          for (auto b : tabs->widget(1)->findChildren<QAbstractButton *>())
+            if (b->accessibleName() == "Save") {
+              palSave = b;
+              break;
+            }
+          check(palName && palSave, "Palette name and Save available for real click");
+          if (palName && palSave) {
+            palName->setFocus(Qt::OtherFocusReason);
+            palName->setText("First click palette");
+            palName->setModified(true);
+            realClick(palSave);
+            const auto pal = object(state.value("palette"));
+            bool savedHasNewName = false;
+            for (const auto &entry : array(pal, "saved"))
+              if (str(entry.toObject(), "name") == "First click palette")
+                savedHasNewName = true;
+            check(str(pal, "name") == "First click palette" && savedHasNewName,
+                  "Real mouse click on Palette Save commits name and saves on first click");
+          }
+        }
         tabs->setCurrentIndex(2);
         // Bug 3 regression: empty Theme page disables Save, Use active palette,
         // and Export controls while keeping Project enabled.
@@ -4378,6 +4660,69 @@ public:
           check(str(array(object(state.value("theme")), "roles")[0].toObject(),
                     "color") == "#224466FF",
                 "Theme toolbar Save commits focused Role color without crashing");
+          // Round 2 Bug 1 regression: real QWindow mouse click on Theme Save
+          // after editing Role color without Enter commits and saves on first click.
+          {
+            activateWindow();
+            settleLayout();
+            QLineEdit *roleField = nullptr;
+            for (auto field : tabs->widget(2)->findChildren<QLineEdit *>())
+              if (field->accessibleName() == "Role color") {
+                roleField = field;
+                break;
+              }
+            QAbstractButton *themeSaveBtn = nullptr;
+            for (auto b : tabs->widget(2)->findChildren<QAbstractButton *>())
+              if (b->accessibleName() == "Save") {
+                themeSaveBtn = b;
+                break;
+              }
+            check(roleField && themeSaveBtn,
+                  "Role color and Theme Save available for real click");
+            if (roleField && themeSaveBtn) {
+              roleField->setFocus(Qt::OtherFocusReason);
+              roleField->setText("#335577FF");
+              roleField->setModified(true);
+              realClick(themeSaveBtn);
+              const auto th = object(state.value("theme"));
+              const auto proj = object(th.value("project"));
+              check(str(array(th, "roles")[0].toObject(), "color") == "#335577FF" &&
+                        !proj.value("dirty").toBool(),
+                    "Real mouse click on Theme Save commits Role color and saves on first click");
+            }
+          }
+          // Round 2 Bug 2 regression: commitFocusedEditor commits editable
+          // Palette swatch link QComboBox before Theme Save.
+          {
+            const auto palSwatches =
+                array(object(state.value("theme")), "palette_swatches");
+            if (!palSwatches.isEmpty()) {
+              const QString targetSwatch =
+                  str(palSwatches[0].toObject(), "name");
+              QComboBox *linkCombo = nullptr;
+              for (auto combo : tabs->widget(2)->findChildren<QComboBox *>())
+                if (combo->accessibleName() == "Palette swatch link") {
+                  linkCombo = combo;
+                  break;
+                }
+              check(linkCombo && linkCombo->isEditable() && linkCombo->lineEdit(),
+                    "Editable Palette swatch link combobox available");
+              if (linkCombo && linkCombo->lineEdit()) {
+                activateWindow();
+                settleLayout();
+                linkCombo->setFocus(Qt::OtherFocusReason);
+                linkCombo->lineEdit()->setText(targetSwatch);
+                linkCombo->lineEdit()->setModified(true);
+                click(tabs->widget(2), "Save");
+                settleLayout();
+                const auto th = object(state.value("theme"));
+                const auto proj = object(th.value("project"));
+                check(str(array(th, "roles")[0].toObject(), "link") == targetSwatch &&
+                          !proj.value("dirty").toBool(),
+                      "Theme Save commits and saves focused editable Palette swatch link");
+              }
+            }
+          }
           click(tabs->widget(2), "Project");
           auto projectDialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
           QComboBox *savedThemes = nullptr;
@@ -4419,6 +4764,24 @@ public:
                 "Theme inspector fits at normal size without horizontal scrolling");
         }
         shot("theme");
+        // Round 2 Bug 3 regression: long theme name elides cleanly in wide
+        // themeActions toolbar without overflowing behind a '>' chevron.
+        {
+          send({{"op", "theme_name"},
+                {"name", "Very Long Theme Name That Previously Overflowed The Wide Theme Toolbar"}});
+          settleLayout();
+          auto *tBar = tabs->widget(2)->findChild<QToolBar *>("themeActions");
+          auto *ctxLbl = tabs->widget(2)->findChild<QLabel *>("themeContextLabel");
+          auto *extBtn = tBar ? tBar->findChild<QToolButton *>("qt_toolbar_ext_button")
+                              : nullptr;
+          check(ctxLbl && ctxLbl->isVisible(),
+                "Long theme name context label stays visible in wide mode");
+          check(!extBtn || !extBtn->isVisible(),
+                "Long theme name does not overflow themeActions into chevron");
+          shot("theme-long-name");
+          send({{"op", "theme_undo"}});
+          settleLayout();
+        }
         widePanes = themePanes();
         if (widePanes && widePanes->orientation() == Qt::Horizontal) {
           auto handle = widePanes->handle(1);
@@ -4607,18 +4970,43 @@ public:
         updateState(loadErrState, true);
         check(configRebind && !configRebind->isEnabled(),
               "Rebind shortcuts disabled during load_error");
+        // Round 2 Bug 7 regression: message_is_error shows error icon in configStatusBox.
+        auto msgErrState = state;
+        msgErrState["load_error"] = QJsonValue::Null;
+        msgErrState["validation_field"] = QJsonValue::Null;
+        msgErrState["message"] = "Could not write config.toml: Permission denied";
+        msgErrState["message_is_error"] = true;
+        updateState(msgErrState, true);
+        settleLayout();
+        check(configStatusBox && configStatusBox->isVisible() &&
+                  configStatusIcon && configStatusIcon->property("isError").toBool(),
+              "Settings configStatusBox uses error icon when message_is_error is true");
+        shot("settings-error");
       } else {
         check(state.contains("entries"), "History entries");
         shot("history");
-        // Bug 8 regression: copy error banner renders outside QScrollArea.
+        // Bug 8 & Round 2 Bug 7 regression: long unbroken D-Bus copy error
+        // wraps cleanly inside scroll area width without widening popup.
         auto errState = state;
-        errState["error"] = "Clipboard copy failed: Wayland compositor unavailable";
+        errState["error"] =
+            "Clipboard copy failed: org.freedesktop.DBus.Error.Failed: "
+            "Wayland compositor unavailable";
         updateState(errState);
         settleLayout();
         auto *errBanner = findChild<QWidget *>("historyErrorBanner");
+        auto *errLabel = errBanner
+                             ? errBanner->findChild<QLabel *>("historyErrorLabel")
+                             : nullptr;
         check(errBanner && errBanner->isVisible() &&
                   (!historyScroll || !historyScroll->isAncestorOf(errBanner)),
               "History copy error banner pinned visibly outside scroll area");
+        check(errBanner && historyScroll &&
+                  errBanner->width() <= historyScroll->width() &&
+                  width() <= historyScroll->width() + 4,
+              "History long D-Bus copy error wraps without expanding popup width");
+        check(errLabel && errLabel->width() > 0 &&
+                  errLabel->height() >= errLabel->heightForWidth(errLabel->width()),
+              "History long D-Bus copy error fits vertically without clipping");
         shot("history-error");
       }
       QFile file(dir + "/" + mode + "-result.json");
@@ -4649,6 +5037,8 @@ public:
       resize(m == "config" ? QSize(580, 656) : QSize(900, 700));
       restoreGeometry(settings.value(m + "/geometry").toByteArray());
     }
+    if (m == "board")
+      qApp->installEventFilter(this);
     auto initial = request({{"op", "init"}});
     if (initial.isObject())
       updateState(initial.toObject());
@@ -4661,6 +5051,8 @@ public:
       timer.start(100);
   }
   ~Frontend() override {
+    if (mode == "board" && qApp)
+      qApp->removeEventFilter(this);
     if (mode != "history")
       settings.setValue(mode + "/geometry", saveGeometry());
     if (splitter && verticalSplitter) {
@@ -4712,6 +5104,8 @@ QWidget *Frontend::palettePage() {
     connect(action, &QAction::triggered, this, [this, pair] {
       if (pair.second == "palette_save" && tabs)
         commitFocusedEditor(tabs->widget(1));
+      if (pair.second == "palette_undo" || pair.second == "palette_redo")
+        discardFocusedEdits();
       send({{"op", pair.second}});
     });
     if (pair.second == "palette_undo")
@@ -4781,7 +5175,8 @@ QWidget *Frontend::palettePage() {
           [this, name, initialPaletteName] {
             if (name->text() == initialPaletteName)
               return;
-            send({{"op", "palette_name"}, {"name", name->text()}});
+            name->setModified(false);
+            send({{"op", "palette_name"}, {"name", name->text()}}, false, true);
           });
   auto historyLock = new QCheckBox("Lock history additions", nameRow);
   historyLock->setChecked(p.value("lock_history").toBool());
@@ -5571,6 +5966,7 @@ QWidget *Frontend::createThemePage() {
     const QString currentName = str(t.value("project").toObject(), "name");
     if (name->text() == currentName)
       return;
+    name->setModified(false);
     send({{"op", "theme_name"}, {"name", name->text()}});
   });
   selection->addRow("Name:", name);
@@ -5783,13 +6179,17 @@ QWidget *Frontend::buildThemeBody(Scene *reuse) {
   actions->addSeparator();
   auto undoAct = addThemeAction(
       "Undo", actionIcon("theme_undo"), QStyle::SP_ArrowBack,
-      actionHint("Undo", "edit-undo-symbolic"),
-      [this] { send({{"op", "theme_undo"}}); });
+      actionHint("Undo", "edit-undo-symbolic"), [this] {
+        discardFocusedEdits();
+        send({{"op", "theme_undo"}});
+      });
   undoAct->setEnabled(t.value("can_undo").toBool());
   auto redoAct = addThemeAction(
       "Redo", actionIcon("theme_redo"), QStyle::SP_ArrowForward,
-      actionHint("Redo", "edit-redo-symbolic"),
-      [this] { send({{"op", "theme_redo"}}); });
+      actionHint("Redo", "edit-redo-symbolic"), [this] {
+        discardFocusedEdits();
+        send({{"op", "theme_redo"}});
+      });
   redoAct->setEnabled(t.value("can_redo").toBool());
   actions->addSeparator();
   auto bindAct = addThemeAction("Use active palette",
@@ -5801,7 +6201,8 @@ QWidget *Frontend::buildThemeBody(Scene *reuse) {
 
   // Subtle right-aligned project context label (wide mode only)
   auto contextSpacer = new QWidget(actions);
-  contextSpacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+  contextSpacer->setFixedWidth(8);
+  contextSpacer->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
   auto contextSpacerAction = actions->addWidget(contextSpacer);
   contextSpacerAction->setObjectName("themeContextSpacerAction");
 
@@ -5824,7 +6225,7 @@ QWidget *Frontend::buildThemeBody(Scene *reuse) {
                       ? pluginName
                       : contextText + QStringLiteral(" · ") + pluginName;
 
-  auto contextLabel = new QLabel(contextText, actions);
+  auto contextLabel = new ElidingLabel(contextText, actions, Qt::ElideMiddle);
   contextLabel->setObjectName("themeContextLabel");
   contextLabel->setContentsMargins(6, 0, 6, 0);
   contextLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
@@ -5988,9 +6389,11 @@ QWidget *Frontend::buildThemeBody(Scene *reuse) {
               [this, id, edit, initialRoleValue] {
                 if (edit->text() == initialRoleValue)
                   return;
+                edit->setModified(false);
                 send({{"op", "theme_assign"},
                       {"role", id},
-                      {"color", edit->text()}});
+                      {"color", edit->text()}},
+                     false, true);
               });
       r->addLayout(topRow);
 
@@ -6048,12 +6451,15 @@ QWidget *Frontend::buildThemeBody(Scene *reuse) {
       r->addLayout(bottomRow);
 
       auto committedLink = std::make_shared<QString>(initialLink);
-      auto commitLink = [this, id, committedLink](const QString &rawName) {
+      auto commitLink = [this, id, committedLink](
+                            const QString &rawName,
+                            bool deferIfMouseDown = false) {
         const QString nextName = rawName.trimmed();
         if (nextName == *committedLink)
           return;
         *committedLink = nextName;
-        send({{"op", "theme_link"}, {"role", id}, {"name", nextName}});
+        send({{"op", "theme_link"}, {"role", id}, {"name", nextName}}, false,
+             deferIfMouseDown);
       };
       connect(link, &QComboBox::activated, this,
               [link, commitLink](int idx) {
@@ -6062,11 +6468,12 @@ QWidget *Frontend::buildThemeBody(Scene *reuse) {
                                         : link->currentText();
                 if (val.isEmpty())
                   link->setEditText(QString());
-                commitLink(val);
+                commitLink(val, false);
               });
       if (auto *le = link->lineEdit()) {
         connect(le, &QLineEdit::editingFinished, this, [le, commitLink] {
-          commitLink(le->text());
+          le->setModified(false);
+          commitLink(le->text(), true);
         });
       }
       rolesListLayout->addWidget(row);
@@ -6252,16 +6659,7 @@ QWidget *Frontend::buildThemeBody(Scene *reuse) {
 
 void Frontend::renderConfig() {
   auto formatWrappableStatus = [](const QString &raw) {
-    QString out;
-    out.reserve(raw.size() + 16);
-    for (int i = 0; i < raw.size(); ++i) {
-      const QChar ch = raw[i];
-      out.append(ch);
-      if ((ch == QLatin1Char('.') || ch == QLatin1Char('/')) &&
-          i + 1 < raw.size() && !raw[i + 1].isSpace())
-        out.append(QChar(0x200B));
-    }
-    return out;
+    return formatWrappableText(raw);
   };
   auto updateShortcutDot = [this](const QString &statusText) {
     if (!shortcutDot)
@@ -6289,6 +6687,7 @@ void Frontend::renderConfig() {
   auto updateConfigStatusIcon = [this](bool isError) {
     if (!configStatusIcon)
       return;
+    configStatusIcon->setProperty("isError", isError);
     QIcon icon = isError
                      ? themedIcon({"dialog-error", "dialog-error-symbolic",
                                    "data-error"},
@@ -6303,7 +6702,9 @@ void Frontend::renderConfig() {
       configLimit->setInvalid(invalid);
   };
   const bool hasLoadError = !state.value("load_error").isNull();
-  const bool statusIsError = hasLoadError || !str(state, "error").isEmpty();
+  const bool statusIsError = hasLoadError ||
+                             state.value("message_is_error").toBool() ||
+                             !str(state, "error").isEmpty();
   if (configSave) {
     limitInvalid = !limitErrorDismissed &&
                    str(state, "validation_field") == "history_limit";
@@ -6838,6 +7239,8 @@ void Frontend::renderHistory() {
     popupLayout->addWidget(new Hairline(popup));
     auto errContainer = new QWidget(popup);
     errContainer->setObjectName("historyErrorBanner");
+    errContainer->setMaximumWidth(targetW);
+    errContainer->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
     auto errLayout = new QHBoxLayout(errContainer);
     errLayout->setContentsMargins(10, 7, 10, 7);
     errLayout->setSpacing(7);
@@ -6848,11 +7251,15 @@ void Frontend::renderHistory() {
             .pixmap(QSize(16, 16), devicePixelRatioF()));
     errIcon->setFixedSize(16, 16);
     errLayout->addWidget(errIcon, 0, Qt::AlignLeft | Qt::AlignVCenter);
-    auto error = new QLabel(errText, errContainer);
+    auto error = new QLabel(formatWrappableText(errText), errContainer);
+    error->setObjectName("historyErrorLabel");
+    error->setToolTip(errText);
     error->setWordWrap(true);
     error->setTextFormat(Qt::PlainText);
     error->setMinimumWidth(0);
-    error->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    error->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
+    const int errTextW = qMax(40, targetW - 10 - 10 - 16 - 7);
+    error->setMinimumHeight(error->heightForWidth(errTextW));
     if (palette().color(QPalette::Window).lightness() >= 128) {
       QPalette errPal = error->palette();
       errPal.setColor(QPalette::WindowText, QColor(0xA6, 0x1D, 0x2B));
