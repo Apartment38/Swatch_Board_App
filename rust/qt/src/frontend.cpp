@@ -392,6 +392,12 @@ protected:
         p.restore();
       }
     }
+    const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
+    const QColor frameColor =
+        darkSurface ? QColor(255, 255, 255, 65) : QColor(0, 0, 0, 72);
+    p.setPen(QPen(frameColor, 1.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(tileRect, radius, radius);
     if (hasFocus()) {
       QPen focusPen(text().isEmpty() ? palette().color(QPalette::Highlight) : fg,
                     2.0);
@@ -403,12 +409,6 @@ protected:
       QColor hoverBorder = fg;
       hoverBorder.setAlpha(105);
       p.setPen(QPen(hoverBorder, 1.0));
-      p.setBrush(Qt::NoBrush);
-      p.drawRoundedRect(tileRect, radius, radius);
-    } else {
-      QColor subtleBorder = palette().color(QPalette::WindowText);
-      subtleBorder.setAlpha(48);
-      p.setPen(QPen(subtleBorder, 1.0));
       p.setBrush(Qt::NoBrush);
       p.drawRoundedRect(tileRect, radius, radius);
     }
@@ -465,7 +465,7 @@ class CurrentColorBanner : public QWidget {
 
 public:
   CurrentColorBanner(const QColor &value, const QString &currentHex,
-                     const QString &outputText,
+                     const QString &outputText, int headerHeight,
                      std::function<void(QString)> onDrop,
                      QWidget *parent = nullptr)
       : QWidget(parent), dropped(std::move(onDrop)) {
@@ -475,13 +475,17 @@ public:
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(0);
 
-    auto row = new QHBoxLayout;
-    row->setContentsMargins(10, 6, 10, 6);
+    auto rowWidget = new QWidget(this);
+    rowWidget->setObjectName("currentColorRow");
+    rowWidget->setFixedHeight(headerHeight);
+    rowWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    auto row = new QHBoxLayout(rowWidget);
+    row->setContentsMargins(10, 0, 10, 0);
     row->setSpacing(10);
 
-    auto chip = new Swatch(value, "Current color", this);
+    auto chip = new Swatch(value, "Current color", rowWidget);
     chip->setText(QString());
-    chip->setFixedSize(52, 26);
+    chip->setFixedSize(48, 22);
     chip->setTileMode(true, false);
     chip->setToolTip(
         "Current color — drag to palette or theme, or drop a color here");
@@ -492,15 +496,15 @@ public:
     row->addWidget(chip, 0, Qt::AlignVCenter);
 
     const QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    auto hexLabel = new QLabel(currentHex, this);
+    auto hexLabel = new QLabel(currentHex, rowWidget);
     QFont hexFont = monoFont;
     hexFont.setBold(true);
     hexLabel->setFont(hexFont);
     hexLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     row->addWidget(hexLabel, 0, Qt::AlignVCenter);
 
-    auto makeMuted = [this](const QString &text, int alpha, bool smaller = false) {
-      auto l = new QLabel(text, this);
+    auto makeMuted = [rowWidget](const QString &text, int alpha, bool smaller = false) {
+      auto l = new QLabel(text, rowWidget);
       if (smaller) {
         QFont f = l->font();
         if (f.pointSizeF() > 0)
@@ -533,7 +537,7 @@ public:
     hintLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     row->addWidget(hintLabel, 0, Qt::AlignVCenter);
 
-    outer->addLayout(row);
+    outer->addWidget(rowWidget);
     outer->addWidget(new Hairline(this));
     updateHintVisibility();
   }
@@ -717,18 +721,19 @@ protected:
     p.setBrush(Qt::NoBrush);
     p.drawRoundedRect(bounds, radius, radius);
 
-    const qreal reticleR = 5.5;
-    const qreal pad = 7.0;
+    const qreal pad = 7.5;
     const qreal rawX = s * (width() - 1) / 100.0;
     const qreal rawY = (100.0 - v) * (height() - 1) / 100.0;
     const QPointF center(
         qBound(pad, rawX, qMax(pad, width() - pad)),
         qBound(pad, rawY, qMax(pad, height() - pad)));
     p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(QColor(0, 0, 0, 225), 2.5));
-    p.drawEllipse(center, reticleR, reticleR);
-    p.setPen(QPen(Qt::white, 1.5));
-    p.drawEllipse(center, reticleR, reticleR);
+    p.setPen(QPen(QColor(0, 0, 0, 225), 1.5));
+    p.drawEllipse(center, 6.2, 6.2);
+    p.setPen(QPen(Qt::white, 1.6));
+    p.drawEllipse(center, 5.0, 5.0);
+    p.setPen(QPen(QColor(0, 0, 0, 190), 1.0));
+    p.drawEllipse(center, 3.8, 3.8);
 
     if (hasFocus()) {
       p.setPen(QPen(palette().color(QPalette::Highlight), 2.0));
@@ -843,10 +848,13 @@ protected:
     const QPointF marker =
         r.center() + QPointF(std::cos(angle), -std::sin(angle)) *
                          (s * r.width() / 200.0);
-    p.setPen(QPen(QColor(0, 0, 0, 225), 2.5));
-    p.drawEllipse(marker, 5.5, 5.5);
-    p.setPen(QPen(Qt::white, 1.5));
-    p.drawEllipse(marker, 5.5, 5.5);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(QColor(0, 0, 0, 225), 1.5));
+    p.drawEllipse(marker, 6.2, 6.2);
+    p.setPen(QPen(Qt::white, 1.6));
+    p.drawEllipse(marker, 5.0, 5.0);
+    p.setPen(QPen(QColor(0, 0, 0, 190), 1.0));
+    p.drawEllipse(marker, 3.8, 3.8);
     if (hasFocus()) {
       p.setPen(QPen(palette().color(QPalette::Highlight), 2.0));
       p.drawRoundedRect(QRectF(rect()).adjusted(1.0, 1.0, -1.0, -1.0), 3.0,
@@ -1151,6 +1159,9 @@ class Frontend : public QWidget {
       splitter->setSizes({target, qMax(1, splitter->width() - target)});
       compactHistory = narrow;
     }
+  }
+  int headerBarHeight() const {
+    return qMax(34, fontMetrics().height() + 14);
   }
   bool shortMixer() const {
     return height() <= qMax(360, fontMetrics().height() * 24);
@@ -1567,10 +1578,13 @@ class Frontend : public QWidget {
       historyPanelLayout->setContentsMargins(0, 0, 0, 0);
       historyPanelLayout->setSpacing(0);
       auto historyHeader = new QLabel("History", historyContent);
+      historyHeader->setObjectName("historyHeader");
       QFont headerFont = historyHeader->font();
       headerFont.setWeight(QFont::DemiBold);
       historyHeader->setFont(headerFont);
-      historyHeader->setContentsMargins(10, 7, 10, 7);
+      historyHeader->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+      historyHeader->setContentsMargins(10, 0, 10, 0);
+      historyHeader->setFixedHeight(headerBarHeight());
       historyPanelLayout->addWidget(historyHeader);
       historyPanelLayout->addWidget(new Hairline(historyContent));
       historyBox = new QWidget;
@@ -1700,12 +1714,16 @@ class Frontend : public QWidget {
       };
       if (previous.value("mixer") != state.value("mixer")) {
         if (spectrumDragging) {
-          auto hsv = array(object(state.value("mixer")), "hsv");
+          auto m = object(state.value("mixer"));
+          auto hsv = array(m, "hsv");
+          auto rgba = array(m, "rgba");
           if (hsv.size() == 3) {
             if (mixerSpectrum) mixerSpectrum->setHsv(hsv[0].toDouble(), hsv[1].toDouble(), hsv[2].toDouble());
             if (mixerWheel) mixerWheel->setHsv(hsv[0].toDouble(), hsv[1].toDouble(), hsv[2].toDouble());
             if (mixerReadout)
-              mixerReadout->setText(mixerHsvReadout(hsv[0].toDouble(), hsv[1].toDouble(), hsv[2].toDouble()));
+              mixerReadout->setText(mixerHsvReadout(
+                  hsv[0].toDouble(), hsv[1].toDouble(), hsv[2].toDouble(),
+                  rgba.size() == 4 ? rgba[3].toInt() : 255));
           }
         } else
           refresh(0, mixerPage(), "Mixer");
@@ -1873,53 +1891,73 @@ class Frontend : public QWidget {
     const QString currentHex = str(m, "current");
     const QString outputText = str(m, "output");
     return new CurrentColorBanner(
-        color(currentHex), currentHex, outputText, [this](QString c) {
+        color(currentHex), currentHex, outputText, headerBarHeight(),
+        [this](QString c) {
           if (color(c).isValid())
             send({{"op", "mixer_select"}, {"color", c}});
         });
   }
   QWidget *mixerPage() {
+    auto m = object(state.value("mixer"));
     auto page = new QWidget;
     page->setObjectName("mixerPage");
     auto layout = new QVBoxLayout(page);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
+    auto actions = new QToolBar(page);
+    actions->setObjectName("mixerActions");
+    actions->setMovable(false);
+    actions->setFloatable(false);
+    actions->setIconSize(QSize(16, 16));
+    actions->setContentsMargins(6, 2, 6, 2);
+    actions->setProperty("boardAction", true);
+    actions->setToolButtonStyle(
+        settings.value("board/toolbarLabels", true).toBool()
+            ? Qt::ToolButtonTextBesideIcon
+            : Qt::ToolButtonIconOnly);
+    const QList<QPair<QString, QString>> actionItems{
+        {"Copy", "mixer_copy"},
+        {"Add to palette", "palette_add_current"},
+        {"Undo", "mixer_undo"},
+        {"Redo", "mixer_redo"}};
+    for (int idx = 0; idx < actionItems.size(); ++idx) {
+      if (idx == 2)
+        actions->addSeparator();
+      const auto &pair = actionItems[idx];
+      const auto icons = actionIcon(pair.second);
+      auto icon = themedIcon(icons, QStyle::SP_FileIcon);
+      auto action = actions->addAction(icon, pair.first);
+      action->setToolTip(actionHint(pair.first, icons.value(0)));
+      actions->widgetForAction(action)->setAccessibleName(pair.first);
+      connect(action, &QAction::triggered, this,
+              [this, pair] { send({{"op", pair.second}}); });
+      if (pair.second == "mixer_undo")
+        action->setEnabled(m.value("can_undo").toBool());
+      if (pair.second == "mixer_redo")
+        action->setEnabled(m.value("can_redo").toBool());
+    }
+    layout->addWidget(actions);
     auto pinnedLine = new Hairline(page);
     pinnedLine->setObjectName("mixerActionsHairline");
-    pinnedLine->hide();
     layout->addWidget(pinnedLine);
     layout->addWidget(scroll(mixer()), 1);
-    layoutMixerActions(page);
-    page->installEventFilter(this);
     return page;
   }
-  void layoutMixerActions(QWidget *page) {
-    if (!page || page->objectName() != "mixerPage") return;
-    auto actions = page->findChild<QToolBar *>("mixerActions");
-    auto viewport = page->findChild<QScrollArea *>();
-    auto content = viewport ? viewport->widget() : nullptr;
-    if (!actions || !content) return;
-    const bool pinned = shortMixer();
-    actions->setContentsMargins(pinned ? 6 : 0, 2, pinned ? 6 : 0, 2);
-    if (auto line = page->findChild<QWidget *>("mixerActionsHairline"))
-      line->setVisible(pinned);
-    auto parent = pinned ? page : content;
-    if (actions->parentWidget() == parent) return;
-    auto layout = qobject_cast<QBoxLayout *>(parent->layout());
-    // Move the same toolbar so each command has one button and one connection.
-    layout->insertWidget(pinned ? 0 : 1, actions);
-  }
-  QString mixerHsvReadout(double hue, double saturation, double value) const {
-    return QStringLiteral("H %1°   S %2%   V %3%")
-        .arg(locale().toString(hue, 'f', 1), locale().toString(saturation, 'f', 1),
-             locale().toString(value, 'f', 1));
+  QString mixerHsvReadout(double hue, double saturation, double value,
+                          int alpha) const {
+    const int alphaPct = qRound(qBound(0, alpha, 255) * 100.0 / 255.0);
+    return QStringLiteral("H %1°   S %2%   V %3%   A %4%")
+        .arg(locale().toString(hue, 'f', 1),
+             locale().toString(saturation, 'f', 1),
+             locale().toString(value, 'f', 1),
+             QString::number(alphaPct));
   }
   QWidget *mixer() {
     auto m = object(state.value("mixer"));
     auto w = new QWidget;
     w->setObjectName("mixerContent");
     auto l = new QVBoxLayout(w);
-    l->setContentsMargins(10, 8, 10, 8);
+    l->setContentsMargins(12, 10, 12, 14);
     l->setSpacing(6);
     const QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     auto channelLabel = [](const QString &text, QWidget *parent) {
@@ -1942,7 +1980,7 @@ class Frontend : public QWidget {
     auto controls = new QGridLayout(selectorsBox);
     controls->setContentsMargins(0, 0, 0, 0);
     controls->setHorizontalSpacing(12);
-    controls->setVerticalSpacing(4);
+    controls->setVerticalSpacing(6);
     auto changed = [this](double h, double s, double v, bool final) {
           spectrumDragging = true;
           send({{"op", "mixer_hsv"}, {"h", h}, {"s", s}, {"v", v}});
@@ -1957,7 +1995,9 @@ class Frontend : public QWidget {
     mixerSpectrum->setObjectName("mixerSpectrum");
     mixerWheel = new MixerWheel(h, s, v, changed, selectorsBox);
     mixerWheel->setObjectName("mixerWheel");
-    mixerReadout = new QLabel(mixerHsvReadout(h, s, v), selectorsBox);
+    mixerReadout = new QLabel(
+        mixerHsvReadout(h, s, v, rgba.size() == 4 ? rgba[3].toInt() : 255),
+        selectorsBox);
     mixerReadout->setObjectName("mixerHsvReadout");
     QFont readoutFont = monoFont;
     if (readoutFont.pointSizeF() > 0)
@@ -1978,14 +2018,17 @@ class Frontend : public QWidget {
     l->addLayout(columns);
     auto inputs = new QWidget(w);
     inputs->setObjectName("mixerInputs");
+    inputs->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    inputs->setMaximumWidth(460);
     auto form = new QFormLayout(inputs);
     form->setContentsMargins(0, 0, 0, 0);
     form->setHorizontalSpacing(8);
     form->setVerticalSpacing(5);
     form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
-    form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
+    form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
     auto hbox = new QWidget(inputs);
+    hbox->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     auto hl = new QHBoxLayout(hbox);
     hl->setContentsMargins(0, 0, 0, 0);
     hl->setSpacing(4);
@@ -1999,11 +2042,11 @@ class Frontend : public QWidget {
       x->setValue(x == hh ? h : x == ss ? s : v);
       x->setSingleStep(.1);
       x->setSuffix(x == hh ? QString::fromUtf8("°") : "%");
-      x->setMaximumWidth(x->sizeHint().width());
+      x->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
       auto label = channelLabel(x == hh ? "H" : x == ss ? "S" : "V", hbox);
       label->setBuddy(x);
       hl->addWidget(label);
-      hl->addWidget(x);
+      hl->addWidget(x, 1);
     }
     const double displayedH = hh->value(), displayedS = ss->value(),
                  displayedV = vv->value();
@@ -2021,9 +2064,9 @@ class Frontend : public QWidget {
                       {"v", changedV ? vv->value() : v}});
               });
     }
-    hl->addStretch();
     form->addRow("HSV:", hbox);
     auto rw = new QWidget(inputs);
+    rw->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     auto rl = new QHBoxLayout(rw);
     rl->setContentsMargins(0, 0, 0, 0);
     rl->setSpacing(4);
@@ -2033,14 +2076,13 @@ class Frontend : public QWidget {
       if (i > 0)
         rl->addSpacing(2);
       auto x = spin(names[i], rgba[i].toInt(), 0, 255, rw);
-      x->setMaximumWidth(x->sizeHint().width());
+      x->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
       channels << x;
       auto label = channelLabel(QString(names[i]).left(1), rw);
       label->setBuddy(x);
       rl->addWidget(label);
-      rl->addWidget(x);
+      rl->addWidget(x, 1);
     }
-    rl->addStretch();
     for (auto x : channels)
       connect(x, &QSpinBox::editingFinished, this, [this, channels] {
         send({{"op", "mixer_rgba"},
@@ -2052,6 +2094,7 @@ class Frontend : public QWidget {
     form->addRow("RGBA:", rw);
     auto fields = array(m, "fields");
     auto formatRow = new QWidget(inputs);
+    formatRow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     auto formatLayout = new QHBoxLayout(formatRow);
     formatLayout->setContentsMargins(0, 0, 0, 0);
     formatLayout->setSpacing(6);
@@ -2059,10 +2102,12 @@ class Frontend : public QWidget {
     format->setAccessibleName("Color format");
     format->addItems({"HEX", "RGB", "RGBA", "HSL", "HSV"});
     format->setCurrentIndex(mixerFormat);
+    format->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     auto value = line("Color value", fields[mixerFormat].toString(), formatRow);
     value->setFont(monoFont);
     value->setMinimumWidth(
         value->fontMetrics().horizontalAdvance(QString(16, QLatin1Char('0'))) + 16);
+    value->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     auto apply = [this, value] {
       value->setModified(false);
       send({{"op", "mixer_apply"}, {"index", mixerFormat}, {"text", value->text()}});
@@ -2077,9 +2122,10 @@ class Frontend : public QWidget {
     applyBtn->setIcon(themedIcon({"dialog-ok-apply-symbolic", "dialog-ok-apply"},
                                  QStyle::SP_DialogApplyButton));
     applyBtn->setIconSize(QSize(16, 16));
-    formatLayout->addWidget(format);
-    formatLayout->addWidget(value);
-    formatLayout->addWidget(applyBtn);
+    applyBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    formatLayout->addWidget(format, 0);
+    formatLayout->addWidget(value, 1);
+    formatLayout->addWidget(applyBtn, 0);
     auto formatLabel = new QLabel("Format:", inputs);
     formatLabel->setBuddy(format);
     form->addRow(formatLabel, formatRow);
@@ -2088,42 +2134,13 @@ class Frontend : public QWidget {
     form->addRow("CMYK:", cmykLabel);
     columns->addWidget(inputs, 1, Qt::AlignTop);
     setTabOrder(mixerSpectrum, mixerWheel);
-    auto actions = new QToolBar(w);
-    actions->setObjectName("mixerActions");
-    actions->setMovable(false);
-    actions->setFloatable(false);
-    actions->setIconSize(QSize(16, 16));
-    actions->setContentsMargins(0, 2, 0, 2);
-    actions->setProperty("boardAction", true);
-    actions->setToolButtonStyle(settings.value("board/toolbarLabels", true).toBool()
-                                    ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
-    const QList<QPair<QString, QString>> actionItems{
-        {"Copy", "mixer_copy"},
-        {"Add to palette", "palette_add_current"},
-        {"Undo", "mixer_undo"},
-        {"Redo", "mixer_redo"}};
-    for (int idx = 0; idx < actionItems.size(); ++idx) {
-      if (idx == 2)
-        actions->addSeparator();
-      const auto &pair = actionItems[idx];
-      const auto icons = actionIcon(pair.second);
-      auto icon = themedIcon(icons, QStyle::SP_FileIcon);
-      auto action = actions->addAction(icon, pair.first);
-      action->setToolTip(actionHint(pair.first, icons.value(0)));
-      actions->widgetForAction(action)->setAccessibleName(pair.first);
-      connect(action, &QAction::triggered, this, [this, pair] { send({{"op", pair.second}}); });
-      if (pair.second == "mixer_undo")
-        action->setEnabled(m.value("can_undo").toBool());
-      if (pair.second == "mixer_redo")
-        action->setEnabled(m.value("can_redo").toBool());
-    }
-    l->addWidget(actions);
     l->addWidget(new Hairline(w));
     auto mixHeader = new QWidget(w);
     mixHeader->setObjectName("mixerMixHeader");
+    mixHeader->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
     auto mixHeaderLayout = new QBoxLayout(QBoxLayout::LeftToRight, mixHeader);
     mixHeaderLayout->setContentsMargins(0, 0, 0, 0);
-    mixHeaderLayout->setSpacing(6);
+    mixHeaderLayout->setSpacing(10);
     auto mixLeft = new QWidget(mixHeader);
     mixLeft->setObjectName("mixerMixLeft");
     auto mixLeftLayout = new QHBoxLayout(mixLeft);
@@ -2149,29 +2166,28 @@ class Frontend : public QWidget {
     });
     mixLeftLayout->addWidget(spaceLabel, 0, Qt::AlignVCenter);
     mixLeftLayout->addWidget(space, 0, Qt::AlignVCenter);
-    mixLeftLayout->addStretch(1);
     auto mixRight = new QWidget(mixHeader);
     mixRight->setObjectName("mixerMixRight");
     auto mixRightLayout = new QHBoxLayout(mixRight);
     mixRightLayout->setContentsMargins(0, 0, 0, 0);
-    mixRightLayout->setSpacing(2);
+    mixRightLayout->setSpacing(6);
     auto addSourceBtn = toolButton(
         "Add source", actionIcon("mixer_source_add"), mixRight,
         [this] { send({{"op", "mixer_source_add"}}); });
     addSourceBtn->setAutoRaise(true);
     addSourceBtn->setIconSize(QSize(16, 16));
     addSourceBtn->setToolTip("Add a color mixing source");
-    auto mixBtn = toolButton(
-        "Mix", actionIcon("mixer_mix"), mixRight,
-        [this] { send({{"op", "mixer_mix"}}); });
-    mixBtn->setAutoRaise(true);
+    auto mixBtn = button("Mix", mixRight,
+                         [this] { send({{"op", "mixer_mix"}}); });
+    mixBtn->setIcon(themedIcon(actionIcon("mixer_mix"),
+                               QStyle::SP_DialogApplyButton));
     mixBtn->setIconSize(QSize(16, 16));
     mixBtn->setToolTip("Mix sources into the current color");
     mixRightLayout->addWidget(addSourceBtn, 0, Qt::AlignVCenter);
     mixRightLayout->addWidget(mixBtn, 0, Qt::AlignVCenter);
-    mixHeaderLayout->addWidget(mixLeft, 1);
+    mixHeaderLayout->addWidget(mixLeft, 0, Qt::AlignVCenter);
     mixHeaderLayout->addWidget(mixRight, 0, Qt::AlignVCenter);
-    l->addWidget(mixHeader);
+    l->addWidget(mixHeader, 0, Qt::AlignLeft);
     int i = 0;
     for (auto value : array(m, "sources")) {
       auto o = value.toObject();
@@ -2298,7 +2314,7 @@ class Frontend : public QWidget {
                     : 0;
         const int selectorsBottom = margins.top() + compactSide + readoutH;
         const int foldGap = viewportSize.height() - selectorsBottom + 2;
-        columns->setSpacing(qBound(12, foldGap, 36));
+        columns->setSpacing(qBound(12, foldGap, 48));
       } else {
         columns->setSpacing(12);
       }
@@ -2310,9 +2326,12 @@ class Frontend : public QWidget {
       auto mixRight = mixHeader->findChild<QWidget *>("mixerMixRight");
       if (mixLayout && mixLeft && mixRight) {
         const bool singleRow =
-            availW >= mixLeft->sizeHint().width() + mixRight->sizeHint().width() + 6;
+            availW >= mixLeft->sizeHint().width() + mixRight->sizeHint().width() + 10;
         mixLayout->setDirection(singleRow ? QBoxLayout::LeftToRight
                                           : QBoxLayout::TopToBottom);
+        mixLayout->setSpacing(singleRow ? 10 : 6);
+        mixLayout->setAlignment(mixLeft,
+                                singleRow ? Qt::AlignVCenter : Qt::AlignLeft);
         mixLayout->setAlignment(mixRight,
                                 singleRow ? Qt::AlignVCenter : Qt::AlignLeft);
         mixHeader->updateGeometry();
@@ -2337,7 +2356,6 @@ protected:
     sizeHistorySidebar();
     sizePinnedPalette();
     if (tabs) {
-      layoutMixerActions(tabs->widget(0));
       if (auto *scroll = tabs->widget(0)->findChild<QScrollArea *>())
         layoutMixerContent(scroll->widget(), scroll->viewport()->size());
     }
@@ -2347,8 +2365,6 @@ protected:
       if (watched == historyPanel)
         updateHistoryEmptyState(historyPanel->width());
       auto page = qobject_cast<QWidget *>(watched);
-      if (page && page->objectName() == "mixerPage")
-        layoutMixerActions(page);
       auto scroll = page ? qobject_cast<QScrollArea *>(page->parentWidget()) : nullptr;
       if (scroll && page == scroll->viewport() && scroll->widget() &&
           scroll->widget()->objectName() == "mixerContent") {
@@ -2693,11 +2709,24 @@ public:
                   boundsInMixer(mixerSpectrum).right() < boundsInMixer(mixerWheel).left() &&
                   boundsInMixer(mixerWheel).right() < boundsInMixer(hueInput).left(),
               "Wide Mixer shows a square spectrum, wheel, and inputs in one row");
-        for (auto b : tabs->widget(0)->findChildren<QAbstractButton *>())
+        auto wideActions = mixerPage->findChild<QToolBar *>("mixerActions");
+        check(wideActions && wideActions->parentWidget() == mixerPage &&
+                  wideActions->isVisible() &&
+                  !mixerScroll->widget()->findChild<QToolBar *>("mixerActions"),
+              "Wide Mixer pins its toolbar above the scroll");
+        for (auto b : mixerPage->findChildren<QAbstractButton *>())
           if (b->accessibleName() == "Copy" || b->accessibleName() == "Add to palette") {
-            check(inMixerViewport(b),
-                  b->accessibleName() + " visible in initial Mixer viewport");
+            check(b->isVisible() &&
+                      mixerPage->rect().contains(
+                          QRect(b->mapTo(mixerPage, QPoint()), b->size())),
+                  b->accessibleName() + " visible in initial Mixer");
           }
+        auto histHdr = historyPanel->findChild<QWidget *>("historyHeader");
+        auto curRow = pinnedCurrent->findChild<QWidget *>("currentColorRow");
+        check(histHdr && curRow &&
+                  histHdr->mapTo(splitter, QPoint(0, histHdr->height())).y() ==
+                      curRow->mapTo(splitter, QPoint(0, curRow->height())).y(),
+              "History and CurrentColorBanner header hairlines align flush");
         shot("mixer");
         resize(540, 360);
         QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
@@ -2726,9 +2755,12 @@ public:
         check(emptyDrop && emptyDrop->acceptDrops() && emptyDrop->isVisible() &&
                   pinnedScroll->height() <= fontMetrics().height() + 8,
               "Compact Mixer retains a one-line empty palette drop target");
+        auto rgbaCompact = array(object(state.value("mixer")), "rgba");
         check(mixerReadout && mixerReadout->isVisible() && inMixerViewport(mixerReadout) &&
-                  mixerReadout->text() == mixerHsvReadout(210.0, 100.0 / 3, 600.0 / 255),
-              "Compact Mixer displays current HSV values without scrolling");
+                  mixerReadout->text() ==
+                      mixerHsvReadout(210.0, 100.0 / 3, 600.0 / 255,
+                                      rgbaCompact.size() == 4 ? rgbaCompact[3].toInt() : 255),
+              "Compact Mixer displays current HSV and alpha values without scrolling");
         shot("mixer-small");
         auto mixSection = mixerScroll->widget()->findChild<QWidget *>("mixerMixHeader");
         QAbstractButton *addSourceBtn = nullptr, *mixBtn = nullptr;
@@ -2756,6 +2788,22 @@ public:
           }
         click(mixerPage, "Copy");
         check(QApplication::clipboard()->text() == "#040506", "Pinned Copy copies the Mixer output");
+        const QString beforeMix = str(object(state.value("mixer")), "current");
+        click(tabs->widget(0), "Mix");
+        check(str(object(state.value("mixer")), "current") != beforeMix,
+              "Mix computes a new current color from sources");
+        click(tabs->widget(0), "Undo");
+        check(str(object(state.value("mixer")), "current") == beforeMix,
+              "Undo restores current color after Mix");
+        const int sourcesBefore = array(object(state.value("mixer")), "sources").size();
+        click(tabs->widget(0), "Add source");
+        check(array(object(state.value("mixer")), "sources").size() == sourcesBefore + 1,
+              "Add source appends a mixing source");
+        click(tabs->widget(0), "Undo");
+        check(array(object(state.value("mixer")), "sources").size() == sourcesBefore &&
+                  str(object(state.value("mixer")), "current") == beforeMix,
+              "Undo restores sources after Add source");
+        mixerPage = tabs->widget(0);
         if (emptyDrop) {
           QMimeData mime;
           mime.setText("#04050642");
