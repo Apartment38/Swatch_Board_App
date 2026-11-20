@@ -62,10 +62,72 @@ static QDoubleSpinBox *decimal(const QString &name, double value, double min,
   return s;
 }
 
+static void paintCheckerboard(QPainter &p, const QRect &r, int cell = 6) {
+  static const QColor light(0xE4, 0xE4, 0xE4);
+  static const QColor dark(0xCC, 0xCC, 0xCC);
+  p.fillRect(r, light);
+  for (int y = r.top(); y <= r.bottom(); y += cell) {
+    const int row = (y - r.top()) / cell;
+    for (int x = r.left(); x <= r.right(); x += cell) {
+      const int col = (x - r.left()) / cell;
+      if ((row + col) & 1) {
+        p.fillRect(QRect(x, y, qMin(cell, r.right() - x + 1),
+                         qMin(cell, r.bottom() - y + 1)),
+                   dark);
+      }
+    }
+  }
+}
+
+class Hairline : public QFrame {
+public:
+  explicit Hairline(QWidget *parent = nullptr) : QFrame(parent) {
+    setFrameShape(QFrame::HLine);
+    setFixedHeight(1);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  }
+
+protected:
+  void paintEvent(QPaintEvent *) override {
+    QPainter p(this);
+    QColor c = palette().color(QPalette::Mid);
+    c.setAlpha(150);
+    p.fillRect(rect(), c);
+  }
+};
+
+class StatusDot : public QWidget {
+  QColor dotColor;
+
+public:
+  explicit StatusDot(QWidget *parent = nullptr) : QWidget(parent) {
+    setFixedSize(8, 8);
+    dotColor = palette().color(QPalette::Mid);
+  }
+  void setColor(const QColor &value) {
+    if (dotColor != value) {
+      dotColor = value;
+      update();
+    }
+  }
+
+protected:
+  void paintEvent(QPaintEvent *) override {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    QColor border = dotColor.darker(125);
+    border.setAlpha(180);
+    p.setPen(QPen(border, 1.0));
+    p.setBrush(dotColor);
+    p.drawEllipse(QRectF(1.0, 1.0, 6.0, 6.0));
+  }
+};
+
 class Swatch : public QPushButton {
   QColor c;
   QPoint start;
   int paletteIndex = -1, historyIndex = -1;
+  bool tileMode = false, tileLocked = false;
   std::function<void(int, QString)> dropped;
 
 public:
@@ -76,11 +138,33 @@ public:
     QPixmap pixmap(24, 24);
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
-    painter.fillRect(QRect(1, 1, 22, 22), c);
-    painter.setPen(palette().color(QPalette::Text));
-    painter.drawRect(1, 1, 21, 21);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    const QRect inner(1, 1, 22, 22);
+    const QRectF chipRect(1.5, 1.5, 21.0, 21.0);
+    QPainterPath clip;
+    clip.addRoundedRect(chipRect, 3.0, 3.0);
+    painter.save();
+    painter.setClipPath(clip);
+    if (c.alpha() < 255)
+      paintCheckerboard(painter, inner, 6);
+    painter.fillRect(inner, c);
+    painter.restore();
+    QColor border = palette().color(QPalette::Mid);
+    border.setAlpha(180);
+    painter.setPen(QPen(border, 1.0));
+    painter.drawRoundedRect(chipRect, 3.0, 3.0);
     setIcon(QIcon(pixmap));
     setIconSize(QSize(24, 24));
+  }
+  void setTileMode(bool enabled, bool locked = false) {
+    tileMode = enabled;
+    tileLocked = locked;
+    if (tileMode) {
+      setIcon(QIcon());
+      setAttribute(Qt::WA_Hover, true);
+      setCursor(Qt::PointingHandCursor);
+    }
+    update();
   }
   void paletteDrop(int index, std::function<void(int, QString)> f) {
     paletteIndex = index;
@@ -90,6 +174,88 @@ public:
   void historyDrag(int index) { historyIndex = index; }
 
 protected:
+  void paintEvent(QPaintEvent *e) override {
+    if (!tileMode) {
+      QPushButton::paintEvent(e);
+      return;
+    }
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    const QRect r = rect();
+    if (c.alpha() < 255)
+      paintCheckerboard(p, r, 6);
+    p.fillRect(r, c);
+    const double a = c.alphaF();
+    const double cr = c.red() * a + 216.0 * (1.0 - a);
+    const double cg = c.green() * a + 216.0 * (1.0 - a);
+    const double cb = c.blue() * a + 216.0 * (1.0 - a);
+    const double luma = 0.2126 * cr + 0.7152 * cg + 0.0722 * cb;
+    const bool dark = luma < 140.0;
+    const QColor fg = dark ? Qt::white : QColor(0x1B, 0x1E, 0x20);
+    if (isDown())
+      p.fillRect(r, dark ? QColor(255, 255, 255, 24) : QColor(0, 0, 0, 26));
+    else if (underMouse())
+      p.fillRect(r, dark ? QColor(255, 255, 255, 18) : QColor(0, 0, 0, 14));
+    if (paletteIndex > 0)
+      p.fillRect(QRect(0, 0, 1, r.height()),
+                 dark ? QColor(255, 255, 255, 45) : QColor(0, 0, 0, 45));
+    QFont f = font();
+    f.setBold(true);
+    p.setFont(f);
+    p.setPen(fg);
+    const bool compactTile = r.height() < 44;
+    const QRect textRect =
+        r.adjusted(6, 2, (tileLocked && compactTile) ? -22 : -6, -2);
+    p.drawText(textRect, Qt::AlignCenter, text());
+    if (tileLocked) {
+      const int sz = 14;
+      const QRect badgeRect(r.right() - sz - 5,
+                            compactTile ? (r.height() - sz) / 2 : 5, sz, sz);
+      QIcon lockIcon = QIcon::fromTheme(QStringLiteral("object-locked"));
+      if (!lockIcon.isNull()) {
+        const qreal dpr = devicePixelRatioF();
+        QPixmap pm = lockIcon.pixmap(QSize(sz, sz), dpr);
+        QPixmap tinted(pm.size());
+        tinted.setDevicePixelRatio(pm.devicePixelRatio());
+        tinted.fill(Qt::transparent);
+        QPainter tp(&tinted);
+        tp.drawPixmap(0, 0, pm);
+        tp.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        QColor badgeFg = fg;
+        badgeFg.setAlpha(215);
+        tp.fillRect(tinted.rect(), badgeFg);
+        tp.end();
+        p.drawPixmap(badgeRect.topLeft(), tinted);
+      } else {
+        QColor badgeFg = fg;
+        badgeFg.setAlpha(215);
+        p.save();
+        p.setPen(QPen(badgeFg, 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        p.setBrush(Qt::NoBrush);
+        p.drawArc(QRectF(badgeRect.left() + 3.5, badgeRect.top() + 1.5, 7.0, 7.0),
+                  0, 180 * 16);
+        p.setBrush(badgeFg);
+        p.setPen(Qt::NoPen);
+        p.drawRoundedRect(
+            QRectF(badgeRect.left() + 2.0, badgeRect.top() + 6.0, 10.0, 7.0),
+            1.5, 1.5);
+        p.restore();
+      }
+    }
+    if (hasFocus()) {
+      QPen focusPen(fg, 2.0);
+      focusPen.setJoinStyle(Qt::MiterJoin);
+      p.setPen(focusPen);
+      p.setBrush(Qt::NoBrush);
+      p.drawRect(r.adjusted(1, 1, -2, -2));
+    } else if (underMouse()) {
+      QColor hoverBorder = fg;
+      hoverBorder.setAlpha(90);
+      p.setPen(QPen(hoverBorder, 1.0));
+      p.setBrush(Qt::NoBrush);
+      p.drawRect(r.adjusted(0, 0, -1, -1));
+    }
+  }
   void mousePressEvent(QMouseEvent *e) override {
     start = e->pos();
     QPushButton::mousePressEvent(e);
@@ -153,22 +319,60 @@ protected:
 };
 class PaletteDrop : public QLabel {
   std::function<void(int, QString)> append;
+  bool dragHover = false;
 
 public:
   PaletteDrop(std::function<void(int, QString)> f, QWidget *parent)
       : QLabel("Drop a history color here to add it", parent), append(f) {
     setAcceptDrops(true);
     setAccessibleName("Drop a history color to add it to the palette");
-    setMinimumHeight(sizeHint().height());
+    setAlignment(Qt::AlignCenter);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    setContentsMargins(12, 0, 12, 0);
+    setMinimumHeight(fontMetrics().height() + 4);
+    QPalette pal = palette();
+    QColor muted = pal.color(QPalette::WindowText);
+    muted.setAlpha(155);
+    pal.setColor(QPalette::WindowText, muted);
+    setPalette(pal);
   }
 
 protected:
+  void paintEvent(QPaintEvent *e) override {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    const bool tall = height() >= 44;
+    const QRectF zone =
+        tall ? QRectF(rect()).adjusted(10.5, 8.5, -10.5, -8.5)
+             : QRectF(rect()).adjusted(6.5, 2.5, -6.5, -2.5);
+    const qreal radius = tall ? 5.0 : 3.0;
+    QColor fill = dragHover ? palette().color(QPalette::Highlight)
+                            : palette().color(QPalette::WindowText);
+    fill.setAlpha(dragHover ? 24 : 8);
+    QColor border = dragHover ? palette().color(QPalette::Highlight)
+                              : palette().color(QPalette::Mid);
+    border.setAlpha(dragHover ? 210 : 155);
+    p.setBrush(fill);
+    p.setPen(QPen(border, 1.0, Qt::DashLine));
+    p.drawRoundedRect(zone, radius, radius);
+    p.end();
+    QLabel::paintEvent(e);
+  }
   void dragEnterEvent(QDragEnterEvent *e) override {
     if (e->mimeData()->hasText() &&
-        !e->mimeData()->hasFormat("application/x-swatch-board-index"))
+        !e->mimeData()->hasFormat("application/x-swatch-board-index")) {
+      dragHover = true;
+      update();
       e->acceptProposedAction();
+    }
+  }
+  void dragLeaveEvent(QDragLeaveEvent *) override {
+    dragHover = false;
+    update();
   }
   void dropEvent(QDropEvent *e) override {
+    dragHover = false;
+    update();
     auto c = e->mimeData()->text();
     bool ok = false;
     int index =
@@ -456,11 +660,12 @@ class Frontend : public QWidget {
   QSettings settings;
   QTabWidget *tabs = nullptr;
   QLabel *status = nullptr, *connectionStatus = nullptr;
+  StatusDot *connectionDot = nullptr;
   QAction *pickAction = nullptr;
   QShortcut *undoShortcut = nullptr, *redoShortcut = nullptr;
   QVBoxLayout *root;
   QVBoxLayout *historyLayout = nullptr;
-  QWidget *historyBox = nullptr;
+  QWidget *historyPanel = nullptr, *historyBox = nullptr;
   QScrollArea *historyScroll = nullptr;
   QSplitter *splitter = nullptr, *verticalSplitter = nullptr;
   QWidget *pinnedScroll = nullptr, *pinnedCurrent = nullptr;
@@ -548,6 +753,20 @@ class Frontend : public QWidget {
   }
   bool compactShelf = false;
   int normalPaletteShelfHeight = 110;
+  bool compactHistory = false;
+  int normalHistoryWidth = 124;
+  void sizeHistorySidebar() {
+    if (!splitter || !historyPanel || !historyPanel->isVisible())
+      return;
+    const bool narrow = width() < 680;
+    if (narrow && !compactHistory)
+      normalHistoryWidth = qMax(82, splitter->sizes().value(0, 124));
+    if (narrow != compactHistory) {
+      const int target = narrow ? 82 : normalHistoryWidth;
+      splitter->setSizes({target, qMax(1, splitter->width() - target)});
+      compactHistory = narrow;
+    }
+  }
   bool shortMixer() const {
     return height() <= qMax(360, fontMetrics().height() * 24);
   }
@@ -685,12 +904,31 @@ class Frontend : public QWidget {
     if (op.contains("mix")) return "applications-graphics";
     return "list-add";
   }
+  QIcon themedIcon(const QStringList &names,
+                   QStyle::StandardPixmap fallback) const {
+    for (const auto &name : names) {
+      auto icon = QIcon::fromTheme(name);
+      if (!icon.isNull())
+        return icon;
+    }
+    return style()->standardIcon(fallback);
+  }
   QWidget *scroll(QWidget *content) {
     auto s = new QScrollArea;
+    s->setFrameShape(QFrame::NoFrame);
     s->setWidgetResizable(true);
     s->setWidget(content);
     if (content->objectName() == "mixerContent")
       s->viewport()->installEventFilter(this);
+    return s;
+  }
+  QWidget *pinnedShelf() {
+    auto s = static_cast<QScrollArea *>(scroll(pinnedPalette()));
+    s->setObjectName("pinnedShelf");
+    s->setStyleSheet(
+        "#pinnedShelf { border: none; border-top: 1px solid palette(mid); }");
+    s->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+    s->setMinimumHeight(38);
     return s;
   }
   QWidget *pinnedPalette() {
@@ -718,15 +956,15 @@ class Frontend : public QWidget {
       auto o = value.toObject();
       int index = i++;
       auto c = color(str(o, "color"));
+      const bool locked = o.value("locked").toBool();
       auto sw = new Swatch(c, str(o, "name"), w);
       sw->setText(str(o, "color").toUpper());
-      sw->setIcon(QIcon());
       sw->setMinimumSize(100, 30);
       sw->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-      auto textColor = c.lightness() < 140 ? "white" : "black";
-      sw->setStyleSheet(QString("QPushButton { background-color: %1; color: %2; border: 0; font-weight: bold; } QPushButton:focus { border: 2px solid %2; }")
-                            .arg(c.name(), textColor));
-      sw->setToolTip(str(o, "name") + " — click to select, drag to reorder; right-click for options");
+      sw->setTileMode(true, locked);
+      sw->setToolTip(
+          str(o, "name") + (locked ? " (locked)" : "") +
+          " — click to select, drag to reorder; right-click for options");
       connect(sw, &QPushButton::clicked, this, [this, c] {
         send({{"op", "mixer_select"}, {"color", hex(c)}});
         tabs->setCurrentIndex(0);
@@ -768,23 +1006,39 @@ class Frontend : public QWidget {
       auto outer = new QWidget;
       auto layout = new QVBoxLayout(outer);
       layout->setContentsMargins(0, 0, 0, 0);
+      layout->setSpacing(0);
       auto toolbar = new QToolBar(outer);
       toolbar->setMovable(false);
+      toolbar->setFloatable(false);
+      toolbar->setContentsMargins(4, 2, 4, 2);
+      toolbar->setIconSize(QSize(18, 18));
       bool labels = settings.value("board/toolbarLabels", true).toBool();
       toolbar->setToolButtonStyle(labels ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
-      auto addAction = [this, toolbar](const QString &name, QStyle::StandardPixmap icon,
+      auto addAction = [this, toolbar](const QString &name,
+                                       const QStringList &icons,
+                                       QStyle::StandardPixmap fallback,
                                        const std::function<void()> &action) {
-        auto a = toolbar->addAction(style()->standardIcon(icon), name);
+        auto a = toolbar->addAction(themedIcon(icons, fallback), name);
         connect(a, &QAction::triggered, this, action);
         return a;
       };
       auto nav = new QActionGroup(toolbar);
       nav->setExclusive(true);
       QList<QAction *> pages;
-      for (auto pair : QList<QPair<QString, QStyle::StandardPixmap>>{
-               {"Mixer", QStyle::SP_ComputerIcon}, {"Palette", QStyle::SP_DirIcon},
-               {"Theme", QStyle::SP_DesktopIcon}}) {
-        auto action = toolbar->addAction(style()->standardIcon(pair.second), pair.first);
+      struct NavEntry {
+        QString label;
+        QStringList icons;
+        QStyle::StandardPixmap fallback;
+      };
+      for (const auto &entry : QList<NavEntry>{
+               {"Mixer", {"color-gradient"}, QStyle::SP_ComputerIcon},
+               {"Palette", {"color-fill"}, QStyle::SP_DirIcon},
+               {"Theme",
+                {"preferences-desktop-theme-global",
+                 "preferences-desktop-theme"},
+                QStyle::SP_DesktopIcon}}) {
+        auto action = toolbar->addAction(
+            themedIcon(entry.icons, entry.fallback), entry.label);
         action->setCheckable(true);
         nav->addAction(action);
         int index = pages.size();
@@ -792,7 +1046,8 @@ class Frontend : public QWidget {
         pages.append(action);
       }
       toolbar->addSeparator();
-      auto pick = addAction("Pick color", QStyle::SP_DialogOpenButton, [this] {
+      auto pick = addAction("Pick color", {"color-picker"},
+                            QStyle::SP_DialogOpenButton, [this] {
         if (state.value("hide_board_while_picking").toBool()) {
           hiddenForPick = true;
           hide();
@@ -800,12 +1055,24 @@ class Frontend : public QWidget {
         }
         send({{"op", "pick"}});
       });
+      pick->setToolTip("Pick a color from the screen");
       pickAction = pick;
-      addAction("Settings", QStyle::SP_FileDialogDetailedView, [this] { send({{"op", "configure"}}); });
-      auto toggle = toolbar->addAction(style()->standardIcon(QStyle::SP_FileDialogListView), "History");
+      auto spacer = new QWidget(toolbar);
+      spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+      spacer->setMinimumWidth(0);
+      spacer->setAttribute(Qt::WA_TransparentForMouseEvents);
+      toolbar->addWidget(spacer);
+      auto toggle = toolbar->addAction(
+          themedIcon({"view-history", "document-open-recent"},
+                     QStyle::SP_FileDialogListView),
+          "History");
+      toggle->setToolTip("Show or hide the picked color history sidebar");
       toggle->setCheckable(true);
       toggle->setChecked(settings.value("board/historyVisible", true).toBool());
-      auto labelToggle = toolbar->addAction("Show labels");
+      auto labelToggle = toolbar->addAction(
+          themedIcon({"view-list-text"}, QStyle::SP_FileDialogContentsView),
+          "Show labels");
+      labelToggle->setToolTip("Show or hide toolbar button labels");
       labelToggle->setCheckable(true);
       labelToggle->setChecked(labels);
       connect(labelToggle, &QAction::toggled, this, [this, toolbar](bool visible) {
@@ -819,21 +1086,46 @@ class Frontend : public QWidget {
           if (b->property("boardAction").toBool())
             b->setToolButtonStyle(buttonStyle);
       });
-      labelToggle->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
+      auto settingsAction = addAction(
+          "Settings", {"configure"}, QStyle::SP_FileDialogDetailedView,
+          [this] { send({{"op", "configure"}}); });
+      settingsAction->setToolTip("Open Swatch Board settings");
       layout->addWidget(toolbar);
+      layout->addWidget(new Hairline(outer));
       splitter = new QSplitter(Qt::Horizontal, outer);
-      historyBox = new QGroupBox("History");
+      historyPanel = new QWidget(splitter);
+      historyPanel->setAutoFillBackground(true);
+      historyPanel->setBackgroundRole(QPalette::Base);
+      historyPanel->setMinimumWidth(78);
+      auto historyPanelLayout = new QVBoxLayout(historyPanel);
+      historyPanelLayout->setContentsMargins(0, 0, 0, 0);
+      historyPanelLayout->setSpacing(0);
+      auto historyHeader = new QLabel("History", historyPanel);
+      QFont headerFont = historyHeader->font();
+      headerFont.setBold(true);
+      historyHeader->setFont(headerFont);
+      historyHeader->setContentsMargins(10, 7, 10, 6);
+      historyPanelLayout->addWidget(historyHeader);
+      historyPanelLayout->addWidget(new Hairline(historyPanel));
+      historyBox = new QWidget;
+      historyBox->setBackgroundRole(QPalette::Base);
       historyLayout = new QVBoxLayout(historyBox);
-      historyScroll = new QScrollArea;
+      historyLayout->setContentsMargins(6, 6, 6, 6);
+      historyLayout->setSpacing(4);
+      historyScroll = new QScrollArea(historyPanel);
+      historyScroll->setFrameShape(QFrame::NoFrame);
       historyScroll->setWidgetResizable(true);
+      historyScroll->setBackgroundRole(QPalette::Base);
       historyScroll->setWidget(historyBox);
-      historyScroll->setVisible(toggle->isChecked());
+      historyPanelLayout->addWidget(historyScroll, 1);
+      historyPanel->setVisible(toggle->isChecked());
       connect(toggle, &QAction::toggled, this, [this](bool visible) {
-        historyScroll->setVisible(visible);
+        historyPanel->setVisible(visible);
         settings.setValue("board/historyVisible", visible);
       });
-      splitter->addWidget(historyScroll);
+      splitter->addWidget(historyPanel);
       tabs = new QTabWidget(outer);
+      tabs->setDocumentMode(true);
       tabs->setAccessibleName("Board sections");
       undoShortcut = new QShortcut(this);
       undoShortcut->setKeys(QKeySequence::keyBindings(QKeySequence::Undo));
@@ -870,27 +1162,45 @@ class Frontend : public QWidget {
       splitter->addWidget(content);
       verticalSplitter = new QSplitter(Qt::Vertical, outer);
       verticalSplitter->addWidget(splitter);
-      pinnedScroll = scroll(pinnedPalette());
-      pinnedScroll->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
-      pinnedScroll->setMinimumHeight(38);
+      pinnedScroll = pinnedShelf();
       verticalSplitter->addWidget(pinnedScroll);
       splitter->setStretchFactor(1, 1);
       verticalSplitter->setStretchFactor(0, 1);
-      splitter->restoreState(
-          settings.value("board/horizontalSplitter").toByteArray());
+      if (!splitter->restoreState(
+              settings.value("board/horizontalSplitter").toByteArray()))
+        splitter->setSizes({124, 776});
       if (!verticalSplitter->restoreState(
               settings.value("board/verticalSplitter").toByteArray()))
         verticalSplitter->setSizes({540, 110});
       layout->addWidget(verticalSplitter, 1);
-      status = new QLabel(outer);
+      layout->addWidget(new Hairline(outer));
+      auto statusBar = new QWidget(outer);
+      auto statusRow = new QHBoxLayout(statusBar);
+      statusRow->setContentsMargins(8, 4, 8, 4);
+      statusRow->setSpacing(6);
+      QFont statusFont = font();
+      if (statusFont.pointSizeF() > 0)
+        statusFont.setPointSizeF(qMax(8.5, statusFont.pointSizeF() - 1.0));
+      else if (statusFont.pixelSize() > 0)
+        statusFont.setPixelSize(qMax(10, statusFont.pixelSize() - 1));
+      QPalette statusPalette = palette();
+      QColor statusFg = statusPalette.color(QPalette::WindowText);
+      statusFg.setAlpha(195);
+      statusPalette.setColor(QPalette::WindowText, statusFg);
+      status = new QLabel(statusBar);
       status->setWordWrap(true);
+      status->setFont(statusFont);
+      status->setPalette(statusPalette);
       status->setAccessibleName("Board message");
-      connectionStatus = new QLabel(outer);
+      connectionDot = new StatusDot(statusBar);
+      connectionStatus = new QLabel(statusBar);
+      connectionStatus->setFont(statusFont);
+      connectionStatus->setPalette(statusPalette);
       connectionStatus->setAccessibleName("Connection status");
-      auto statusRow = new QHBoxLayout;
       statusRow->addWidget(status, 1);
-      statusRow->addWidget(connectionStatus, 0, Qt::AlignBottom);
-      layout->addLayout(statusRow);
+      statusRow->addWidget(connectionDot, 0, Qt::AlignVCenter);
+      statusRow->addWidget(connectionStatus, 0, Qt::AlignVCenter);
+      layout->addWidget(statusBar);
       replace(outer);
     } else {
       int current = tabs->currentIndex();
@@ -950,9 +1260,7 @@ class Frontend : public QWidget {
         }
       }
       if (previous.value("palette") != state.value("palette")) {
-        auto replacement = scroll(pinnedPalette());
-        replacement->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
-        replacement->setMinimumHeight(38);
+        auto replacement = pinnedShelf();
         preserveView(pinnedScroll, replacement);
         auto old = verticalSplitter->replaceWidget(1, replacement);
         pinnedScroll = replacement;
@@ -968,32 +1276,54 @@ class Frontend : public QWidget {
           item->widget()->deleteLater();
         delete item;
       }
-      int index = 0;
-      for (auto v : array(state, "history")) {
-        auto o = v.toObject();
-        auto b = new Swatch(color(str(o, "color")), str(o, "text"), historyBox);
-        b->setToolTip(str(o, "detail"));
-        int i = index++;
-        b->historyDrag(i);
-        connect(b, &QPushButton::clicked, this, [this, i] {
-          int tab = tabs->currentIndex();
-          send({{"op", "history_select"}, {"index", i}, {"tab", tab}});
-          if (tab != 1)
-            tabs->setCurrentIndex(0);
-        });
-        historyLayout->addWidget(b);
+      auto entries = array(state, "history");
+      if (entries.isEmpty()) {
+        auto empty = new QLabel(
+            "No picked colors yet.\nUse Pick color to capture.", historyBox);
+        empty->setWordWrap(true);
+        empty->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        empty->setContentsMargins(6, 8, 6, 8);
+        QPalette ep = empty->palette();
+        QColor muted = ep.color(QPalette::WindowText);
+        muted.setAlpha(140);
+        ep.setColor(QPalette::WindowText, muted);
+        empty->setPalette(ep);
+        historyLayout->addWidget(empty);
+      } else {
+        int index = 0;
+        for (auto v : entries) {
+          auto o = v.toObject();
+          auto b = new Swatch(color(str(o, "color")), str(o, "text"), historyBox);
+          b->setFlat(true);
+          b->setToolTip(str(o, "detail"));
+          int i = index++;
+          b->historyDrag(i);
+          connect(b, &QPushButton::clicked, this, [this, i] {
+            int tab = tabs->currentIndex();
+            send({{"op", "history_select"}, {"index", i}, {"tab", tab}});
+            if (tab != 1)
+              tabs->setCurrentIndex(0);
+          });
+          historyLayout->addWidget(b);
+        }
       }
       historyLayout->addStretch();
     }
     status->setText(message());
-    pickAction->setEnabled(state.value("loaded").toBool() &&
-                           state.value("connected").toBool() &&
-                           !state.value("picking").toBool());
-    connectionStatus->setText(state.value("picking").toBool()   ? "Picking…"
-                              : !state.value("loaded").toBool() ? "Loading…"
-                              : state.value("connected").toBool()
-                                  ? "Connected"
-                                  : "Disconnected");
+    const bool picking = state.value("picking").toBool();
+    const bool loaded = state.value("loaded").toBool();
+    const bool connected = state.value("connected").toBool();
+    pickAction->setEnabled(loaded && connected && !picking);
+    connectionStatus->setText(picking    ? "Picking…"
+                              : !loaded  ? "Loading…"
+                              : connected ? "Connected"
+                                          : "Disconnected");
+    if (connectionDot) {
+      connectionDot->setColor(
+          (picking || !loaded) ? QColor(0xF6, 0x74, 0x00)
+          : connected          ? QColor(0x27, 0xAE, 0x60)
+                               : palette().color(QPalette::Mid));
+    }
   }
   QWidget *currentColor() {
     auto current = new Swatch(color(str(object(state.value("mixer")), "current")), "Current color");
@@ -1248,6 +1578,7 @@ class Frontend : public QWidget {
 protected:
   void resizeEvent(QResizeEvent *event) override {
     QWidget::resizeEvent(event);
+    sizeHistorySidebar();
     sizePinnedPalette();
     if (tabs)
       layoutMixerActions(tabs->widget(0));
@@ -2131,6 +2462,10 @@ public:
                                    : "Swatch Board History");
     setObjectName("swatch_" + m);
     root = new QVBoxLayout(this);
+    if (m == "board") {
+      root->setContentsMargins(0, 0, 0, 0);
+      root->setSpacing(0);
+    }
     if (m == "history") {
       setWindowFlags(Qt::Popup);
       setAttribute(Qt::WA_NoMouseReplay);
