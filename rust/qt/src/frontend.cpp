@@ -680,7 +680,7 @@ class PreviewStrip : public QWidget {
 public:
   explicit PreviewStrip(QWidget *parent = nullptr) : QWidget(parent) {
     setAccessibleName("Generated palette preview");
-    setFixedHeight(36);
+    setFixedHeight(38);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setMouseTracking(true);
   }
@@ -2647,7 +2647,7 @@ class Frontend : public QWidget {
     auto selector =
         gen->findChild<QWidget *>("paletteSelector", Qt::FindDirectChildrenOnly);
     if (columns && parameters && selector) {
-      const bool compact = width < 640;
+      const bool compact = width < 620;
       if (!gen->property("compactMode").isValid() ||
           gen->property("compactMode").toBool() != compact) {
         changed = true;
@@ -2663,7 +2663,7 @@ class Frontend : public QWidget {
           delete columns->takeAt(0);
         columns->setDirection(compact ? QBoxLayout::TopToBottom
                                       : QBoxLayout::LeftToRight);
-        columns->setSpacing(compact ? 10 : 24);
+        columns->setSpacing(compact ? 8 : 28);
         if (compact) {
           parameters->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
           selector->setMinimumWidth(0);
@@ -2679,18 +2679,17 @@ class Frontend : public QWidget {
           columns->addWidget(parameters, 0);
         } else {
           parameters->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
-          selector->setMinimumWidth(260);
-          selector->setMaximumWidth(268);
-          selector->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+          selector->setMinimumWidth(220);
+          selector->setMaximumWidth(QWIDGETSIZE_MAX);
+          selector->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
           if (auto *sl = qobject_cast<QVBoxLayout *>(selector->layout()))
-            sl->setSpacing(8);
+            sl->setSpacing(10);
           if (auto *wheel = selector->findChild<QWidget *>("paletteWheel"))
-            wheel->setFixedSize(168, 168);
+            wheel->setFixedSize(176, 176);
           if (auto *strip = selector->findChild<QWidget *>("palettePreviewStrip"))
-            strip->setFixedHeight(36);
+            strip->setFixedHeight(38);
           columns->addWidget(parameters, 0, Qt::AlignTop);
-          columns->addWidget(selector, 0, Qt::AlignTop);
-          columns->addStretch(1);
+          columns->addWidget(selector, 1, Qt::AlignTop);
         }
       }
     }
@@ -3811,7 +3810,7 @@ QWidget *Frontend::palettePage() {
   auto saved = combo("Saved palettes", savedEntries, libRow, str(p, "id"));
   saved->setEditable(true);
   saved->setInsertPolicy(QComboBox::NoInsert);
-  saved->lineEdit()->setPlaceholderText("Search saved palettes");
+  saved->lineEdit()->setPlaceholderText(QString::fromUtf8("Search palettes\u2026"));
   saved->completer()->setFilterMode(Qt::MatchContains);
   saved->completer()->setCompletionMode(QCompleter::PopupCompletion);
   saved->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
@@ -3873,7 +3872,7 @@ QWidget *Frontend::palettePage() {
   auto columns = new QBoxLayout(QBoxLayout::LeftToRight);
   columns->setObjectName("paletteGeneratorColumns");
   columns->setContentsMargins(0, 0, 0, 0);
-  columns->setSpacing(24);
+  columns->setSpacing(28);
 
   auto parameters = new QWidget(gen);
   parameters->setObjectName("paletteParameters");
@@ -3888,16 +3887,14 @@ QWidget *Frontend::palettePage() {
 
   auto selector = new QWidget(gen);
   selector->setObjectName("paletteSelector");
-  selector->setMinimumWidth(260);
-  selector->setMaximumWidth(268);
-  selector->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+  selector->setMinimumWidth(220);
+  selector->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
   auto selectorLayout = new QVBoxLayout(selector);
   selectorLayout->setContentsMargins(0, 0, 0, 0);
-  selectorLayout->setSpacing(8);
+  selectorLayout->setSpacing(10);
 
   columns->addWidget(parameters, 0, Qt::AlignTop);
-  columns->addWidget(selector, 0, Qt::AlignTop);
-  columns->addStretch(1);
+  columns->addWidget(selector, 1, Qt::AlignTop);
   genRoot->addLayout(columns);
 
   const int fieldW = 248;
@@ -3960,7 +3957,6 @@ QWidget *Frontend::palettePage() {
   connect(count, &QSpinBox::valueChanged, this,
           [this](int value) { generationDraft["count"] = value; });
   auto seedLabel = new QLabel("Seed:", countSeedRow);
-  applyMuted(seedLabel, 175);
   auto seed = line("Random seed", generationDraft.value("seed").toString("0"),
                    countSeedRow);
   seed->setFont(monoFont);
@@ -3970,8 +3966,9 @@ QWidget *Frontend::palettePage() {
   connect(seed, &QLineEdit::textChanged, this,
           [this](const QString &value) { generationDraft["seed"] = value; });
   auto randomSeedBtn = new QToolButton(countSeedRow);
-  randomSeedBtn->setAutoRaise(true);
-  randomSeedBtn->setFixedSize(26, 26);
+  randomSeedBtn->setAutoRaise(false);
+  const int seedHeight = seed->sizeHint().height();
+  randomSeedBtn->setFixedSize(seedHeight, seedHeight);
   randomSeedBtn->setIcon(themedIcon(
       {"roll-symbolic", "roll", "view-refresh-symbolic", "view-refresh"},
       QStyle::SP_BrowserReload));
@@ -4085,7 +4082,7 @@ QWidget *Frontend::palettePage() {
           [wheel, resolveBaseColor](const QString &text) {
             wheel->setColor(resolveBaseColor(text));
           });
-  wheel->setFixedSize(168, 168);
+  wheel->setFixedSize(176, 176);
   selectorLayout->addWidget(wheel, 0, Qt::AlignHCenter);
 
   auto previewStrip = new PreviewStrip(selector);
@@ -4190,7 +4187,6 @@ QWidget *Frontend::palettePage() {
 
   auto savedLabel = new QLabel("Saved generations:", savedFooter);
   savedLabel->setObjectName("savedGenerationLabel");
-  applyMuted(savedLabel, 205);
 
   auto generationRow = new QWidget(savedFooter);
   generationRow->setObjectName("savedGenerationRow");
@@ -4224,6 +4220,7 @@ QWidget *Frontend::palettePage() {
   if (!hasGenerations) {
     generations->addItem("No saved generations");
     generations->setEnabled(false);
+    applyMuted(savedLabel, 165);
   }
   load->setEnabled(hasGenerations);
   generationLayout->addWidget(generations, 1);
