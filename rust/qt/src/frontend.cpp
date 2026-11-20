@@ -119,9 +119,12 @@ class StatusDot : public QWidget {
   QColor dotColor;
 
 public:
+  static QColor neutralColor(const QPalette &pal) {
+    return mutedColor(pal, 155);
+  }
   explicit StatusDot(QWidget *parent = nullptr) : QWidget(parent) {
     setFixedSize(8, 8);
-    dotColor = palette().color(QPalette::Mid);
+    dotColor = neutralColor(palette());
   }
   void setColor(const QColor &value) {
     if (dotColor != value) {
@@ -134,8 +137,10 @@ protected:
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, true);
-    QColor border = dotColor.darker(125);
-    border.setAlpha(180);
+    const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
+    QColor border = darkSurface ? QColor(255, 255, 255, 65) : dotColor.darker(125);
+    if (!darkSurface)
+      border.setAlpha(180);
     p.setPen(QPen(border, 1.0));
     p.setBrush(dotColor);
     p.drawEllipse(QRectF(1.0, 1.0, 6.0, 6.0));
@@ -168,7 +173,25 @@ protected:
 };
 
 class HistoryLimitSpinBox : public QAbstractSpinBox {
+  static constexpr quint64 kMaxHistoryLimit = 9223372036854775807ULL;
   bool invalid = false;
+
+  enum class ParsedState { EmptyOrZero, Valid, Overflow };
+  ParsedState parseValue(quint64 &out) const {
+    const QString t = lineEdit()->text().trimmed();
+    if (t.isEmpty()) {
+      out = 0;
+      return ParsedState::EmptyOrZero;
+    }
+    bool ok = false;
+    const quint64 v = t.toULongLong(&ok);
+    if (!ok || v > kMaxHistoryLimit) {
+      out = kMaxHistoryLimit;
+      return ParsedState::Overflow;
+    }
+    out = v;
+    return v == 0 ? ParsedState::EmptyOrZero : ParsedState::Valid;
+  }
 
 public:
   explicit HistoryLimitSpinBox(const QString &initialValue,
@@ -199,16 +222,20 @@ public:
   void stepBy(int steps) override {
     if (isReadOnly() || steps == 0)
       return;
-    bool ok = false;
-    quint64 v = lineEdit()->text().toULongLong(&ok);
-    if (!ok)
-      v = 0;
+    quint64 v = 0;
+    const auto st = parseValue(v);
     quint64 next = v;
-    if (steps > 0) {
+    if (st == ParsedState::Overflow) {
+      if (steps > 0)
+        return;
+      const quint64 extra =
+          static_cast<quint64>(-static_cast<qint64>(steps) - 1);
+      next = (extra < kMaxHistoryLimit) ? (kMaxHistoryLimit - extra) : 1;
+      if (next < 1)
+        next = 1;
+    } else if (steps > 0) {
       const quint64 delta = static_cast<quint64>(steps);
-      next = (v > std::numeric_limits<quint64>::max() - delta)
-                 ? std::numeric_limits<quint64>::max()
-                 : v + delta;
+      next = (v >= kMaxHistoryLimit - delta) ? kMaxHistoryLimit : (v + delta);
       if (next < 1)
         next = 1;
     } else {
@@ -223,10 +250,14 @@ protected:
   StepEnabled stepEnabled() const override {
     if (isReadOnly())
       return StepNone;
-    StepEnabled flags = StepUpEnabled;
-    bool ok = false;
-    const quint64 v = lineEdit()->text().toULongLong(&ok);
-    if (ok && v > 1)
+    quint64 v = 0;
+    const auto st = parseValue(v);
+    if (st == ParsedState::Overflow)
+      return StepDownEnabled;
+    StepEnabled flags = StepNone;
+    if (v < kMaxHistoryLimit)
+      flags |= StepUpEnabled;
+    if (v > 1)
       flags |= StepDownEnabled;
     return flags;
   }
@@ -357,14 +388,14 @@ class Swatch : public QPushButton {
   QColor c;
   QPoint start;
   int paletteIndex = -1, historyIndex = -1;
-  bool tileMode = false, tileLocked = false;
+  bool tileMode = false, tileLocked = false, historyRowMode = false;
   std::function<void(int, QString)> dropped;
 
-public:
-  Swatch(const QColor &value, const QString &name, QWidget *parent = nullptr)
-      : QPushButton(name, parent), c(value) {
-    setAccessibleName(name + " " + hex(c));
-    setMinimumSize(64, 30);
+  void rebuildIcon() {
+    if (tileMode || historyRowMode) {
+      setIcon(QIcon());
+      return;
+    }
     QPixmap pixmap(24, 24);
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
@@ -379,22 +410,64 @@ public:
       paintCheckerboard(painter, inner, 6);
     painter.fillRect(inner, c);
     painter.restore();
-    QColor border = palette().color(QPalette::Mid);
-    border.setAlpha(180);
+    const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
+    const QColor border =
+        darkSurface ? QColor(255, 255, 255, 65) : QColor(0, 0, 0, 72);
     painter.setPen(QPen(border, 1.0));
     painter.drawRoundedRect(chipRect, 3.0, 3.0);
     setIcon(QIcon(pixmap));
     setIconSize(QSize(24, 24));
   }
+
+public:
+  Swatch(const QColor &value, const QString &name, QWidget *parent = nullptr)
+      : QPushButton(name, parent), c(value) {
+    setAccessibleName(name + " " + hex(c));
+    setMinimumSize(64, 30);
+    rebuildIcon();
+  }
   void setTileMode(bool enabled, bool locked = false) {
     tileMode = enabled;
     tileLocked = locked;
     if (tileMode) {
+      historyRowMode = false;
       setIcon(QIcon());
       setAttribute(Qt::WA_Hover, true);
       setCursor(Qt::PointingHandCursor);
+    } else {
+      rebuildIcon();
     }
     update();
+  }
+  void setHistoryRowMode(bool enabled) {
+    historyRowMode = enabled;
+    if (historyRowMode) {
+      tileMode = false;
+      setIcon(QIcon());
+      setMinimumSize(0, 30);
+      setFixedHeight(30);
+      setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+      setAttribute(Qt::WA_Hover, true);
+      setCursor(Qt::PointingHandCursor);
+    } else {
+      rebuildIcon();
+    }
+    updateGeometry();
+    update();
+  }
+  QSize sizeHint() const override {
+    if (historyRowMode)
+      return QSize(110, 30);
+    if (tileMode)
+      return minimumSize().expandedTo(QSize(64, 30));
+    return QPushButton::sizeHint();
+  }
+  QSize minimumSizeHint() const override {
+    if (historyRowMode)
+      return QSize(48, 30);
+    if (tileMode)
+      return minimumSize().expandedTo(QSize(32, 22));
+    return QPushButton::minimumSizeHint();
   }
   void paletteDrop(int index, std::function<void(int, QString)> f) {
     paletteIndex = index;
@@ -404,7 +477,72 @@ public:
   void historyDrag(int index) { historyIndex = index; }
 
 protected:
+  void changeEvent(QEvent *e) override {
+    QPushButton::changeEvent(e);
+    if (e->type() == QEvent::PaletteChange ||
+        e->type() == QEvent::ApplicationPaletteChange)
+      rebuildIcon();
+  }
   void paintEvent(QPaintEvent *e) override {
+    if (historyRowMode) {
+      QPainter p(this);
+      p.setRenderHint(QPainter::Antialiasing, true);
+      const QRect r = rect();
+      const QRectF pill = QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5);
+      const QColor fg = palette().color(
+          isEnabled() ? QPalette::Active : QPalette::Disabled,
+          QPalette::WindowText);
+      if (isDown()) {
+        QColor fill = fg;
+        fill.setAlpha(24);
+        p.setBrush(fill);
+        p.setPen(Qt::NoPen);
+        p.drawRoundedRect(pill, 3.5, 3.5);
+      } else if (underMouse()) {
+        QColor fill = fg;
+        fill.setAlpha(14);
+        p.setBrush(fill);
+        p.setPen(Qt::NoPen);
+        p.drawRoundedRect(pill, 3.5, 3.5);
+      }
+      if (hasFocus()) {
+        p.setBrush(Qt::NoBrush);
+        p.setPen(QPen(palette().color(QPalette::Highlight), 1.5));
+        p.drawRoundedRect(pill.adjusted(0.5, 0.5, -0.5, -0.5), 3.5, 3.5);
+      }
+      const bool compact = r.width() < 104;
+      const int padL = compact ? 3 : 5;
+      const int padR = compact ? 3 : 5;
+      const int chipSz = compact ? 20 : 24;
+      const int gap = compact ? 4 : 6;
+      const QRect chipOuter(padL, (r.height() - chipSz) / 2, chipSz, chipSz);
+      const QRectF chipRect = QRectF(chipOuter).adjusted(0.5, 0.5, -0.5, -0.5);
+      QPainterPath clip;
+      clip.addRoundedRect(chipRect, 3.0, 3.0);
+      p.save();
+      p.setClipPath(clip);
+      if (c.alpha() < 255)
+        paintCheckerboard(p, chipOuter, 5);
+      p.fillRect(chipOuter, c);
+      p.restore();
+      const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
+      const QColor border =
+          darkSurface ? QColor(255, 255, 255, 65) : QColor(0, 0, 0, 72);
+      p.setPen(QPen(border, 1.0));
+      p.setBrush(Qt::NoBrush);
+      p.drawRoundedRect(chipRect, 3.0, 3.0);
+
+      const int textX = chipOuter.right() + 1 + gap;
+      const int textW = r.width() - textX - padR;
+      if (textW > 4 && !text().isEmpty()) {
+        const QRect textRect(textX, 0, textW, r.height());
+        const QString elided =
+            fontMetrics().elidedText(text(), Qt::ElideRight, textW);
+        p.setPen(palette().color(QPalette::ButtonText));
+        p.drawText(textRect, Qt::AlignLeft | Qt::AlignVCenter, elided);
+      }
+      return;
+    }
     if (!tileMode) {
       QPushButton::paintEvent(e);
       return;
@@ -435,38 +573,52 @@ protected:
       p.fillRect(r, dark ? QColor(255, 255, 255, 18) : QColor(0, 0, 0, 14));
     p.restore();
     const bool compactTile = r.height() < 44;
+    const int lockSz = 14;
+    const QRect badgeRect(r.right() - lockSz - 5,
+                          compactTile ? (r.height() - lockSz) / 2 : 5, lockSz,
+                          lockSz);
     if (!text().isEmpty()) {
       QFont f = font();
       f.setBold(true);
       p.setFont(f);
-      const QRect textRect =
-          r.adjusted(6, 2, (tileLocked && compactTile) ? -22 : -6, -2);
-      if (translucent) {
-        QRectF textBounds = p.boundingRect(textRect, Qt::AlignCenter, text());
-        QRectF pill = textBounds.adjusted(-6.0, -2.0, 6.0, 2.0);
-        const QRectF pillLimit = tileRect.adjusted(3.0, 2.0, -3.0, -2.0);
-        pill = pill.intersected(pillLimit);
-        p.setPen(QPen(QColor(0, 0, 0, 40), 1.0));
-        p.setBrush(QColor(255, 255, 255, 225));
-        p.drawRoundedRect(pill, 3.0, 3.0);
-        p.setPen(QColor(0x1B, 0x1E, 0x20));
-        p.drawText(textRect, Qt::AlignCenter, text());
-      } else {
-        p.setPen(fg);
-        p.drawText(textRect, Qt::AlignCenter, text());
+      const int rightInset = tileLocked ? (r.right() - badgeRect.left() + 6) : 6;
+      const QRect textRect = r.adjusted(6, 2, -rightInset, -2);
+      const QString displayText =
+          textRect.width() > 0
+              ? p.fontMetrics().elidedText(text(), Qt::ElideRight,
+                                           textRect.width())
+              : QString();
+      if (!displayText.isEmpty()) {
+        if (translucent) {
+          QRectF textBounds =
+              p.boundingRect(textRect, Qt::AlignCenter, displayText);
+          QRectF pill = textBounds.adjusted(-5.0, -2.0, 5.0, 2.0);
+          const qreal pillRightLimit =
+              tileLocked ? qMin(tileRect.right() - 3.0, badgeRect.left() - 3.0)
+                         : (tileRect.right() - 3.0);
+          const QRectF pillLimit(tileRect.left() + 3.0, tileRect.top() + 2.0,
+                                 qMax(0.0, pillRightLimit - (tileRect.left() + 3.0)),
+                                 qMax(0.0, tileRect.height() - 4.0));
+          pill = pill.intersected(pillLimit);
+          p.setPen(QPen(QColor(0, 0, 0, 40), 1.0));
+          p.setBrush(QColor(255, 255, 255, 225));
+          p.drawRoundedRect(pill, 3.0, 3.0);
+          p.setPen(QColor(0x1B, 0x1E, 0x20));
+          p.drawText(textRect, Qt::AlignCenter, displayText);
+        } else {
+          p.setPen(fg);
+          p.drawText(textRect, Qt::AlignCenter, displayText);
+        }
       }
     }
     if (tileLocked) {
-      const int sz = 14;
-      const QRect badgeRect(r.right() - sz - 5,
-                            compactTile ? (r.height() - sz) / 2 : 5, sz, sz);
       QIcon lockIcon =
           QIcon::fromTheme(QStringLiteral("object-locked-symbolic"));
       if (lockIcon.isNull())
         lockIcon = QIcon::fromTheme(QStringLiteral("object-locked"));
       if (!lockIcon.isNull()) {
         const qreal dpr = devicePixelRatioF();
-        QPixmap pm = lockIcon.pixmap(QSize(sz, sz), dpr);
+        QPixmap pm = lockIcon.pixmap(QSize(lockSz, lockSz), dpr);
         QPixmap tinted(pm.size());
         tinted.setDevicePixelRatio(pm.devicePixelRatio());
         tinted.fill(Qt::transparent);
@@ -557,12 +709,42 @@ protected:
 };
 class CurrentColorBanner : public QWidget {
   std::function<void(QString)> dropped;
+  QHBoxLayout *rowLayout = nullptr;
+  QWidget *chipWidget = nullptr;
+  QLabel *hexLabel = nullptr;
+  QLabel *sepLabel = nullptr;
+  QLabel *outLabel = nullptr;
   QLabel *hintLabel = nullptr;
+  QString fullOutputText;
   bool dragHover = false;
 
-  void updateHintVisibility() {
+  void updateLayoutMetrics() {
+    if (!rowLayout || !chipWidget || !hexLabel)
+      return;
+    const auto m = rowLayout->contentsMargins();
+    const int sp = rowLayout->spacing();
+    const int hexW = hexLabel->fontMetrics().horizontalAdvance(hexLabel->text()) + 4;
+    int leftFixed = m.left() + m.right() + chipWidget->width() + sp + hexW;
+    if (sepLabel)
+      leftFixed += sp + sepLabel->fontMetrics().horizontalAdvance(sepLabel->text()) + 2;
+    const int fullOutW =
+        outLabel ? outLabel->fontMetrics().horizontalAdvance(fullOutputText) + 4 : 0;
+    const int hintW =
+        hintLabel ? hintLabel->fontMetrics().horizontalAdvance(hintLabel->text()) + 4 : 0;
+    const int neededWithHint =
+        leftFixed + (outLabel ? sp + fullOutW : 0) + (hintLabel ? sp + hintW : 0) + 12;
+    const bool showHint = hintLabel && width() >= neededWithHint;
     if (hintLabel)
-      hintLabel->setVisible(width() >= 520);
+      hintLabel->setVisible(showHint);
+    if (outLabel) {
+      const int availOutW = width() - leftFixed - sp - (showHint ? (sp + hintW) : 0);
+      if (availOutW <= 4) {
+        outLabel->setText(QString());
+      } else {
+        outLabel->setText(
+            outLabel->fontMetrics().elidedText(fullOutputText, Qt::ElideRight, availOutW));
+      }
+    }
   }
 
 public:
@@ -581,9 +763,9 @@ public:
     rowWidget->setObjectName("currentColorRow");
     rowWidget->setFixedHeight(headerHeight);
     rowWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    auto row = new QHBoxLayout(rowWidget);
-    row->setContentsMargins(10, 0, 10, 0);
-    row->setSpacing(10);
+    rowLayout = new QHBoxLayout(rowWidget);
+    rowLayout->setContentsMargins(10, 0, 10, 0);
+    rowLayout->setSpacing(10);
 
     auto chip = new Swatch(value, "Current color", rowWidget);
     chip->setText(QString());
@@ -595,15 +777,16 @@ public:
       if (dropped && color(c).isValid())
         dropped(c);
     });
-    row->addWidget(chip, 0, Qt::AlignVCenter);
+    chipWidget = chip;
+    rowLayout->addWidget(chip, 0, Qt::AlignVCenter);
 
     const QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    auto hexLabel = new QLabel(currentHex, rowWidget);
+    hexLabel = new QLabel(currentHex, rowWidget);
     QFont hexFont = monoFont;
     hexFont.setBold(true);
     hexLabel->setFont(hexFont);
     hexLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    row->addWidget(hexLabel, 0, Qt::AlignVCenter);
+    rowLayout->addWidget(hexLabel, 0, Qt::AlignVCenter);
 
     auto makeMuted = [rowWidget](const QString &text, int alpha, bool smaller = false) {
       auto l = new QLabel(text, rowWidget);
@@ -624,33 +807,42 @@ public:
     };
 
     if (!outputText.isEmpty()) {
-      row->addWidget(makeMuted(QString::fromUtf8("·"), 120), 0, Qt::AlignVCenter);
-      auto outLabel = makeMuted("Output: " + outputText, 175);
+      sepLabel = makeMuted(QString::fromUtf8("·"), 120);
+      rowLayout->addWidget(sepLabel, 0, Qt::AlignVCenter);
+      fullOutputText = "Output: " + outputText;
+      outLabel = makeMuted(fullOutputText, 175);
+      outLabel->setToolTip(fullOutputText);
       outLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
       outLabel->setMinimumWidth(0);
-      row->addWidget(outLabel, 0, Qt::AlignVCenter);
+      outLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+      rowLayout->addWidget(outLabel, 1, Qt::AlignVCenter);
+    } else {
+      rowLayout->addStretch(1);
     }
-
-    row->addStretch(1);
 
     hintLabel = makeMuted(
         QString::fromUtf8("Drag swatch to palette or theme · Drop color here"),
         130, true);
     hintLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    row->addWidget(hintLabel, 0, Qt::AlignVCenter);
+    hintLabel->setMinimumWidth(0);
+    rowLayout->addWidget(hintLabel, 0, Qt::AlignVCenter);
 
     outer->addWidget(rowWidget);
     outer->addWidget(new Hairline(this));
-    updateHintVisibility();
+    updateLayoutMetrics();
   }
   QSize minimumSizeHint() const override {
     return QSize(0, QWidget::minimumSizeHint().height());
   }
 
 protected:
+  void showEvent(QShowEvent *e) override {
+    QWidget::showEvent(e);
+    updateLayoutMetrics();
+  }
   void resizeEvent(QResizeEvent *e) override {
     QWidget::resizeEvent(e);
-    updateHintVisibility();
+    updateLayoutMetrics();
   }
   void paintEvent(QPaintEvent *e) override {
     QWidget::paintEvent(e);
@@ -733,12 +925,16 @@ protected:
                             ? QRectF(rect()).adjusted(6.5, 2.5, -6.5, -2.5)
                             : QRectF(rect()).adjusted(6.5, 6.5, -6.5, -6.5);
     const qreal radius = compactDrop ? 3.5 : 5.0;
+    const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
     QColor fill = dragHover ? palette().color(QPalette::Highlight)
                             : palette().color(QPalette::WindowText);
     fill.setAlpha(dragHover ? 24 : 8);
-    QColor border = dragHover ? palette().color(QPalette::Highlight)
-                              : palette().color(QPalette::Mid);
-    border.setAlpha(dragHover ? 215 : (compactDrop ? 145 : 165));
+    QColor border = dragHover
+                        ? palette().color(QPalette::Highlight)
+                        : (darkSurface ? QColor(255, 255, 255, compactDrop ? 90 : 105)
+                                       : QColor(0, 0, 0, compactDrop ? 80 : 95));
+    if (dragHover)
+      border.setAlpha(215);
     p.setBrush(fill);
     p.setPen(QPen(border, 1.0, Qt::DashLine));
     p.drawRoundedRect(zone, radius, radius);
@@ -768,6 +964,24 @@ protected:
       append(ok ? index : -1, c);
       e->acceptProposedAction();
     }
+  }
+};
+class PopupFrame : public QWidget {
+public:
+  explicit PopupFrame(QWidget *parent = nullptr) : QWidget(parent) {
+    setAutoFillBackground(false);
+  }
+
+protected:
+  void paintEvent(QPaintEvent *) override {
+    QPainter p(this);
+    p.fillRect(rect(), palette().color(QPalette::Window));
+    const bool darkSurface = palette().color(QPalette::Window).lightness() < 128;
+    const QColor border =
+        darkSurface ? QColor(255, 255, 255, 65) : QColor(0, 0, 0, 72);
+    p.setPen(QPen(border, 1.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5));
   }
 };
 class PreviewStrip : public QWidget {
@@ -1739,7 +1953,8 @@ class Frontend : public QWidget {
   QWidget *pinnedScroll = nullptr, *pinnedCurrent = nullptr;
   QVBoxLayout *boardContent = nullptr;
   QPushButton *configSave = nullptr, *configRebind = nullptr;
-  QLabel *configStatus = nullptr, *shortcutStatus = nullptr, *limitError = nullptr;
+  QLabel *configStatus = nullptr, *configStatusIcon = nullptr,
+         *shortcutStatus = nullptr, *limitError = nullptr;
   QWidget *limitErrorBox = nullptr, *configStatusBox = nullptr,
           *shortcutStatusBox = nullptr;
   StatusDot *shortcutDot = nullptr;
@@ -1747,16 +1962,47 @@ class Frontend : public QWidget {
   QScrollArea *configScroll = nullptr;
   QList<QPushButton *> historyButtons;
   bool hiddenForPick = false, spectrumDragging = false;
+  bool renderingBoard = false, hasPendingBoardRender = false;
   int mixerFormat = 0;
   QPointer<Spectrum> mixerSpectrum;
   QPointer<MixerWheel> mixerWheel;
   QPointer<QLabel> mixerReadout;
+  QWidget *themeContainer = nullptr, *themeBody = nullptr;
+  QPointer<QDialog> themeProjectDialog;
+  QPointer<QComboBox> themePluginsCombo, themeSavedCombo;
+  QPointer<QLineEdit> themeNameEdit;
+  QPointer<QPushButton> themeOpenBtn, themeNewBtn;
   QJsonObject configDraft, generationDraft, themeDraft;
   bool compactThemePreview = false;
   bool themeProjectVisible = false;
   bool configInitialized = false;
   bool limitInvalid = false;
   bool limitErrorDismissed = false;
+  static void suppressChildSignals(QWidget *w) {
+    if (!w)
+      return;
+    for (auto *e : w->findChildren<QLineEdit *>())
+      e->blockSignals(true);
+    for (auto *s : w->findChildren<QAbstractSpinBox *>())
+      s->blockSignals(true);
+    for (auto *c : w->findChildren<QComboBox *>())
+      c->blockSignals(true);
+  }
+  void commitFocusedEditor(QWidget *scope) {
+    auto *focused = QApplication::focusWidget();
+    if (!focused || (scope && focused != scope && !scope->isAncestorOf(focused)))
+      return;
+    if (auto *edit = qobject_cast<QLineEdit *>(focused)) {
+      const bool wasModified = edit->isModified();
+      QPointer<QLineEdit> guarded(edit);
+      edit->clearFocus();
+      if (!wasModified && guarded)
+        QMetaObject::invokeMethod(guarded, "editingFinished");
+    } else if (auto *spin = qobject_cast<QAbstractSpinBox *>(focused)) {
+      spin->interpretText();
+      spin->clearFocus();
+    }
+  }
   QJsonValue request(QJsonObject req) {
     auto bytes = QJsonDocument(req).toJson(QJsonDocument::Compact);
     char *answer = callback(context, bytes.constData());
@@ -1774,10 +2020,10 @@ class Frontend : public QWidget {
     }
     return doc.isObject() ? QJsonValue(doc.object()) : QJsonValue();
   }
-  void send(QJsonObject req) {
+  void send(QJsonObject req, bool forceUpdate = false) {
     auto result = request(req);
     if (result.isObject())
-      updateState(result.toObject());
+      updateState(result.toObject(), forceUpdate);
   }
   QString activeEditor() const {
     static const QStringList editors = {"mixer", "palette", "theme"};
@@ -1789,10 +2035,15 @@ class Frontend : public QWidget {
     undoShortcut->setEnabled(editor.value("can_undo").toBool());
     redoShortcut->setEnabled(editor.value("can_redo").toBool());
   }
-  void updateState(const QJsonObject &next) {
-    if (next == state)
+  void updateState(const QJsonObject &next, bool force = false) {
+    if (!force && next == state)
       return;
     auto previous = state;
+    if (mode == "config" &&
+        (force ||
+         str(next, "validation_field") != str(previous, "validation_field") ||
+         str(next, "message") != str(previous, "message")))
+      limitErrorDismissed = false;
     state = next;
     if (state.contains("clipboard") && state.value("clipboard").isString())
       QApplication::clipboard()->setText(str(state, "clipboard"));
@@ -1888,33 +2139,57 @@ class Frontend : public QWidget {
     auto page = tabs->widget(2);
     bool compact = tabs->currentIndex() == 2 && page &&
                    page->height() < page->fontMetrics().height() * 22;
+    const auto swatches = array(object(state.value("palette")), "swatches");
     const bool mixerEmptyShelf = tabs->currentIndex() == 0 && shortMixer() &&
-                                 array(object(state.value("palette")), "swatches").isEmpty();
+                                 swatches.isEmpty();
     const int shelfThreshold = fontMetrics().height() * 24;
     const bool shrinkShelf = (tabs->currentIndex() == 1 && height() < shelfThreshold) ||
                              mixerEmptyShelf;
     const int dropHeight = fontMetrics().height() + 8;
+    int hbarExtent = 0;
+    if (auto *sa = pinnedScroll->findChild<QScrollArea *>("pinnedShelfScroll")) {
+      sa->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+      if (!swatches.isEmpty()) {
+        const int contentMinW =
+            swatches.size() * 96 + qMax(0, swatches.size() - 1) * 4 + 12;
+        const int availW = sa->viewport()->width() > 0
+                               ? sa->viewport()->width()
+                               : qMax(1, width() - 2);
+        if (contentMinW > availW)
+          hbarExtent =
+              sa->style()->pixelMetric(QStyle::PM_ScrollBarExtent, nullptr, sa);
+      }
+    }
+    const int minShelfH = mixerEmptyShelf ? dropHeight : (42 + hbarExtent);
+    const int compactThemeH =
+        page ? qMax(page->fontMetrics().height() * 3, minShelfH) : minShelfH;
     if (verticalSplitter && shrinkShelf && !compactShelf)
       normalPaletteShelfHeight = verticalSplitter->sizes().value(1, 76);
-    pinnedScroll->setMinimumHeight(mixerEmptyShelf ? dropHeight : 42);
+    pinnedScroll->setMinimumHeight(minShelfH);
     pinnedScroll->setMaximumHeight(mixerEmptyShelf ? dropHeight :
-                                   compact ? page->fontMetrics().height() * 3 : QWIDGETSIZE_MAX);
+                                   compact ? compactThemeH : QWIDGETSIZE_MAX);
     if (verticalSplitter && shrinkShelf != compactShelf) {
       verticalSplitter->setSizes({verticalSplitter->height(),
-                                  shrinkShelf ? pinnedScroll->minimumHeight()
-                                              : normalPaletteShelfHeight});
+                                  shrinkShelf ? minShelfH
+                                              : qMax(normalPaletteShelfHeight, minShelfH)});
       compactShelf = shrinkShelf;
+    } else if (verticalSplitter && compactShelf &&
+               verticalSplitter->sizes().value(1, 0) < minShelfH) {
+      verticalSplitter->setSizes(
+          {qMax(1, verticalSplitter->height() - minShelfH), minShelfH});
     }
     if (compact && verticalSplitter)
-      verticalSplitter->setSizes({verticalSplitter->height(), page->fontMetrics().height() * 3});
+      verticalSplitter->setSizes({verticalSplitter->height(), compactThemeH});
   }
   void preserveView(QWidget *old, QWidget *replacement) {
     auto oldScroll = qobject_cast<QScrollArea *>(old),
          newScroll = qobject_cast<QScrollArea *>(replacement);
-    if (!oldScroll && (old->objectName() == "themePage" || old->objectName() == "mixerPage" ||
+    if (!oldScroll && (old->objectName() == "themePage" || old->objectName() == "themeBody" ||
+                       old->objectName() == "mixerPage" ||
                        old->objectName() == "palettePage" || old->objectName() == "pinnedShelf"))
       oldScroll = old->findChild<QScrollArea *>();
-    if (!newScroll && (replacement->objectName() == "themePage" || replacement->objectName() == "mixerPage" ||
+    if (!newScroll && (replacement->objectName() == "themePage" || replacement->objectName() == "themeBody" ||
+                       replacement->objectName() == "mixerPage" ||
                        replacement->objectName() == "palettePage" || replacement->objectName() == "pinnedShelf"))
       newScroll = replacement->findChild<QScrollArea *>();
     int vertical = oldScroll ? oldScroll->verticalScrollBar()->value() : 0,
@@ -1970,12 +2245,18 @@ class Frontend : public QWidget {
     while (auto item = root->takeAt(0)) {
       if (item->widget()) {
         preserveView(item->widget(), w);
+        suppressChildSignals(item->widget());
         item->widget()->hide();
+        item->widget()->setParent(nullptr);
         item->widget()->deleteLater();
       }
       delete item;
     }
     root->addWidget(w);
+    if (isVisible()) {
+      w->show();
+      root->activate();
+    }
   }
   QComboBox *combo(const QString &name, QJsonArray values, QWidget *parent,
                    const QString &selected = {}) {
@@ -1999,21 +2280,85 @@ class Frontend : public QWidget {
     return label + " (" + QKeySequence(key).toString(QKeySequence::NativeText) + ")";
   }
   QToolButton *toolButton(const QString &label, const QStringList &iconNames,
-                          QWidget *parent, const std::function<void()> &action) {
+                          QWidget *parent, const std::function<void()> &action,
+                          QStyle::StandardPixmap fallback = QStyle::SP_FileIcon) {
     auto b = new QToolButton(parent);
     b->setText(label);
     b->setAccessibleName(label);
     b->setToolTip(actionHint(label, iconNames.value(0)));
     b->setProperty("boardAction", true);
-    b->setIcon(themedIcon(iconNames, QStyle::SP_FileIcon));
+    b->setIcon(themedIcon(iconNames, fallback));
     b->setToolButtonStyle(settings.value("board/toolbarLabels", true).toBool()
                               ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
     connect(b, &QToolButton::clicked, this, action);
     return b;
   }
   QToolButton *toolButton(const QString &label, const QString &iconName,
-                          QWidget *parent, const std::function<void()> &action) {
-    return toolButton(label, QStringList{iconName}, parent, action);
+                          QWidget *parent, const std::function<void()> &action,
+                          QStyle::StandardPixmap fallback = QStyle::SP_FileIcon) {
+    return toolButton(label, QStringList{iconName}, parent, action, fallback);
+  }
+  QStyle::StandardPixmap actionFallback(const QString &op) const {
+    if (op == "mixer_copy" || op.contains("copy"))
+      return QStyle::SP_FileLinkIcon;
+    if (op == "palette_add_current")
+      return QStyle::SP_DialogYesButton;
+    if (op == "mixer_source_add")
+      return QStyle::SP_FileDialogNewFolder;
+    if (op.contains("undo"))
+      return QStyle::SP_ArrowBack;
+    if (op.contains("redo"))
+      return QStyle::SP_ArrowForward;
+    if (op == "mixer_mix" || op == "theme_palette_bind")
+      return QStyle::SP_DialogApplyButton;
+    if (op.contains("duplicate"))
+      return QStyle::SP_FileLinkIcon;
+    if (op.contains("save"))
+      return QStyle::SP_DialogSaveButton;
+    if (op.contains("new"))
+      return QStyle::SP_FileIcon;
+    return QStyle::SP_DialogOpenButton;
+  }
+  QPixmap makeEmptyHistoryIcon(int iconSz, int alpha) const {
+    const qreal dpr = devicePixelRatioF();
+    const QStringList names{"view-history-symbolic", "view-history",
+                            "document-open-recent"};
+    for (const auto &name : names) {
+      if (QIcon::hasThemeIcon(name)) {
+        QIcon icon = QIcon::fromTheme(name);
+        if (!icon.isNull()) {
+          QPixmap raw = icon.pixmap(QSize(iconSz, iconSz), dpr);
+          QPixmap tinted(raw.size());
+          tinted.setDevicePixelRatio(raw.devicePixelRatio());
+          tinted.fill(Qt::transparent);
+          QPainter tp(&tinted);
+          tp.drawPixmap(0, 0, raw);
+          tp.setCompositionMode(QPainter::CompositionMode_SourceIn);
+          tp.fillRect(tinted.rect(), mutedColor(palette(), alpha));
+          tp.end();
+          return tinted;
+        }
+      }
+    }
+    const int px = qMax(1, qRound(iconSz * dpr));
+    QPixmap pm(px, px);
+    pm.setDevicePixelRatio(dpr);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    const QColor ink = mutedColor(palette(), alpha);
+    p.setPen(QPen(ink, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    p.setBrush(Qt::NoBrush);
+    const QRectF ring(2.5, 2.5, iconSz - 5.0, iconSz - 5.0);
+    p.drawArc(ring, 150 * 16, -310 * 16);
+    const QPointF center(iconSz / 2.0, iconSz / 2.0);
+    p.drawLine(center, center + QPointF(0.0, -iconSz * 0.22));
+    p.drawLine(center, center + QPointF(iconSz * 0.17, iconSz * 0.1));
+    const QPointF tip(ring.left() + 0.6, ring.top() + ring.height() * 0.25);
+    p.drawLine(tip, tip + QPointF(0.0, -4.0));
+    p.drawLine(tip, tip + QPointF(4.0, 0.0));
+    p.end();
+    return pm;
   }
   QStringList actionIcon(const QString &op) const {
     if (op == "mixer_copy" || op.contains("copy"))
@@ -2066,6 +2411,7 @@ class Frontend : public QWidget {
     l->addWidget(new Hairline(container));
     auto s = static_cast<QScrollArea *>(scroll(pinnedPalette()));
     s->setObjectName("pinnedShelfScroll");
+    s->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     s->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     l->addWidget(s, 1);
     return container;
@@ -2143,8 +2489,17 @@ class Frontend : public QWidget {
     return w;
   }
   void renderBoard(const QJsonObject &previous) {
-    bool first = !tabs;
-    if (first) {
+    if (renderingBoard) {
+      hasPendingBoardRender = true;
+      return;
+    }
+    renderingBoard = true;
+    QJsonObject prev = previous;
+    for (;;) {
+      hasPendingBoardRender = false;
+      const QJsonObject currentSnapshot = state;
+      bool first = !tabs;
+      if (first) {
       auto outer = new QWidget;
       auto layout = new QVBoxLayout(outer);
       layout->setContentsMargins(0, 0, 0, 0);
@@ -2267,7 +2622,7 @@ class Frontend : public QWidget {
         for (auto b : findChildren<QToolButton *>())
           if (b->property("boardAction").toBool())
             b->setToolButtonStyle(buttonStyle);
-        if (tabs) {
+        if (tabs && tabs->widget(0)) {
           if (auto *scroll = tabs->widget(0)->findChild<QScrollArea *>())
             layoutMixerContent(scroll->widget(), scroll->viewport()->size());
         }
@@ -2344,7 +2699,7 @@ class Frontend : public QWidget {
       });
       tabs->addTab(mixerPage(), "Mixer");
       tabs->addTab(palettePage(), "Palette");
-      tabs->addTab(themePage(), "Theme");
+      tabs->addTab(createThemePage(), "Theme");
       tabs->setCurrentIndex(
           qBound(0, settings.value("board/tab", 0).toInt(), 2));
       tabs->tabBar()->hide();
@@ -2414,7 +2769,7 @@ class Frontend : public QWidget {
       QTimer::singleShot(0, this, [this] { clearToolbarFocus(); });
     } else {
       int current = tabs->currentIndex();
-      if (previous.value("mixer") != state.value("mixer")) {
+      if (prev.value("mixer") != state.value("mixer")) {
         auto replacement = currentColor();
         boardContent->replaceWidget(pinnedCurrent, replacement);
         pinnedCurrent->hide();
@@ -2425,12 +2780,18 @@ class Frontend : public QWidget {
       QSignalBlocker blocker(tabs);
       auto refresh = [this](int index, QWidget *page, const QString &title) {
         auto old = tabs->widget(index);
-        preserveView(old, page);
-        tabs->removeTab(index);
-        tabs->insertTab(index, page, title);
-        old->deleteLater();
+        if (old) {
+          preserveView(old, page);
+          suppressChildSignals(old);
+          tabs->removeTab(index);
+          tabs->insertTab(index, page, title);
+          old->hide();
+          old->deleteLater();
+        } else {
+          tabs->insertTab(index, page, title);
+        }
       };
-      if (previous.value("mixer") != state.value("mixer")) {
+      if (prev.value("mixer") != state.value("mixer")) {
         if (spectrumDragging) {
           auto m = object(state.value("mixer"));
           auto hsv = array(m, "hsv");
@@ -2446,23 +2807,24 @@ class Frontend : public QWidget {
         } else
           refresh(0, mixerPage(), "Mixer");
       }
-      if (previous.value("palette") != state.value("palette") ||
+      if (prev.value("palette") != state.value("palette") ||
           (generationDraft.value("base").toString().isEmpty() &&
-           previous.value("mixer") != state.value("mixer")))
+           prev.value("mixer") != state.value("mixer")))
         refresh(1, palettePage(), "Palette");
-      if (previous.value("theme") != state.value("theme")) {
+      if (prev.value("theme") != state.value("theme")) {
         Scene *reused = nullptr;
-        if (object(previous.value("theme")).value("scene") ==
-            object(state.value("theme")).value("scene")) {
-          for (auto widget : tabs->widget(2)->findChildren<QWidget *>())
+        if (themeBody &&
+            object(prev.value("theme")).value("scene") ==
+                object(state.value("theme")).value("scene")) {
+          for (auto widget : themeBody->findChildren<QWidget *>())
             if ((reused = dynamic_cast<Scene *>(widget)))
               break;
         }
-        auto replacement = themePage(reused);
-        refresh(2, replacement, "Theme");
-        if (object(previous.value("theme")).value("selected") !=
+        refreshThemeContent(reused);
+        syncThemeProjectDialog();
+        if (object(prev.value("theme")).value("selected") !=
             object(state.value("theme")).value("selected")) {
-          QPointer<QWidget> guarded(replacement);
+          QPointer<QWidget> guarded(themeBody);
           QTimer::singleShot(0, this, [guarded] {
             if (!guarded) return;
             auto inspector = guarded->findChild<QScrollArea *>("themeInspector");
@@ -2472,19 +2834,23 @@ class Frontend : public QWidget {
           });
         }
       }
-      if (previous.value("palette") != state.value("palette")) {
+      if (prev.value("palette") != state.value("palette")) {
         auto replacement = pinnedShelf();
         preserveView(pinnedScroll, replacement);
         auto old = verticalSplitter->replaceWidget(1, replacement);
         pinnedScroll = replacement;
         sizePinnedPalette();
-        old->deleteLater();
+        if (old) {
+          suppressChildSignals(old);
+          old->hide();
+          old->deleteLater();
+        }
       }
       tabs->setCurrentIndex(current);
       pinnedCurrent->setVisible(current == 0);
       clearToolbarFocus();
     }
-    if (first || previous.value("history") != state.value("history")) {
+    if (first || prev.value("history") != state.value("history")) {
       historyEmptyPrimary = nullptr;
       historyEmptyHint = nullptr;
       while (auto item = historyLayout->takeAt(0)) {
@@ -2497,23 +2863,10 @@ class Frontend : public QWidget {
         historyLayout->setContentsMargins(8, 12, 8, 12);
         historyLayout->setSpacing(6);
         historyLayout->addStretch(1);
-        QIcon histIcon = themedIcon(
-            {"view-history-symbolic", "view-history", "document-open-recent"},
-            QStyle::SP_FileDialogListView);
-        if (!histIcon.isNull()) {
-          const int iconSz = 22;
-          const qreal dpr = devicePixelRatioF();
-          QPixmap raw = histIcon.pixmap(QSize(iconSz, iconSz), dpr);
-          QPixmap tinted(raw.size());
-          tinted.setDevicePixelRatio(raw.devicePixelRatio());
-          tinted.fill(Qt::transparent);
-          QPainter tp(&tinted);
-          tp.drawPixmap(0, 0, raw);
-          tp.setCompositionMode(QPainter::CompositionMode_SourceIn);
-          tp.fillRect(tinted.rect(), mutedColor(palette(), 110));
-          tp.end();
+        QPixmap emptyIcon = makeEmptyHistoryIcon(22, 110);
+        if (!emptyIcon.isNull()) {
           auto iconLabel = new QLabel(historyBox);
-          iconLabel->setPixmap(tinted);
+          iconLabel->setPixmap(emptyIcon);
           iconLabel->setAlignment(Qt::AlignCenter);
           historyLayout->addWidget(iconLabel, 0, Qt::AlignHCenter);
         }
@@ -2559,9 +2912,12 @@ class Frontend : public QWidget {
         int index = 0;
         for (auto v : entries) {
           auto o = v.toObject();
-          auto b = new Swatch(color(str(o, "color")), str(o, "text"), historyBox);
+          const QString entryText = str(o, "text");
+          const QString detail = str(o, "detail");
+          auto b = new Swatch(color(str(o, "color")), entryText, historyBox);
           b->setFlat(true);
-          b->setToolTip(str(o, "detail"));
+          b->setHistoryRowMode(true);
+          b->setToolTip(detail.isEmpty() ? entryText : detail);
           int i = index++;
           b->historyDrag(i);
           connect(b, &QPushButton::clicked, this, [this, i] {
@@ -2601,8 +2957,13 @@ class Frontend : public QWidget {
       connectionDot->setColor(
           (picking || !loaded) ? QColor(0xF6, 0x74, 0x00)
           : connected          ? QColor(0x27, 0xAE, 0x60)
-                               : palette().color(QPalette::Mid));
+                               : StatusDot::neutralColor(palette()));
     }
+      if (!hasPendingBoardRender && state == currentSnapshot)
+        break;
+      prev = currentSnapshot;
+    }
+    renderingBoard = false;
   }
   QWidget *currentColor() {
     auto m = object(state.value("mixer"));
@@ -2643,7 +3004,7 @@ class Frontend : public QWidget {
         actions->addSeparator();
       const auto &pair = actionItems[idx];
       const auto icons = actionIcon(pair.second);
-      auto icon = themedIcon(icons, QStyle::SP_FileIcon);
+      auto icon = themedIcon(icons, actionFallback(pair.second));
       auto action = actions->addAction(icon, pair.first);
       action->setToolTip(actionHint(pair.first, icons.value(0)));
       actions->widgetForAction(action)->setAccessibleName(pair.first);
@@ -2891,14 +3252,15 @@ class Frontend : public QWidget {
     mixRightLayout->setSpacing(6);
     auto addSourceBtn = toolButton(
         "Add source", actionIcon("mixer_source_add"), mixRight,
-        [this] { send({{"op", "mixer_source_add"}}); });
+        [this] { send({{"op", "mixer_source_add"}}); },
+        actionFallback("mixer_source_add"));
     addSourceBtn->setAutoRaise(true);
     addSourceBtn->setIconSize(QSize(16, 16));
     addSourceBtn->setToolTip("Add a color mixing source");
     auto mixBtn = button("Mix", mixRight,
                          [this] { send({{"op", "mixer_mix"}}); });
     mixBtn->setIcon(themedIcon(actionIcon("mixer_mix"),
-                               QStyle::SP_DialogApplyButton));
+                               actionFallback("mixer_mix")));
     mixBtn->setIconSize(QSize(16, 16));
     mixBtn->setToolTip("Mix sources into the current color");
     mixRightLayout->addWidget(addSourceBtn, 0, Qt::AlignVCenter);
@@ -2914,14 +3276,16 @@ class Frontend : public QWidget {
       auto r = new QHBoxLayout(row);
       r->setContentsMargins(0, 0, 0, 0);
       r->setSpacing(8);
-      auto source = new Swatch(color(str(o, "color")),
+      const QString initialColor = str(o, "color");
+      const double initialWeight = o.value("weight").toDouble();
+      auto source = new Swatch(color(initialColor),
                                QStringLiteral("Source %1").arg(index + 1), row);
       source->setText(QString());
       source->setFixedSize(34, 24);
       source->setTileMode(true, false);
       source->setToolTip(
           QStringLiteral("Source %1 — drag or drop a color").arg(index + 1));
-      auto c = line("Source color", str(o, "color"), row);
+      auto c = line("Source color", initialColor, row);
       c->setFont(monoFont);
       const int hexFieldW =
           c->fontMetrics().horizontalAdvance(QStringLiteral("#00000000")) + 24;
@@ -2933,8 +3297,7 @@ class Frontend : public QWidget {
       weightLayout->setContentsMargins(0, 0, 0, 0);
       weightLayout->setSpacing(4);
       auto weightLabel = channelLabel("Weight:", weightBox);
-      auto weight =
-          decimal("Source weight", o.value("weight").toDouble(), 0, 1, weightBox);
+      auto weight = decimal("Source weight", initialWeight, 0, 1, weightBox);
       weight->setMaximumWidth(weight->sizeHint().width());
       weightLabel->setBuddy(weight);
       weightLayout->addWidget(weightLabel);
@@ -2949,11 +3312,17 @@ class Frontend : public QWidget {
       r->addWidget(source, 0, Qt::AlignVCenter);
       r->addWidget(c, 0, Qt::AlignVCenter);
       r->addWidget(weightBox, 0, Qt::AlignVCenter);
-      auto apply = [this, index, c, weight] {
+      const double displayedWeight = weight->value();
+      auto apply = [this, index, c, weight, initialColor, initialWeight,
+                    displayedWeight] {
+        const bool colorChanged = c->text() != initialColor;
+        const bool weightChanged = weight->value() != displayedWeight;
+        if (!colorChanged && !weightChanged)
+          return;
         send({{"op", "mixer_source"},
               {"index", index},
-              {"color", c->text()},
-              {"weight", weight->value()}});
+              {"color", colorChanged ? c->text() : initialColor},
+              {"weight", weightChanged ? weight->value() : initialWeight}});
       };
       connect(c, &QLineEdit::editingFinished, this, apply);
       connect(weight, &QDoubleSpinBox::editingFinished, this, apply);
@@ -3179,7 +3548,10 @@ class Frontend : public QWidget {
     }
   }
   QWidget *palettePage();
-  QWidget *themePage(Scene *reuse = nullptr);
+  QWidget *createThemePage();
+  QWidget *buildThemeBody(Scene *reuse = nullptr);
+  void refreshThemeContent(Scene *reuse = nullptr);
+  void syncThemeProjectDialog();
   void layoutThemePage(QWidget *page, int width, bool initialize = false);
   void renderConfig();
   void renderHistory();
@@ -3195,7 +3567,7 @@ protected:
     QWidget::resizeEvent(event);
     sizeHistorySidebar();
     sizePinnedPalette();
-    if (tabs) {
+    if (tabs && tabs->widget(0)) {
       if (auto *scroll = tabs->widget(0)->findChild<QScrollArea *>())
         layoutMixerContent(scroll->widget(), scroll->viewport()->size());
     }
@@ -3261,8 +3633,10 @@ protected:
           return true;
         } else
           return QWidget::eventFilter(watched, event);
-        historyButtons[qBound(0, next, int(historyButtons.size()) - 1)]
-            ->setFocus();
+        const int clamped = qBound(0, next, int(historyButtons.size()) - 1);
+        historyButtons[clamped]->setFocus();
+        if (historyScroll)
+          historyScroll->ensureWidgetVisible(historyButtons[clamped], 12, 12);
         return true;
       }
     }
@@ -3631,6 +4005,20 @@ public:
         click(mixerPage, "Copy");
         check(QApplication::clipboard()->text() == "#040506", "Pinned Copy copies the Mixer output");
         const QString beforeMix = str(object(state.value("mixer")), "current");
+        // Bug 4 regression: focusing and leaving an unchanged mixing source
+        // field must not send mixer_source or overwrite the current color.
+        for (auto field : tabs->widget(0)->findChildren<QLineEdit *>())
+          if (field->accessibleName() == "Source color") {
+            QMetaObject::invokeMethod(field, "editingFinished");
+            break;
+          }
+        for (auto spinBox : tabs->widget(0)->findChildren<QDoubleSpinBox *>())
+          if (spinBox->accessibleName() == "Source weight") {
+            QMetaObject::invokeMethod(spinBox, "editingFinished");
+            break;
+          }
+        check(str(object(state.value("mixer")), "current") == beforeMix,
+              "Unchanged mixing source focus leaves current color untouched");
         click(tabs->widget(0), "Mix");
         check(str(object(state.value("mixer")), "current") != beforeMix,
               "Mix computes a new current color from sources");
@@ -3731,6 +4119,14 @@ public:
             tabs->widget(1)->findChild<QWidget *>("palettePreviewStrip"));
         check(palPreview && palPreview->colorCount() > 0,
               "Palette preview populates immediately");
+        // Bug 14 regression: pinned palette shelf never spawns a vertical scrollbar.
+        if (auto *shelfScroll =
+                pinnedScroll->findChild<QScrollArea *>("pinnedShelfScroll")) {
+          check(shelfScroll->verticalScrollBarPolicy() ==
+                        Qt::ScrollBarAlwaysOff &&
+                    shelfScroll->verticalScrollBar()->maximum() == 0,
+                "Pinned palette shelf never spawns a vertical scrollbar");
+        }
         if (array(object(state.value("palette")), "saved").isEmpty()) {
           for (auto b : tabs->widget(1)->findChildren<QAbstractButton *>())
             if (b->accessibleName() == "Open" || b->accessibleName() == "Delete")
@@ -3811,17 +4207,38 @@ public:
         auto edits = tabs->widget(1)->findChildren<QLineEdit *>();
         for (auto e : edits)
           if (e->accessibleName() == "Palette name") {
+            // Bug 1 regression: editing Palette name without pressing Enter
+            // and clicking toolbar Save must commit the name without crashing.
+            e->setFocus(Qt::OtherFocusReason);
             e->setText("Qt smoke palette");
-            QMetaObject::invokeMethod(e, "editingFinished");
+            e->setModified(true);
             break;
           }
         click(tabs->widget(1), "Save");
+        check(str(object(state.value("palette")), "name") == "Qt smoke palette",
+              "Toolbar Save commits focused Palette name edit without crashing");
         auto id = str(object(state.value("palette")), "id");
         check(!id.isEmpty(), "Save palette");
         click(tabs->widget(1), "Open");
         check(str(object(state.value("palette")), "id") == id,
               "Reopen palette");
         tabs->setCurrentIndex(2);
+        // Bug 3 regression: empty Theme page disables Save, Use active palette,
+        // and Export controls while keeping Project enabled.
+        for (auto b : tabs->widget(2)->findChildren<QAbstractButton *>()) {
+          const QString an = b->accessibleName();
+          if (an == "Save" || an == "Use active palette" || an == "Export" ||
+              an == "Choose directory")
+            check(!b->isEnabled(), an + " disabled without theme project");
+          if (an == "Project")
+            check(b->isEnabled(), "Project enabled without theme project");
+        }
+        for (auto e : tabs->widget(2)->findChildren<QLineEdit *>())
+          if (e->accessibleName() == "Export directory")
+            check(!e->isEnabled(), "Export directory disabled without theme project");
+        for (auto cb : tabs->widget(2)->findChildren<QCheckBox *>())
+          if (cb->text().contains("Overwrite"))
+            check(!cb->isEnabled(), "Overwrite checkbox disabled without theme project");
         check(!array(object(state.value("theme")), "plugins").isEmpty(),
               "Theme plugin available");
         if (!array(object(state.value("theme")), "plugins").isEmpty()) {
@@ -3836,12 +4253,40 @@ public:
             auto name = dialog->findChild<QLineEdit *>();
             check(name && name->accessibleName() == "Theme name", "Theme project name available");
             if (name) {
+              // Bug 2 regression: editing Theme name and clicking Close must
+              // commit the name and close on the first click without reopening.
+              name->setFocus(Qt::OtherFocusReason);
               name->setText("Smoke theme");
-              QMetaObject::invokeMethod(name, "editingFinished");
-              check(str(object(object(state.value("theme")).value("project")), "name") == "Smoke theme",
-                    "Theme project name updated");
+              name->setModified(true);
+              QPushButton *closeBtn = nullptr;
+              if (auto *box = dialog->findChild<QDialogButtonBox *>())
+                closeBtn = box->button(QDialogButtonBox::Close);
+              check(closeBtn != nullptr, "Theme project Close button available");
+              if (closeBtn) {
+                const QPoint c = closeBtn->rect().center();
+                // Simulate real mouse-click focus transfer from Theme name to
+                // Close before press/release.
+                QFocusEvent focusOut(QEvent::FocusOut, Qt::MouseFocusReason);
+                QApplication::sendEvent(name, &focusOut);
+                QMouseEvent press(QEvent::MouseButtonPress, c,
+                                  closeBtn->mapToGlobal(c), Qt::LeftButton,
+                                  Qt::LeftButton, Qt::NoModifier);
+                QApplication::sendEvent(closeBtn, &press);
+                QMouseEvent release(QEvent::MouseButtonRelease, c,
+                                    closeBtn->mapToGlobal(c), Qt::LeftButton,
+                                    Qt::NoButton, Qt::NoModifier);
+                QApplication::sendEvent(closeBtn, &release);
+                QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+                auto *afterDialog =
+                    tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
+                check(str(object(object(state.value("theme")).value("project")), "name") == "Smoke theme",
+                      "Theme project name updated");
+                check(afterDialog == dialog && !afterDialog->isVisible(),
+                      "Theme project closes on first click after editing name");
+              }
             }
           }
+          click(tabs->widget(2), "Project");
           dialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
           if (dialog) {
             QApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
@@ -3849,6 +4294,18 @@ public:
             dialog->reject();
             check(!dialog->isVisible(), "Theme project closes");
           }
+          // Bug 16 regression: Palette swatch link combobox includes explicit Unlinked entry.
+          bool foundLinkCombo = false;
+          for (auto combo : tabs->widget(2)->findChildren<QComboBox *>()) {
+            if (combo->accessibleName() == "Palette swatch link") {
+              foundLinkCombo = true;
+              check(combo->count() > 0 && combo->itemText(0) == "Unlinked" &&
+                        combo->itemData(0).toString().isEmpty(),
+                    "Palette link combobox has explicit Unlinked item");
+              break;
+            }
+          }
+          check(foundLinkCombo, "Palette link combobox available");
           check(!pinnedCurrent->isVisible(), "Mixer current color hidden on Theme");
           for (auto b : boardContent->parentWidget()->findChildren<QPushButton *>())
             if (b->accessibleName().startsWith("Current color"))
@@ -3907,7 +4364,20 @@ public:
                       str(updated[0].toObject(), "color") == "#142638FF",
                   "Theme scene drop updates the background role");
           }
+          // Bug 1 regression: editing Role color without pressing Enter and
+          // clicking Theme toolbar Save must commit the color without crashing.
+          for (auto field : tabs->widget(2)->findChildren<QLineEdit *>()) {
+            if (field->accessibleName() == "Role color") {
+              field->setFocus(Qt::OtherFocusReason);
+              field->setText("#224466FF");
+              field->setModified(true);
+              break;
+            }
+          }
           click(tabs->widget(2), "Save");
+          check(str(array(object(state.value("theme")), "roles")[0].toObject(),
+                    "color") == "#224466FF",
+                "Theme toolbar Save commits focused Role color without crashing");
           click(tabs->widget(2), "Project");
           auto projectDialog = tabs->widget(2)->findChild<QDialog *>("themeProjectDialog");
           QComboBox *savedThemes = nullptr;
@@ -4104,9 +4574,52 @@ public:
               "Save re-enabled after editing invalid limit");
         check(limitErrorBox && !limitErrorBox->isVisible(),
               "Limit validation banner hides after edit");
+        // Bug 6 regression: re-submitting invalid limit after editing must
+        // re-show the validation error instead of being silently dropped.
+        edit(this, "Stored history limit", "0");
+        click(this, "Save settings");
+        check(configSave && !configSave->isEnabled() && limitErrorBox &&
+                  limitErrorBox->isVisible(),
+              "Re-submitting invalid limit re-shows validation error");
+        // Bug 18 regression: HistoryLimitSpinBox overflow stepping clamps to i64::MAX.
+        if (configLimit) {
+          configLimit->lineEdit()->setText("99999999999999999999");
+          configLimit->stepUp();
+          check(configLimit->lineEdit()->text() != "1",
+                "Overflow stepUp does not wrap down to 1");
+          configLimit->stepDown();
+          check(configLimit->lineEdit()->text() == "9223372036854775807",
+                "Overflow stepDown clamps to i64::MAX");
+        }
+        // Bug 19 regression: long KDE fallback status wraps without horizontal overflow.
+        auto longStatusState = state;
+        longStatusState["shortcut_status"] =
+            "GlobalShortcuts unavailable; configure KDE shortcut calling "
+            "org.apartment38.SwatchBoard1.ShowHistory";
+        updateState(longStatusState, true);
+        settleLayout();
+        check(configScroll &&
+                  configScroll->horizontalScrollBar()->maximum() == 0,
+              "Long KDE fallback shortcut status has no horizontal overflow");
+        // Bug 20 regression: load_error disables Rebind shortcuts.
+        auto loadErrState = state;
+        loadErrState["load_error"] = "Failed to parse config.toml";
+        updateState(loadErrState, true);
+        check(configRebind && !configRebind->isEnabled(),
+              "Rebind shortcuts disabled during load_error");
       } else {
         check(state.contains("entries"), "History entries");
         shot("history");
+        // Bug 8 regression: copy error banner renders outside QScrollArea.
+        auto errState = state;
+        errState["error"] = "Clipboard copy failed: Wayland compositor unavailable";
+        updateState(errState);
+        settleLayout();
+        auto *errBanner = findChild<QWidget *>("historyErrorBanner");
+        check(errBanner && errBanner->isVisible() &&
+                  (!historyScroll || !historyScroll->isAncestorOf(errBanner)),
+              "History copy error banner pinned visibly outside scroll area");
+        shot("history-error");
       }
       QFile file(dir + "/" + mode + "-result.json");
       if (file.open(QIODevice::WriteOnly))
@@ -4133,7 +4646,7 @@ public:
       setWindowFlags(Qt::Popup);
       setAttribute(Qt::WA_NoMouseReplay);
     } else {
-      resize(m == "config" ? QSize(580, 620) : QSize(900, 700));
+      resize(m == "config" ? QSize(580, 656) : QSize(900, 700));
       restoreGeometry(settings.value(m + "/geometry").toByteArray());
     }
     auto initial = request({{"op", "init"}});
@@ -4190,13 +4703,17 @@ QWidget *Frontend::palettePage() {
       actions->addSeparator();
     const auto &pair = actionItems[idx];
     const auto icons = actionIcon(pair.second);
-    auto action = actions->addAction(themedIcon(icons, QStyle::SP_FileIcon),
-                                     pair.first);
+    auto action =
+        actions->addAction(themedIcon(icons, actionFallback(pair.second)),
+                           pair.first);
     action->setToolTip(actionHint(pair.first, icons.value(0)));
     if (auto *btn = actions->widgetForAction(action))
       btn->setAccessibleName(pair.first);
-    connect(action, &QAction::triggered, this,
-            [this, pair] { send({{"op", pair.second}}); });
+    connect(action, &QAction::triggered, this, [this, pair] {
+      if (pair.second == "palette_save" && tabs)
+        commitFocusedEditor(tabs->widget(1));
+      send({{"op", pair.second}});
+    });
     if (pair.second == "palette_undo")
       action->setEnabled(p.value("can_undo").toBool());
     if (pair.second == "palette_redo")
@@ -4254,14 +4771,18 @@ QWidget *Frontend::palettePage() {
   auto nameRowLayout = new QBoxLayout(QBoxLayout::LeftToRight, nameRow);
   nameRowLayout->setContentsMargins(0, 0, 0, 0);
   nameRowLayout->setSpacing(12);
-  auto name = line("Palette name", str(p, "name"), nameRow);
+  const QString initialPaletteName = str(p, "name");
+  auto name = line("Palette name", initialPaletteName, nameRow);
   name->setPlaceholderText("Untitled");
   name->setMinimumWidth(110);
   name->setMaximumWidth(260);
   name->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-  connect(name, &QLineEdit::editingFinished, this, [this, name] {
-    send({{"op", "palette_name"}, {"name", name->text()}});
-  });
+  connect(name, &QLineEdit::editingFinished, this,
+          [this, name, initialPaletteName] {
+            if (name->text() == initialPaletteName)
+              return;
+            send({{"op", "palette_name"}, {"name", name->text()}});
+          });
   auto historyLock = new QCheckBox("Lock history additions", nameRow);
   historyLock->setChecked(p.value("lock_history").toBool());
   historyLock->setToolTip(
@@ -4681,12 +5202,14 @@ QWidget *Frontend::palettePage() {
         generationDraft["generation"] = generations->currentData().toString();
       });
   savedLabel->setBuddy(generations);
-  auto load = toolButton("Load generation",
-                         {"document-open-recent-symbolic", "document-open-recent"},
-                         generationRow, [this, generations] {
-                           send({{"op", "palette_generation"},
-                                 {"id", generations->currentData().toString()}});
-                         });
+  auto load = toolButton(
+      "Load generation", {"document-open-recent-symbolic", "document-open-recent"},
+      generationRow,
+      [this, generations] {
+        send({{"op", "palette_generation"},
+              {"id", generations->currentData().toString()}});
+      },
+      QStyle::SP_DialogOpenButton);
   load->setIconSize(QSize(16, 16));
   bool hasGenerations = generations->count() > 0;
   if (!hasGenerations) {
@@ -4918,27 +5441,19 @@ void Frontend::layoutThemePage(QWidget *page, int width, bool initialize) {
   }
 }
 
-QWidget *Frontend::themePage(Scene *reuse) {
-  auto t = object(state.value("theme")), project = object(t.value("project"));
-  auto outer = new QWidget;
-  outer->setObjectName("themePage");
-  outer->installEventFilter(this);
-  auto outerLayout = new QVBoxLayout(outer);
-  outerLayout->setSpacing(0);
-  outerLayout->setContentsMargins(0, 0, 0, 0);
+QWidget *Frontend::createThemePage() {
+  themeContainer = new QWidget;
+  themeContainer->setObjectName("themePage");
+  themeContainer->installEventFilter(this);
+  auto containerLayout = new QVBoxLayout(themeContainer);
+  containerLayout->setSpacing(0);
+  containerLayout->setContentsMargins(0, 0, 0, 0);
 
-  const QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-  const QFontMetrics monoFm(monoFont);
-  auto applyMuted = [](QLabel *label, int alpha = 165) {
-    QPalette pal = label->palette();
-    const QColor muted = mutedColor(pal, alpha);
-    pal.setColor(QPalette::WindowText, muted);
-    pal.setColor(QPalette::Text, muted);
-    label->setPalette(pal);
-  };
-
-  // Theme Project Dialog
-  auto projectDialog = new QDialog(outer);
+  // Persistent Theme Project Dialog owned by themeContainer so editing
+  // Theme name and clicking Close / New theme / Open never tears down the
+  // dialog mid-click.
+  auto projectDialog = new QDialog(themeContainer);
+  themeProjectDialog = projectDialog;
   projectDialog->setObjectName("themeProjectDialog");
   projectDialog->setWindowTitle("Theme project");
   auto projectLayout = new QVBoxLayout(projectDialog);
@@ -4965,11 +5480,19 @@ QWidget *Frontend::themePage(Scene *reuse) {
     return b;
   };
 
-  auto plugins =
-      combo("Theme plugins", array(t, "plugins"), projectDialog,
-            themeDraft.value("plugin").toString(str(project, "plugin_id")));
+  auto discard = [this] {
+    const auto proj = object(object(state.value("theme")).value("project"));
+    return !proj.value("dirty").toBool() ||
+           QMessageBox::question(this, "Unsaved theme",
+                                 "Discard unsaved theme changes?") ==
+               QMessageBox::Yes;
+  };
+
+  auto plugins = new QComboBox(projectDialog);
+  plugins->setAccessibleName("Theme plugins");
   plugins->setMinimumContentsLength(12);
   plugins->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+  themePluginsCombo = plugins;
   connect(plugins, &QComboBox::currentIndexChanged, this, [this, plugins] {
     themeDraft["plugin"] = plugins->currentData().toString();
   });
@@ -4978,12 +5501,6 @@ QWidget *Frontend::themePage(Scene *reuse) {
   pluginLayout->setContentsMargins(0, 0, 0, 0);
   pluginLayout->setSpacing(6);
   pluginLayout->addWidget(plugins, 1);
-  auto discard = [this, project] {
-    return !project.value("dirty").toBool() ||
-           QMessageBox::question(this, "Unsaved theme",
-                                 "Discard unsaved theme changes?") ==
-               QMessageBox::Yes;
-  };
   auto newThemeBtn = makeDialogButton(
       "New theme", {"document-new-symbolic", "document-new"}, QStyle::SP_FileIcon,
       pluginRow, [this, plugins, discard] {
@@ -4992,21 +5509,17 @@ QWidget *Frontend::themePage(Scene *reuse) {
                 {"id", plugins->currentData().toString()},
                 {"discard", true}});
       });
+  themeNewBtn = newThemeBtn;
   pluginLayout->addWidget(newThemeBtn);
   selection->addRow("Plugin:", pluginRow);
 
-  const auto savedEntries = array(t, "saved");
-  const bool hasSaved = !savedEntries.isEmpty();
-  auto saved = combo("Saved themes", savedEntries, projectDialog,
-                     themeDraft.value("saved").toString());
+  auto saved = new QComboBox(projectDialog);
+  saved->setAccessibleName("Saved themes");
   saved->setMinimumContentsLength(12);
   saved->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
-  if (!hasSaved) {
-    saved->addItem("No saved themes");
-    saved->setEnabled(false);
-  }
-  connect(saved, &QComboBox::currentIndexChanged, this, [this, saved, hasSaved] {
-    if (hasSaved)
+  themeSavedCombo = saved;
+  connect(saved, &QComboBox::currentIndexChanged, this, [this, saved] {
+    if (saved->isEnabled())
       themeDraft["saved"] = saved->currentData().toString();
   });
   auto savedRow = new QWidget(projectDialog);
@@ -5023,7 +5536,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
                 {"discard", true}});
       });
   openBtn->setAccessibleName("Open theme");
-  openBtn->setEnabled(hasSaved);
+  themeOpenBtn = openBtn;
   savedLayout->addWidget(openBtn);
   auto reloadBtn = new QToolButton(savedRow);
   reloadBtn->setIcon(themedIcon({"view-refresh-symbolic", "view-refresh"},
@@ -5044,11 +5557,20 @@ QWidget *Frontend::themePage(Scene *reuse) {
       qMax(openBtn->sizeHint().width(), rightColW - 6 - reloadSide));
   selection->addRow("Saved:", savedRow);
 
-  auto name = line("Theme name", str(project, "name"), projectDialog);
+  auto name = line("Theme name", QString(), projectDialog);
   name->setPlaceholderText("Theme name");
   name->setMaximumWidth(
       name->fontMetrics().horizontalAdvance(QString(32, QLatin1Char('M'))) + 20);
+  themeNameEdit = name;
   connect(name, &QLineEdit::editingFinished, this, [this, name] {
+    const auto t = object(state.value("theme"));
+    const bool hasProject =
+        t.value("project").isObject() && !t.value("project").toObject().isEmpty();
+    if (!hasProject)
+      return;
+    const QString currentName = str(t.value("project").toObject(), "name");
+    if (name->text() == currentName)
+      return;
     send({{"op", "theme_name"}, {"name", name->text()}});
   });
   selection->addRow("Name:", name);
@@ -5062,10 +5584,134 @@ QWidget *Frontend::themePage(Scene *reuse) {
     closeBtn->setDefault(false);
   }
   connect(closeProject, &QDialogButtonBox::rejected, projectDialog,
-          &QDialog::reject);
+          [this, projectDialog, name] {
+            if (name && name->isEnabled() && name->isModified()) {
+              QFocusEvent focusOut(QEvent::FocusOut, Qt::OtherFocusReason);
+              QApplication::sendEvent(name, &focusOut);
+            }
+            projectDialog->reject();
+          });
   connect(projectDialog, &QDialog::finished, this,
           [this] { themeProjectVisible = false; });
   projectLayout->addWidget(closeProject);
+
+  syncThemeProjectDialog();
+  refreshThemeContent(nullptr);
+  return themeContainer;
+}
+
+void Frontend::syncThemeProjectDialog() {
+  if (!themeProjectDialog)
+    return;
+  const auto t = object(state.value("theme"));
+  const bool hasProject =
+      t.value("project").isObject() && !t.value("project").toObject().isEmpty();
+  const auto project = hasProject ? t.value("project").toObject() : QJsonObject{};
+
+  if (themePluginsCombo) {
+    QSignalBlocker block(themePluginsCombo);
+    const QString desired =
+        themeDraft.value("plugin").toString(str(project, "plugin_id"));
+    themePluginsCombo->clear();
+    const auto pluginEntries = array(t, "plugins");
+    for (auto v : pluginEntries) {
+      auto o = v.toObject();
+      themePluginsCombo->addItem(
+          str(o, "name").isEmpty() ? str(o, "label") : str(o, "name"),
+          str(o, "id"));
+    }
+    const int idx = themePluginsCombo->findData(desired);
+    if (idx >= 0)
+      themePluginsCombo->setCurrentIndex(idx);
+    if (themeNewBtn)
+      themeNewBtn->setEnabled(!pluginEntries.isEmpty());
+  }
+  if (themeSavedCombo) {
+    QSignalBlocker block(themeSavedCombo);
+    const auto savedEntries = array(t, "saved");
+    const bool hasSaved = !savedEntries.isEmpty();
+    const QString desired = themeDraft.value("saved").toString();
+    themeSavedCombo->clear();
+    if (!hasSaved) {
+      themeSavedCombo->addItem("No saved themes");
+      themeSavedCombo->setEnabled(false);
+    } else {
+      for (auto v : savedEntries) {
+        auto o = v.toObject();
+        themeSavedCombo->addItem(
+            str(o, "name").isEmpty() ? str(o, "label") : str(o, "name"),
+            str(o, "id"));
+      }
+      themeSavedCombo->setEnabled(true);
+      const int idx = themeSavedCombo->findData(desired);
+      if (idx >= 0)
+        themeSavedCombo->setCurrentIndex(idx);
+    }
+    if (themeOpenBtn)
+      themeOpenBtn->setEnabled(hasSaved);
+  }
+  if (themeNameEdit) {
+    QSignalBlocker block(themeNameEdit);
+    const QString desiredName = hasProject ? str(project, "name") : QString();
+    themeNameEdit->setEnabled(hasProject);
+    if (themeNameEdit->text() != desiredName) {
+      themeNameEdit->setText(desiredName);
+      themeNameEdit->setModified(false);
+    }
+  }
+  if (themeProjectVisible && !themeProjectDialog->isVisible())
+    themeProjectDialog->show();
+}
+
+void Frontend::refreshThemeContent(Scene *reuse) {
+  if (!themeContainer)
+    return;
+  auto *layout = qobject_cast<QVBoxLayout *>(themeContainer->layout());
+  if (!layout)
+    return;
+  auto *newBody = buildThemeBody(reuse);
+  auto *oldBody = themeBody;
+  if (oldBody) {
+    preserveView(oldBody, newBody);
+    suppressChildSignals(oldBody);
+    layout->removeWidget(oldBody);
+    oldBody->hide();
+    oldBody->setParent(nullptr);
+    oldBody->deleteLater();
+  }
+  themeBody = newBody;
+  layout->addWidget(newBody, 1);
+  const int targetW = themeContainer->width() > 0
+                          ? themeContainer->width()
+                          : (tabs ? tabs->width() : width());
+  layoutThemePage(themeContainer, targetW, true);
+  alignHeaderToolbar(themeContainer, "themeActions");
+  if (themeContainer->isVisible()) {
+    newBody->show();
+    layout->activate();
+  }
+}
+
+QWidget *Frontend::buildThemeBody(Scene *reuse) {
+  auto t = object(state.value("theme"));
+  const bool hasProject =
+      t.value("project").isObject() && !t.value("project").toObject().isEmpty();
+  auto project = hasProject ? t.value("project").toObject() : QJsonObject{};
+  auto outer = new QWidget(themeContainer);
+  outer->setObjectName("themeBody");
+  auto outerLayout = new QVBoxLayout(outer);
+  outerLayout->setSpacing(0);
+  outerLayout->setContentsMargins(0, 0, 0, 0);
+
+  const QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+  const QFontMetrics monoFm(monoFont);
+  auto applyMuted = [](QLabel *label, int alpha = 165) {
+    QPalette pal = label->palette();
+    const QColor muted = mutedColor(pal, alpha);
+    pal.setColor(QPalette::WindowText, muted);
+    pal.setColor(QPalette::Text, muted);
+    label->setPalette(pal);
+  };
 
   // Pinned Theme Action Toolbar (flush with History header hairline)
   auto actions = new QToolBar(outer);
@@ -5101,11 +5747,14 @@ QWidget *Frontend::themePage(Scene *reuse) {
                  {"project-open-symbolic", "document-open-folder-symbolic",
                   "folder-open"},
                  QStyle::SP_DirOpenIcon, "Theme project settings",
-                 [this, projectDialog] {
+                 [this] {
                    themeProjectVisible = true;
-                   projectDialog->show();
-                   projectDialog->raise();
-                   projectDialog->activateWindow();
+                   syncThemeProjectDialog();
+                   if (themeProjectDialog) {
+                     themeProjectDialog->show();
+                     themeProjectDialog->raise();
+                     themeProjectDialog->activateWindow();
+                   }
                  });
 
   auto previewToggleAction = actions->addAction(
@@ -5124,8 +5773,13 @@ QWidget *Frontend::themePage(Scene *reuse) {
     previewToggle->setFocusPolicy(Qt::TabFocus);
   }
 
-  addThemeAction("Save", actionIcon("theme_save"), QStyle::SP_DialogSaveButton,
-                 "Save", [this] { send({{"op", "theme_save"}}); });
+  auto saveAct = addThemeAction(
+      "Save", actionIcon("theme_save"), QStyle::SP_DialogSaveButton, "Save",
+      [this] {
+        commitFocusedEditor(themeBody);
+        send({{"op", "theme_save"}});
+      });
+  saveAct->setEnabled(hasProject);
   actions->addSeparator();
   auto undoAct = addThemeAction(
       "Undo", actionIcon("theme_undo"), QStyle::SP_ArrowBack,
@@ -5138,10 +5792,12 @@ QWidget *Frontend::themePage(Scene *reuse) {
       [this] { send({{"op", "theme_redo"}}); });
   redoAct->setEnabled(t.value("can_redo").toBool());
   actions->addSeparator();
-  addThemeAction("Use active palette", actionIcon("theme_palette_bind"),
-                 QStyle::SP_DialogApplyButton,
-                 "Bind matching roles to the active palette",
-                 [this] { send({{"op", "theme_palette_bind"}}); });
+  auto bindAct = addThemeAction("Use active palette",
+                                actionIcon("theme_palette_bind"),
+                                QStyle::SP_DialogApplyButton,
+                                "Bind matching roles to the active palette",
+                                [this] { send({{"op", "theme_palette_bind"}}); });
+  bindAct->setEnabled(hasProject);
 
   // Subtle right-aligned project context label (wide mode only)
   auto contextSpacer = new QWidget(actions);
@@ -5256,9 +5912,6 @@ QWidget *Frontend::themePage(Scene *reuse) {
   previewGrid->setRowStretch(0, 1);
   previewGrid->setColumnStretch(0, 1);
 
-  if (themeProjectVisible)
-    projectDialog->show();
-
   // Flat KDE HIG Inspector
   auto w = new QWidget;
   w->setObjectName("themeInspectorContent");
@@ -5325,14 +5978,20 @@ QWidget *Frontend::themePage(Scene *reuse) {
       connect(sw, &QPushButton::clicked, this,
               [this, id] { send({{"op", "theme_select"}, {"role", id}}); });
 
-      auto edit = new ColorLineEdit(str(o, "value"), row);
+      const QString initialRoleValue = str(o, "value");
+      auto edit = new ColorLineEdit(initialRoleValue, row);
       edit->setFont(monoFont);
       edit->setMinimumWidth(monoFm.horizontalAdvance("#142638") + 16);
       edit->setMaximumWidth(monoFm.horizontalAdvance("#142638FF") + 18);
       topRow->addWidget(edit, 0, Qt::AlignRight | Qt::AlignVCenter);
-      connect(edit, &QLineEdit::editingFinished, this, [this, id, edit] {
-        send({{"op", "theme_assign"}, {"role", id}, {"color", edit->text()}});
-      });
+      connect(edit, &QLineEdit::editingFinished, this,
+              [this, id, edit, initialRoleValue] {
+                if (edit->text() == initialRoleValue)
+                  return;
+                send({{"op", "theme_assign"},
+                      {"role", id},
+                      {"color", edit->text()}});
+              });
       r->addLayout(topRow);
 
       auto bottomRow = new QHBoxLayout;
@@ -5343,15 +6002,29 @@ QWidget *Frontend::themePage(Scene *reuse) {
       auto link = new QComboBox(row);
       link->setAccessibleName("Palette swatch link");
       link->setEditable(true);
+      link->setInsertPolicy(QComboBox::NoInsert);
       if (auto *le = link->lineEdit()) {
         le->setPlaceholderText("Unlinked");
         QPalette lePal = le->palette();
         lePal.setColor(QPalette::PlaceholderText, mutedColor(lePal, 185));
         le->setPalette(lePal);
       }
-      for (auto v : array(t, "palette_swatches"))
-        link->addItem(str(v.toObject(), "name"));
-      link->setEditText(str(o, "link"));
+      link->addItem("Unlinked", QString());
+      for (auto v : array(t, "palette_swatches")) {
+        const QString swatchName = str(v.toObject(), "name");
+        link->addItem(swatchName, swatchName);
+      }
+      const QString initialLink = str(o, "link");
+      if (initialLink.isEmpty()) {
+        link->setCurrentIndex(0);
+        link->setEditText(QString());
+      } else {
+        const int idx = link->findData(initialLink);
+        if (idx >= 0)
+          link->setCurrentIndex(idx);
+        else
+          link->setEditText(initialLink);
+      }
       link->setMinimumContentsLength(7);
       link->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
       link->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
@@ -5374,15 +6047,28 @@ QWidget *Frontend::themePage(Scene *reuse) {
       bottomRow->addWidget(defaultBtn, 0, Qt::AlignRight | Qt::AlignVCenter);
       r->addLayout(bottomRow);
 
-      connect(link, &QComboBox::activated, this, [this, id, link](int) {
-        send({{"op", "theme_link"}, {"role", id}, {"name", link->currentText()}});
-      });
-      connect(link->lineEdit(), &QLineEdit::returnPressed, this,
-              [this, id, link] {
-                send({{"op", "theme_link"},
-                      {"role", id},
-                      {"name", link->currentText()}});
+      auto committedLink = std::make_shared<QString>(initialLink);
+      auto commitLink = [this, id, committedLink](const QString &rawName) {
+        const QString nextName = rawName.trimmed();
+        if (nextName == *committedLink)
+          return;
+        *committedLink = nextName;
+        send({{"op", "theme_link"}, {"role", id}, {"name", nextName}});
+      };
+      connect(link, &QComboBox::activated, this,
+              [link, commitLink](int idx) {
+                const QString val = (idx >= 0 && link->itemData(idx).isValid())
+                                        ? link->itemData(idx).toString()
+                                        : link->currentText();
+                if (val.isEmpty())
+                  link->setEditText(QString());
+                commitLink(val);
               });
+      if (auto *le = link->lineEdit()) {
+        connect(le, &QLineEdit::editingFinished, this, [le, commitLink] {
+          commitLink(le->text());
+        });
+      }
       rolesListLayout->addWidget(row);
     }
     rolesSection->addLayout(rolesListLayout);
@@ -5466,6 +6152,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
       line("Export directory", themeDraft.value("directory").toString(), w);
   dir->setPlaceholderText(QString::fromUtf8("Export folder path\u2026"));
   dir->setMinimumWidth(80);
+  dir->setEnabled(hasProject);
   connect(dir, &QLineEdit::textChanged, this,
           [this](const QString &value) { themeDraft["directory"] = value; });
   exportDirRow->addWidget(dir, 1);
@@ -5479,6 +6166,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
   chooseBtn->setIcon(
       themedIcon({"folder-open-symbolic", "folder-open"}, QStyle::SP_DirOpenIcon));
   chooseBtn->setIconSize(QSize(16, 16));
+  chooseBtn->setEnabled(hasProject);
   exportDirRow->addWidget(chooseBtn);
   exportSection->addLayout(exportDirRow);
 
@@ -5487,6 +6175,7 @@ QWidget *Frontend::themePage(Scene *reuse) {
   exportActionRow->setSpacing(6);
   auto overwrite = new QCheckBox("Overwrite existing files", w);
   overwrite->setChecked(themeDraft.value("overwrite").toBool());
+  overwrite->setEnabled(hasProject);
   connect(overwrite, &QCheckBox::toggled, this,
           [this](bool value) { themeDraft["overwrite"] = value; });
   exportActionRow->addWidget(overwrite, 0, Qt::AlignLeft | Qt::AlignVCenter);
@@ -5497,14 +6186,16 @@ QWidget *Frontend::themePage(Scene *reuse) {
   exportBtn->setIcon(themedIcon({"document-export-symbolic", "document-export"},
                                 QStyle::SP_DialogSaveButton));
   exportBtn->setIconSize(QSize(16, 16));
-  auto updateExportButton = [exportBtn](const QString &value) {
+  exportBtn->setEnabled(hasProject);
+  auto updateExportButton = [exportBtn, hasProject](const QString &value) {
     const bool hasDir = !value.trimmed().isEmpty();
     exportBtn->setText(hasDir ? QStringLiteral("Export")
                               : QString::fromUtf8("Export\u2026"));
-    exportBtn->setPrimary(hasDir);
+    exportBtn->setPrimary(hasProject && hasDir);
     exportBtn->setToolTip(
-        hasDir ? QStringLiteral("Export theme files to the selected folder")
-               : QStringLiteral("Choose a folder and export theme files"));
+        !hasProject ? QStringLiteral("Open or create a theme project to export")
+        : hasDir    ? QStringLiteral("Export theme files to the selected folder")
+                    : QStringLiteral("Choose a folder and export theme files"));
   };
   updateExportButton(dir->text());
   connect(dir, &QLineEdit::textChanged, exportBtn, updateExportButton);
@@ -5556,40 +6247,79 @@ QWidget *Frontend::themePage(Scene *reuse) {
     }
   });
   outerLayout->addWidget(panes, 1);
-  layoutThemePage(outer, tabs ? tabs->width() : outer->width(), true);
   return outer;
 }
 
 void Frontend::renderConfig() {
+  auto formatWrappableStatus = [](const QString &raw) {
+    QString out;
+    out.reserve(raw.size() + 16);
+    for (int i = 0; i < raw.size(); ++i) {
+      const QChar ch = raw[i];
+      out.append(ch);
+      if ((ch == QLatin1Char('.') || ch == QLatin1Char('/')) &&
+          i + 1 < raw.size() && !raw[i + 1].isSpace())
+        out.append(QChar(0x200B));
+    }
+    return out;
+  };
   auto updateShortcutDot = [this](const QString &statusText) {
     if (!shortcutDot)
       return;
-    if (statusText.contains("ready", Qt::CaseInsensitive))
-      shortcutDot->setColor(QColor(0x27, 0xAE, 0x60));
-    else if (statusText.contains("Checking", Qt::CaseInsensitive))
+    const bool hasFailure =
+        statusText.contains("unavailable", Qt::CaseInsensitive) ||
+        statusText.contains("failed", Qt::CaseInsensitive) ||
+        statusText.contains("error", Qt::CaseInsensitive) ||
+        statusText.contains("fallback", Qt::CaseInsensitive) ||
+        statusText.contains("unable", Qt::CaseInsensitive) ||
+        statusText.contains("configure", Qt::CaseInsensitive) ||
+        statusText.contains("not running", Qt::CaseInsensitive) ||
+        statusText.contains("disconnected", Qt::CaseInsensitive);
+    const bool hasActive =
+        statusText.contains("ready", Qt::CaseInsensitive) ||
+        statusText.contains("GlobalShortcuts", Qt::CaseInsensitive) ||
+        statusText.contains("bindings:", Qt::CaseInsensitive);
+    if (statusText.contains("Checking", Qt::CaseInsensitive))
       shortcutDot->setColor(QColor(0xF6, 0x74, 0x00));
+    else if (hasActive && !hasFailure)
+      shortcutDot->setColor(QColor(0x27, 0xAE, 0x60));
     else
-      shortcutDot->setColor(palette().color(QPalette::Mid));
+      shortcutDot->setColor(StatusDot::neutralColor(palette()));
+  };
+  auto updateConfigStatusIcon = [this](bool isError) {
+    if (!configStatusIcon)
+      return;
+    QIcon icon = isError
+                     ? themedIcon({"dialog-error", "dialog-error-symbolic",
+                                   "data-error"},
+                                  QStyle::SP_MessageBoxCritical)
+                     : themedIcon({"dialog-information-symbolic",
+                                   "dialog-information"},
+                                  QStyle::SP_MessageBoxInformation);
+    configStatusIcon->setPixmap(icon.pixmap(QSize(16, 16), devicePixelRatioF()));
   };
   auto applyLimitErrorStyle = [this](bool invalid) {
     if (configLimit)
       configLimit->setInvalid(invalid);
   };
+  const bool hasLoadError = !state.value("load_error").isNull();
+  const bool statusIsError = hasLoadError || !str(state, "error").isEmpty();
   if (configSave) {
     limitInvalid = !limitErrorDismissed &&
                    str(state, "validation_field") == "history_limit";
-    configSave->setEnabled(state.value("load_error").isNull() &&
+    configSave->setEnabled(!hasLoadError &&
                            !state.value("busy").toBool() && !limitInvalid);
-    configRebind->setEnabled(!state.value("busy").toBool());
+    configRebind->setEnabled(!hasLoadError && !state.value("busy").toBool());
     const QString statusMsg =
         str(state, "validation_field").isEmpty() ? message() : QString();
     configStatus->setText(statusMsg);
     configStatus->setToolTip(str(state, "message_detail"));
     configStatus->setAccessibleDescription(str(state, "message_detail"));
+    updateConfigStatusIcon(statusIsError);
     if (configStatusBox)
       configStatusBox->setVisible(!statusMsg.isEmpty());
     const QString scStatus = str(state, "shortcut_status");
-    shortcutStatus->setText(scStatus);
+    shortcutStatus->setText(formatWrappableStatus(scStatus));
     shortcutStatus->setToolTip(str(state, "shortcut_status_detail"));
     shortcutStatus->setAccessibleDescription(
         str(state, "shortcut_status_detail"));
@@ -5616,8 +6346,8 @@ void Frontend::renderConfig() {
 
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
-  l->setContentsMargins(16, 12, 16, 12);
-  l->setSpacing(10);
+  l->setContentsMargins(16, 10, 16, 10);
+  l->setSpacing(8);
 
   const QFontMetrics fm = w->fontMetrics();
   int labelW = 0;
@@ -5688,7 +6418,7 @@ void Frontend::renderConfig() {
   // Section 1: History
   auto historySection = new QVBoxLayout;
   historySection->setContentsMargins(0, 0, 0, 0);
-  historySection->setSpacing(6);
+  historySection->setSpacing(5);
   historySection->addWidget(makeSectionHeading("History"));
 
   auto limitFieldBox = new QWidget(w);
@@ -5796,7 +6526,7 @@ void Frontend::renderConfig() {
   // Section 2: Picker & Clipboard
   auto pickerSection = new QVBoxLayout;
   pickerSection->setContentsMargins(0, 0, 0, 0);
-  pickerSection->setSpacing(6);
+  pickerSection->setSpacing(5);
   pickerSection->addWidget(makeSectionHeading("Picker & Clipboard"));
 
   auto zoom = spin("Picker zoom", configDraft.value("picker_zoom").toInt(), 1,
@@ -5837,7 +6567,7 @@ void Frontend::renderConfig() {
   // Section 3: Shortcuts & Startup
   auto shortcutSection = new QVBoxLayout;
   shortcutSection->setContentsMargins(0, 0, 0, 0);
-  shortcutSection->setSpacing(6);
+  shortcutSection->setSpacing(5);
   shortcutSection->addWidget(makeSectionHeading("Shortcuts & Startup"));
 
   auto addShortcutField = [&](const char *key, const QString &name,
@@ -5851,50 +6581,57 @@ void Frontend::renderConfig() {
   addShortcutField("pick_shortcut", "Pick shortcut", "Pick shortcut:");
   addShortcutField("history_shortcut", "History shortcut", "History shortcut:");
 
-  auto rebindRow = new QWidget(w);
-  auto rebindRowLayout = new QHBoxLayout(rebindRow);
-  rebindRowLayout->setContentsMargins(0, 0, 0, 0);
-  rebindRowLayout->setSpacing(10);
-  rebindRowLayout->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-
   configRebind =
       new QPushButton(themedIcon({"configure-shortcuts-symbolic",
                                   "configure-shortcuts", "view-refresh-symbolic",
                                   "view-refresh"},
                                  QStyle::SP_BrowserReload),
-                      "Rebind shortcuts", rebindRow);
+                      "Rebind shortcuts", w);
   configRebind->setAccessibleName("Rebind shortcuts");
   configRebind->setIconSize(QSize(16, 16));
   configRebind->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-  configRebind->setEnabled(!state.value("busy").toBool());
+  configRebind->setEnabled(!hasLoadError && !state.value("busy").toBool());
   connect(configRebind, &QPushButton::clicked, this,
           [this] { send({{"op", "rebind"}}); });
-  rebindRowLayout->addWidget(configRebind, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  addFormRow(shortcutSection, QString(), configRebind, configRebind);
 
-  auto scStatusContainer = new QWidget(rebindRow);
-  scStatusContainer->setSizePolicy(QSizePolicy::Expanding,
-                                   QSizePolicy::Preferred);
-  auto scStatusLayout = new QHBoxLayout(scStatusContainer);
-  scStatusLayout->setContentsMargins(0, 0, 0, 0);
-  scStatusLayout->setSpacing(6);
-  shortcutDot = new StatusDot(scStatusContainer);
+  auto scStatusRow = new QWidget(w);
+  scStatusRow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+  auto scStatusRowLayout = new QHBoxLayout(scStatusRow);
+  scStatusRowLayout->setContentsMargins(0, 0, 0, 0);
+  scStatusRowLayout->setSpacing(10);
+  scStatusRowLayout->addWidget(makeLabelSpacer(scStatusRow), 0, Qt::AlignTop);
+
+  auto scStatusInner = new QHBoxLayout;
+  scStatusInner->setContentsMargins(0, 0, 0, 0);
+  scStatusInner->setSpacing(6);
+  auto dotWrap = new QWidget(scStatusRow);
+  auto dotWrapLayout = new QVBoxLayout(dotWrap);
+  dotWrapLayout->setContentsMargins(0, qMax(0, (fm.height() - 8) / 2), 0, 0);
+  dotWrapLayout->setSpacing(0);
+  shortcutDot = new StatusDot(dotWrap);
   shortcutDot->setToolTip(str(state, "shortcut_status_detail"));
-  scStatusLayout->addWidget(shortcutDot, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  shortcutStatus = new QLabel(str(state, "shortcut_status"), scStatusContainer);
+  dotWrapLayout->addWidget(shortcutDot, 0, Qt::AlignTop | Qt::AlignLeft);
+  scStatusInner->addWidget(dotWrap, 0, Qt::AlignTop | Qt::AlignLeft);
+
+  const QString initialScStatus = str(state, "shortcut_status");
+  shortcutStatus =
+      new QLabel(formatWrappableStatus(initialScStatus), scStatusRow);
   shortcutStatus->setToolTip(str(state, "shortcut_status_detail"));
   shortcutStatus->setAccessibleDescription(
       str(state, "shortcut_status_detail"));
   shortcutStatus->setWordWrap(true);
   shortcutStatus->setTextFormat(Qt::PlainText);
+  shortcutStatus->setMinimumWidth(0);
+  shortcutStatus->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
   applyMuted(shortcutStatus, 170);
-  scStatusLayout->addWidget(shortcutStatus, 1);
-  shortcutStatusBox = scStatusContainer;
-  updateShortcutDot(shortcutStatus->text());
-  shortcutStatusBox->setVisible(!shortcutStatus->text().isEmpty());
-  rebindRowLayout->addWidget(shortcutStatusBox, 1, Qt::AlignVCenter);
+  scStatusInner->addWidget(shortcutStatus, 1);
+  scStatusRowLayout->addLayout(scStatusInner, 1);
 
-  addFormRow(shortcutSection, QString(), rebindRow, configRebind, true);
-  shortcutSection->addSpacing(4);
+  shortcutStatusBox = scStatusRow;
+  updateShortcutDot(initialScStatus);
+  shortcutStatusBox->setVisible(!initialScStatus.isEmpty());
+  shortcutSection->addWidget(shortcutStatusBox);
   addCheck(shortcutSection, "autostart", "Start automatically");
 
   l->addLayout(shortcutSection);
@@ -5912,13 +6649,10 @@ void Frontend::renderConfig() {
   auto statusInner = new QHBoxLayout;
   statusInner->setContentsMargins(14, 7, 14, 7);
   statusInner->setSpacing(8);
-  auto statusIcon = new QLabel(configStatusBox);
-  statusIcon->setPixmap(
-      themedIcon({"dialog-information-symbolic", "dialog-information"},
-                 QStyle::SP_MessageBoxInformation)
-          .pixmap(QSize(16, 16), devicePixelRatioF()));
-  statusIcon->setFixedSize(16, 16);
-  statusInner->addWidget(statusIcon, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  configStatusIcon = new QLabel(configStatusBox);
+  configStatusIcon->setFixedSize(16, 16);
+  updateConfigStatusIcon(statusIsError);
+  statusInner->addWidget(configStatusIcon, 0, Qt::AlignLeft | Qt::AlignVCenter);
   const QString initialStatus =
       str(state, "validation_field").isEmpty() ? message() : QString();
   configStatus = new QLabel(initialStatus, configStatusBox);
@@ -5945,11 +6679,11 @@ void Frontend::renderConfig() {
       "Save", footer);
   saveBtn->setAccessibleName("Save settings");
   saveBtn->setIconSize(QSize(16, 16));
-  saveBtn->setEnabled(state.value("load_error").isNull() &&
-                      !state.value("busy").toBool() && !limitInvalid);
+  saveBtn->setEnabled(!hasLoadError && !state.value("busy").toBool() &&
+                      !limitInvalid);
   connect(saveBtn, &QPushButton::clicked, this, [this] {
     limitErrorDismissed = false;
-    send({{"op", "save"}, {"config", configDraft}});
+    send({{"op", "save"}, {"config", configDraft}}, true);
     if (str(state, "validation_field") == "history_limit") {
       configLimit->setFocus();
       configScroll->ensureWidgetVisible(configLimit);
@@ -5973,12 +6707,9 @@ void Frontend::renderConfig() {
 }
 void Frontend::renderHistory() {
   historyButtons.clear();
-  auto popup = new QFrame;
-  popup->setFrameShape(QFrame::StyledPanel);
-  popup->setFrameShadow(QFrame::Plain);
-  popup->setLineWidth(1);
+  auto popup = new PopupFrame;
   auto popupLayout = new QVBoxLayout(popup);
-  popupLayout->setContentsMargins(0, 0, 0, 0);
+  popupLayout->setContentsMargins(1, 1, 1, 1);
   popupLayout->setSpacing(0);
 
   auto header = new QWidget(popup);
@@ -6017,22 +6748,10 @@ void Frontend::renderHistory() {
     l->setContentsMargins(16, 18, 16, 18);
     l->setSpacing(6);
     l->addStretch(1);
-    QIcon histIcon = themedIcon(
-        {"view-history-symbolic", "view-history", "document-open-recent"},
-        QStyle::SP_FileDialogListView);
-    if (!histIcon.isNull()) {
-      const int iconSz = 22;
-      QPixmap raw = histIcon.pixmap(QSize(iconSz, iconSz), devicePixelRatioF());
-      QPixmap tinted(raw.size());
-      tinted.setDevicePixelRatio(raw.devicePixelRatio());
-      tinted.fill(Qt::transparent);
-      QPainter tp(&tinted);
-      tp.drawPixmap(0, 0, raw);
-      tp.setCompositionMode(QPainter::CompositionMode_SourceIn);
-      tp.fillRect(tinted.rect(), mutedColor(palette(), 115));
-      tp.end();
+    QPixmap emptyIcon = makeEmptyHistoryIcon(22, 115);
+    if (!emptyIcon.isNull()) {
       auto iconLabel = new QLabel(w);
-      iconLabel->setPixmap(tinted);
+      iconLabel->setPixmap(emptyIcon);
       iconLabel->setAlignment(Qt::AlignCenter);
       l->addWidget(iconLabel, 0, Qt::AlignHCenter);
     }
@@ -6051,12 +6770,15 @@ void Frontend::renderHistory() {
     auto grid = new QGridLayout;
     grid->setContentsMargins(10, 10, 10, 10);
     grid->setSpacing(6);
+    for (int col = 0; col < columns; ++col)
+      grid->setColumnStretch(col, 1);
     int index = 0;
     for (auto value : entries) {
       auto o = value.toObject();
       auto b = new Swatch(color(str(o, "color")), str(o, "text"), w);
       b->setTileMode(true, false);
       b->setMinimumSize(104, 42);
+      b->setFixedHeight(42);
       b->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
       b->setToolTip(str(o, "detail"));
       b->installEventFilter(this);
@@ -6078,18 +6800,71 @@ void Frontend::renderHistory() {
     l->addLayout(grid);
     l->addStretch(1);
   }
-  auto error = new QLabel(str(state, "error"), w);
-  error->setWordWrap(true);
-  error->setContentsMargins(10, 0, 10, 10);
-  error->setVisible(!error->text().isEmpty());
-  l->addWidget(error);
 
-  auto sc = scroll(w);
-  sc->setMinimumSize(
-      qMin(900, columns * 110 + 20),
-      entries.isEmpty() ? 110 : qMin(650, rows * 48 + 24));
+  auto sc = static_cast<QScrollArea *>(scroll(w));
+  historyScroll = sc;
+  const int actualRows =
+      entries.isEmpty() ? 0 : (entries.size() + columns - 1) / columns;
+  const int visibleRows = qMin(actualRows, rows);
+  const int gridVerticalPad = actualRows > rows ? 16 : 20;
+  const int naturalGridH =
+      visibleRows * 42 + qMax(0, visibleRows - 1) * 6 + gridVerticalPad;
+  const bool needsVScroll =
+      !entries.isEmpty() && (actualRows > rows || naturalGridH > 650);
+  const int contentW = columns * 104 + qMax(0, columns - 1) * 6 + 20;
+  const int vbarW = needsVScroll
+                        ? sc->style()->pixelMetric(QStyle::PM_ScrollBarExtent,
+                                                   nullptr, sc)
+                        : 0;
+  const int headerMinW = header->sizeHint().width();
+  const int naturalW = qMax(contentW + vbarW, headerMinW);
+  const int targetW = qMin(900, naturalW);
+  const bool needsHScroll = naturalW > 900;
+  const int hbarH = needsHScroll
+                        ? sc->style()->pixelMetric(QStyle::PM_ScrollBarExtent,
+                                                   nullptr, sc)
+                        : 0;
+  const int targetH =
+      entries.isEmpty() ? 110 : qMin(650, naturalGridH + hbarH);
+  sc->setHorizontalScrollBarPolicy(needsHScroll ? Qt::ScrollBarAsNeeded
+                                                : Qt::ScrollBarAlwaysOff);
+  sc->setVerticalScrollBarPolicy(needsVScroll ? Qt::ScrollBarAsNeeded
+                                              : Qt::ScrollBarAlwaysOff);
+  sc->setFixedSize(targetW, targetH);
   popupLayout->addWidget(sc, 1);
+
+  const QString errText = str(state, "error");
+  if (!errText.isEmpty()) {
+    popupLayout->addWidget(new Hairline(popup));
+    auto errContainer = new QWidget(popup);
+    errContainer->setObjectName("historyErrorBanner");
+    auto errLayout = new QHBoxLayout(errContainer);
+    errLayout->setContentsMargins(10, 7, 10, 7);
+    errLayout->setSpacing(7);
+    auto errIcon = new QLabel(errContainer);
+    errIcon->setPixmap(
+        themedIcon({"dialog-error", "dialog-error-symbolic", "data-error"},
+                   QStyle::SP_MessageBoxCritical)
+            .pixmap(QSize(16, 16), devicePixelRatioF()));
+    errIcon->setFixedSize(16, 16);
+    errLayout->addWidget(errIcon, 0, Qt::AlignLeft | Qt::AlignVCenter);
+    auto error = new QLabel(errText, errContainer);
+    error->setWordWrap(true);
+    error->setTextFormat(Qt::PlainText);
+    error->setMinimumWidth(0);
+    error->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    if (palette().color(QPalette::Window).lightness() >= 128) {
+      QPalette errPal = error->palette();
+      errPal.setColor(QPalette::WindowText, QColor(0xA6, 0x1D, 0x2B));
+      errPal.setColor(QPalette::Text, QColor(0xA6, 0x1D, 0x2B));
+      error->setPalette(errPal);
+    }
+    errLayout->addWidget(error, 1);
+    popupLayout->addWidget(errContainer);
+  }
+
   replace(popup);
+  adjustSize();
   if (!historyButtons.isEmpty())
     historyButtons.first()->setFocus();
 }

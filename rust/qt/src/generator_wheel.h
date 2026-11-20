@@ -43,7 +43,8 @@ class GeneratorWheel : public QWidget {
       s = qBound(0.0, selected.hsvSaturationF() + next.y() - old.y(), 1.0);
     }
     lastDrag = point;
-    selected.setHsvF(h, s, selected.valueF(), selected.alphaF());
+    const double value = selected.valueF() <= 0.0 ? 1.0 : selected.valueF();
+    selected.setHsvF(h, s, value, selected.alphaF());
     update();
     changed(selected);
   }
@@ -100,14 +101,24 @@ protected:
     p.setPen(QPen(darkSurface ? QColor(255, 255, 255, 65) : QColor(0, 0, 0, 68), 1.0));
     p.setBrush(Qt::NoBrush);
     p.drawEllipse(r.adjusted(0.5, 0.5, -0.5, -0.5));
-    QColor spoke = palette().color(QPalette::Text);
-    spoke.setAlpha(125);
-    p.setPen(QPen(spoke, 1.0));
-    for (const auto &c : colors) p.drawLine(r.center(), marker(c));
+    // The wheel interior is always bright (V = 1.0, white center), so spokes
+    // use dark ink with a subtle light halo regardless of light/dark UI theme.
+    const QColor spokeHalo(255, 255, 255, 110);
+    const QColor spokeInk(20, 24, 28, 155);
+    for (const auto &c : colors) {
+      const QPointF pt = marker(c);
+      p.setPen(QPen(spokeHalo, 2.4, Qt::SolidLine, Qt::RoundCap));
+      p.drawLine(r.center(), pt);
+      p.setPen(QPen(spokeInk, 1.15, Qt::SolidLine, Qt::RoundCap));
+      p.drawLine(r.center(), pt);
+    }
     const QPointF basePoint = marker(selected);
     if (QLineF(r.center(), basePoint).length() > 1.0) {
-      QColor baseSpoke = darkSurface ? QColor(255, 255, 255, 165) : QColor(0, 0, 0, 145);
-      QPen dashPen(baseSpoke, 1.0, Qt::DashLine);
+      QPen dashHalo(QColor(255, 255, 255, 130), 2.4, Qt::DashLine, Qt::RoundCap);
+      dashHalo.setDashPattern({3.0, 3.0});
+      p.setPen(dashHalo);
+      p.drawLine(r.center(), basePoint);
+      QPen dashPen(QColor(20, 24, 28, 195), 1.2, Qt::DashLine, Qt::RoundCap);
       dashPen.setDashPattern({3.0, 3.0});
       p.setPen(dashPen);
       p.drawLine(r.center(), basePoint);
@@ -168,6 +179,7 @@ protected:
     else if (e->key() == Qt::Key_Up) s = qMin(255, s + 3);
     else if (e->key() == Qt::Key_Down) s = qMax(0, s - 3);
     else { QWidget::keyPressEvent(e); return; }
-    selected.setHsv(h, s, selected.value(), selected.alpha()); update(); changed(selected);
+    const int value = selected.value() <= 0 ? 255 : selected.value();
+    selected.setHsv(h, s, value, selected.alpha()); update(); changed(selected);
   }
 };
