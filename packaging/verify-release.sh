@@ -25,8 +25,32 @@ for name in swatch-board-picker swatch-board-tray swatch-board-history \
 done
 "$bin/swatch-board-picker" --version | grep -Fx "Swatch Board Picker 0.1.0"
 "$bin/swatch-board-picker" --help >/dev/null
-rust_license_dir=${RUST_LICENSE_DIR:-"$(rustc --print sysroot)/share/doc/rust"}
-python3 - "$stage" "$root" "$rust_license_dir" <<'PY'
+rust_license_dir=${RUST_LICENSE_DIR:-}
+rust_copyright=''
+rust_licenses_dir=''
+if [[ -n $rust_license_dir ]]; then
+    rust_copyright="$rust_license_dir/COPYRIGHT-library.html"
+    rust_licenses_dir="$rust_license_dir/licenses"
+else
+    rust_sysroot=$(rustc --print sysroot)
+    while [[ $rust_sysroot != / && $rust_sysroot == */ ]]; do rust_sysroot=${rust_sysroot%/}; done
+    if [[ -s $rust_sysroot/share/doc/rust/COPYRIGHT-library.html && -s $rust_sysroot/share/doc/rust/licenses/MIT.txt && -s $rust_sysroot/share/doc/rust/licenses/Apache-2.0.txt ]]; then
+        rust_copyright="$rust_sysroot/share/doc/rust/COPYRIGHT-library.html"
+        rust_licenses_dir="$rust_sysroot/share/doc/rust/licenses"
+    else
+        if [[ -s $rust_sysroot/share/licenses/rust/COPYRIGHT-library.html.rustc ]]; then
+            rust_copyright="$rust_sysroot/share/licenses/rust/COPYRIGHT-library.html.rustc"
+        elif [[ -s $rust_sysroot/share/licenses/rust/COPYRIGHT-library.html ]]; then
+            rust_copyright="$rust_sysroot/share/licenses/rust/COPYRIGHT-library.html"
+        fi
+        rust_licenses_dir="$rust_sysroot/share/doc/rustc/licenses"
+    fi
+fi
+[[ -n $rust_copyright && -s $rust_copyright && -s $rust_licenses_dir/MIT.txt && -s $rust_licenses_dir/Apache-2.0.txt ]] || {
+    printf '%s\n' 'Missing Rust standard library notices for release verification.' >&2
+    exit 1
+}
+python3 - "$stage" "$root" "$rust_copyright" "$rust_licenses_dir" <<'PY'
 import json
 from pathlib import Path
 import subprocess
@@ -34,7 +58,8 @@ import sys
 
 prefix = Path(sys.argv[1]) / "usr"
 source = Path(sys.argv[2])
-rust_source = Path(sys.argv[3])
+rust_copyright = Path(sys.argv[3])
+rust_licenses = Path(sys.argv[4])
 # Check all shipped plugin/schema bytes, not merely their directory names.
 for category in ("plugins", "schemas"):
     original = source / category
@@ -51,11 +76,15 @@ if (prefix / "share/licenses/swatch-board/LICENSE").read_bytes() != (source / "L
 if (prefix / "share/licenses/swatch-board/THIRD_PARTY_NOTICES.txt").read_bytes() != (source / "THIRD_PARTY_NOTICES.txt").read_bytes():
     raise RuntimeError("installed third-party notices differ")
 rust_installed = prefix / "share/licenses/swatch-board/rust-standard-library"
-for relative in [Path("COPYRIGHT-library.html"), *(
-    p.relative_to(rust_source) for p in (rust_source / "licenses").rglob("*") if p.is_file()
-)]:
-    if (rust_installed / relative).read_bytes() != (rust_source / relative).read_bytes():
-        raise RuntimeError(f"installed Rust notice differs: {relative}")
+if (rust_installed / "COPYRIGHT-library.html").read_bytes() != rust_copyright.read_bytes():
+    raise RuntimeError("installed Rust notice differs: COPYRIGHT-library.html")
+expected_rust = {p.relative_to(rust_licenses) for p in rust_licenses.rglob("*") if p.is_file()}
+actual_rust = {p.relative_to(rust_installed / "licenses") for p in (rust_installed / "licenses").rglob("*") if p.is_file()}
+if actual_rust != expected_rust:
+    raise RuntimeError(f"installed Rust licenses inventory mismatch: {actual_rust ^ expected_rust}")
+for relative in expected_rust:
+    if (rust_installed / "licenses" / relative).read_bytes() != (rust_licenses / relative).read_bytes():
+        raise RuntimeError(f"installed Rust notice differs: licenses/{relative}")
 for name in ("ghostty", "zed", "kde", "example-terminal"):
     plugin = prefix / "share/swatch-board/plugins" / name
     manifest = json.loads((plugin / "manifest.json").read_text())

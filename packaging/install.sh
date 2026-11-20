@@ -68,14 +68,37 @@ fi
 # Rust's standard library is linked into the executables and has notices outside
 # Cargo.lock. Use the documentation from the *same* toolchain used to build.
 rust_license_dir=${RUST_LICENSE_DIR:-}
-if [[ -z $rust_license_dir ]]; then
+rust_copyright=''
+rust_licenses_subdir=''
+if [[ -n $rust_license_dir ]]; then
+    rust_copyright="$rust_license_dir/COPYRIGHT-library.html"
+    rust_licenses_subdir="$rust_license_dir/licenses"
+    [[ -s $rust_copyright && -s $rust_licenses_subdir/MIT.txt && -s $rust_licenses_subdir/Apache-2.0.txt ]] || {
+        printf 'Missing Rust standard library notices in %s\n' "$rust_license_dir" >&2
+        exit 1
+    }
+else
     command -v rustc >/dev/null || { printf '%s\n' 'Set RUST_LICENSE_DIR to the build toolchain share/doc/rust directory.' >&2; exit 1; }
-    rust_license_dir="$(rustc --print sysroot)/share/doc/rust"
+    rust_sysroot=$(rustc --print sysroot)
+    while [[ $rust_sysroot != / && $rust_sysroot == */ ]]; do rust_sysroot=${rust_sysroot%/}; done
+    if [[ -s $rust_sysroot/share/doc/rust/COPYRIGHT-library.html && -s $rust_sysroot/share/doc/rust/licenses/MIT.txt && -s $rust_sysroot/share/doc/rust/licenses/Apache-2.0.txt ]]; then
+        rust_copyright="$rust_sysroot/share/doc/rust/COPYRIGHT-library.html"
+        rust_licenses_subdir="$rust_sysroot/share/doc/rust/licenses"
+    else
+        # Arch Linux's official `rust` package splits the notice file and license texts.
+        if [[ -s $rust_sysroot/share/licenses/rust/COPYRIGHT-library.html.rustc ]]; then
+            rust_copyright="$rust_sysroot/share/licenses/rust/COPYRIGHT-library.html.rustc"
+        elif [[ -s $rust_sysroot/share/licenses/rust/COPYRIGHT-library.html ]]; then
+            rust_copyright="$rust_sysroot/share/licenses/rust/COPYRIGHT-library.html"
+        fi
+        rust_licenses_subdir="$rust_sysroot/share/doc/rustc/licenses"
+        [[ -n $rust_copyright && -s $rust_copyright && -s $rust_licenses_subdir/MIT.txt && -s $rust_licenses_subdir/Apache-2.0.txt ]] || {
+            printf 'Missing Rust standard library notices in %s/share/doc/rust (or %s/share/licenses/rust and %s/share/doc/rustc/licenses)\n' \
+                "$rust_sysroot" "$rust_sysroot" "$rust_sysroot" >&2
+            exit 1
+        }
+    fi
 fi
-[[ -s $rust_license_dir/COPYRIGHT-library.html && -s $rust_license_dir/licenses/MIT.txt && -s $rust_license_dir/licenses/Apache-2.0.txt ]] || {
-    printf 'Missing Rust standard library notices in %s\n' "$rust_license_dir" >&2
-    exit 1
-}
 
 install -d "$destdir$prefix/bin" "$destdir$prefix/share/applications" \
     "$destdir$prefix/share/icons/hicolor/scalable/apps" "$destdir$prefix/share/metainfo" \
@@ -92,9 +115,9 @@ install -m 644 "$root/share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.
     "$destdir$prefix/share/metainfo/org.apartment38.SwatchBoard.Board.metainfo.xml"
 install -m 644 "$root/LICENSE" "$destdir$prefix/share/licenses/swatch-board/LICENSE"
 install -m 644 "$root/THIRD_PARTY_NOTICES.txt" "$destdir$prefix/share/licenses/swatch-board/THIRD_PARTY_NOTICES.txt"
-install -d "$destdir$prefix/share/licenses/swatch-board/rust-standard-library"
-install -m 644 "$rust_license_dir/COPYRIGHT-library.html" "$destdir$prefix/share/licenses/swatch-board/rust-standard-library/COPYRIGHT-library.html"
-cp -R "$rust_license_dir/licenses" "$destdir$prefix/share/licenses/swatch-board/rust-standard-library/"
+install -d "$destdir$prefix/share/licenses/swatch-board/rust-standard-library/licenses"
+install -m 644 "$rust_copyright" "$destdir$prefix/share/licenses/swatch-board/rust-standard-library/COPYRIGHT-library.html"
+cp -R "$rust_licenses_subdir/." "$destdir$prefix/share/licenses/swatch-board/rust-standard-library/licenses/"
 chmod -R a+rX "$destdir$prefix/share/licenses/swatch-board/rust-standard-library"
 install -d "$destdir$prefix/share/swatch-board/plugins" "$destdir$prefix/share/swatch-board/schemas"
 cp -R "$root/plugins/." "$destdir$prefix/share/swatch-board/plugins/"

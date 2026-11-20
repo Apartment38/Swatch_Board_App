@@ -32,14 +32,41 @@ class InstallerTests(unittest.TestCase):
         (self.rust_notices / "licenses/MIT.txt").write_text("test license")
         (self.rust_notices / "licenses/Apache-2.0.txt").write_text("test Apache license")
 
-    def install(self):
+    def install(self, env_overrides=None, omit_rust_license_dir=False):
+        env = {
+            **os.environ,
+            "PREFIX": "/usr/local",
+            "DESTDIR": str(self.stage),
+            "BINDIR": str(self.bindir),
+            "EFFECT_LIB": str(self.effect),
+            "QT_PLUGIN_DIR": "/opt/qt/plugins",
+        }
+        if omit_rust_license_dir:
+            env.pop("RUST_LICENSE_DIR", None)
+        else:
+            env["RUST_LICENSE_DIR"] = str(self.rust_notices)
+        if env_overrides:
+            env.update(env_overrides)
         return subprocess.run(
             ["bash", str(ROOT / "packaging/install.sh")],
-            env={**os.environ, "PREFIX": "/usr/local", "DESTDIR": str(self.stage),
-                 "BINDIR": str(self.bindir), "RUST_LICENSE_DIR": str(self.rust_notices),
-                 "EFFECT_LIB": str(self.effect), "QT_PLUGIN_DIR": "/opt/qt/plugins"},
+            env=env,
             capture_output=True, text=True, check=False,
         )
+
+    def make_fake_rustc_path(self, sysroot: Path) -> str:
+        fake_bin = self.root / f"fake-rustc-{sysroot.name}"
+        fake_bin.mkdir(exist_ok=True)
+        rustc = fake_bin / "rustc"
+        rustc.write_text(
+            "#!/bin/sh\n"
+            "if [ \"$1\" = \"--print\" ] && [ \"$2\" = \"sysroot\" ]; then\n"
+            f"  printf '%s\\n' \"{sysroot}\"\n"
+            "  exit 0\n"
+            "fi\n"
+            "exit 1\n"
+        )
+        rustc.chmod(0o755)
+        return f"{fake_bin}:{os.environ.get('PATH', '')}"
 
     def test_installs_required_worker_without_desktop_launcher(self):
         result = self.install()
@@ -93,6 +120,107 @@ class InstallerTests(unittest.TestCase):
         result = self.install()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Missing KWin effect", result.stderr)
+        self.assertFalse(self.stage.exists())
+
+    def test_arch_distro_rust_sysroot_layout_installs_licenses(self):
+        sysroot = self.root / "arch-sysroot"
+        (sysroot / "share/licenses/rust").mkdir(parents=True)
+        (sysroot / "share/doc/rustc/licenses").mkdir(parents=True)
+        (sysroot / "share/licenses/rust/COPYRIGHT-library.html.rustc").write_text(
+            "arch rust stdlib copyright"
+        )
+        (sysroot / "share/doc/rustc/licenses/MIT.txt").write_text("arch MIT text")
+        (sysroot / "share/doc/rustc/licenses/Apache-2.0.txt").write_text("arch Apache text")
+        (sysroot / "share/doc/rustc/licenses/Unicode-3.0.txt").write_text("arch Unicode text")
+
+        result = self.install(
+            env_overrides={"PATH": self.make_fake_rustc_path(sysroot)},
+            omit_rust_license_dir=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        installed_rust = self.stage / "usr/local/share/licenses/swatch-board/rust-standard-library"
+        self.assertEqual(
+            (installed_rust / "COPYRIGHT-library.html").read_text(),
+            "arch rust stdlib copyright",
+        )
+        self.assertEqual((installed_rust / "licenses/MIT.txt").read_text(), "arch MIT text")
+        self.assertEqual(
+            (installed_rust / "licenses/Apache-2.0.txt").read_text(),
+            "arch Apache text",
+        )
+        self.assertEqual(
+            (installed_rust / "licenses/Unicode-3.0.txt").read_text(),
+            "arch Unicode text",
+        )
+
+    def test_arch_distro_rust_sysroot_layout_without_rustc_suffix(self):
+        sysroot = self.root / "arch-sysroot-plain"
+        (sysroot / "share/licenses/rust").mkdir(parents=True)
+        (sysroot / "share/doc/rustc/licenses").mkdir(parents=True)
+        (sysroot / "share/licenses/rust/COPYRIGHT-library.html").write_text(
+            "plain arch copyright"
+        )
+        (sysroot / "share/doc/rustc/licenses/MIT.txt").write_text("plain MIT")
+        (sysroot / "share/doc/rustc/licenses/Apache-2.0.txt").write_text("plain Apache")
+
+        result = self.install(
+            env_overrides={"PATH": self.make_fake_rustc_path(sysroot)},
+            omit_rust_license_dir=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        installed_rust = self.stage / "usr/local/share/licenses/swatch-board/rust-standard-library"
+        self.assertEqual(
+            (installed_rust / "COPYRIGHT-library.html").read_text(),
+            "plain arch copyright",
+        )
+        self.assertEqual((installed_rust / "licenses/MIT.txt").read_text(), "plain MIT")
+
+    def test_standard_rustup_sysroot_layout_auto_discovery(self):
+        sysroot = self.root / "rustup-sysroot"
+        (sysroot / "share/doc/rust/licenses").mkdir(parents=True)
+        (sysroot / "share/doc/rust/COPYRIGHT-library.html").write_text("rustup copyright")
+        (sysroot / "share/doc/rust/licenses/MIT.txt").write_text("rustup MIT")
+        (sysroot / "share/doc/rust/licenses/Apache-2.0.txt").write_text("rustup Apache")
+
+        result = self.install(
+            env_overrides={"PATH": self.make_fake_rustc_path(sysroot)},
+            omit_rust_license_dir=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        installed_rust = self.stage / "usr/local/share/licenses/swatch-board/rust-standard-library"
+        self.assertEqual(
+            (installed_rust / "COPYRIGHT-library.html").read_text(),
+            "rustup copyright",
+        )
+        self.assertEqual((installed_rust / "licenses/MIT.txt").read_text(), "rustup MIT")
+
+    def test_explicit_invalid_rust_license_dir_does_not_fallback_to_sysroot(self):
+        sysroot = self.root / "arch-sysroot-valid"
+        (sysroot / "share/licenses/rust").mkdir(parents=True)
+        (sysroot / "share/doc/rustc/licenses").mkdir(parents=True)
+        (sysroot / "share/licenses/rust/COPYRIGHT-library.html.rustc").write_text("valid")
+        (sysroot / "share/doc/rustc/licenses/MIT.txt").write_text("MIT")
+        (sysroot / "share/doc/rustc/licenses/Apache-2.0.txt").write_text("Apache")
+
+        result = self.install(
+            env_overrides={
+                "PATH": self.make_fake_rustc_path(sysroot),
+                "RUST_LICENSE_DIR": str(self.root / "does-not-exist"),
+            },
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Missing Rust standard library notices", result.stderr)
+        self.assertFalse(self.stage.exists())
+
+    def test_empty_sysroot_fails_before_writing_stage(self):
+        sysroot = self.root / "empty-sysroot"
+        sysroot.mkdir()
+        result = self.install(
+            env_overrides={"PATH": self.make_fake_rustc_path(sysroot)},
+            omit_rust_license_dir=True,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Missing Rust standard library notices", result.stderr)
         self.assertFalse(self.stage.exists())
 
 
