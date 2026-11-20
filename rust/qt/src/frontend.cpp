@@ -141,6 +141,95 @@ protected:
   }
 };
 
+class NavToolButton : public QToolButton {
+public:
+  explicit NavToolButton(QWidget *parent = nullptr) : QToolButton(parent) {
+    setAutoRaise(true);
+    setFocusPolicy(Qt::NoFocus);
+    setAttribute(Qt::WA_Hover, true);
+    setMinimumWidth(0);
+    setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Preferred);
+  }
+  QSize sizeHint() const override {
+    ensurePolished();
+    const bool showText =
+        toolButtonStyle() != Qt::ToolButtonIconOnly && !text().isEmpty();
+    const QSize iconSz = icon().isNull() ? QSize(0, 0) : iconSize();
+    const int textW = showText ? fontMetrics().horizontalAdvance(text()) : 0;
+    const int textH = showText ? fontMetrics().height() : 0;
+    const int gap = (!icon().isNull() && showText) ? 5 : 0;
+    const int padX = showText ? 8 : 6;
+    const int padY = 4;
+    const int w = iconSz.width() + gap + textW + 2 * padX;
+    const int h = qMax(iconSz.height(), textH) + 2 * padY;
+    return QSize(w, h);
+  }
+  QSize minimumSizeHint() const override { return sizeHint(); }
+
+protected:
+  void paintEvent(QPaintEvent *) override {
+    QStyleOptionToolButton opt;
+    initStyleOption(&opt);
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    const bool checked = isChecked();
+    const bool pressed = isDown();
+    const bool hovered = (opt.state & QStyle::State_MouseOver) && isEnabled();
+    const QColor hi = palette().color(QPalette::Highlight);
+    const QColor fg = palette().color(
+        isEnabled() ? QPalette::Active : QPalette::Disabled,
+        QPalette::WindowText);
+
+    const QRectF pill = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+    if (checked) {
+      QColor fill = hi;
+      fill.setAlpha(pressed ? 62 : (hovered ? 56 : 42));
+      QColor border = hi;
+      border.setAlpha(pressed ? 215 : (hovered ? 205 : 185));
+      p.setBrush(fill);
+      p.setPen(QPen(border, 1.0));
+      p.drawRoundedRect(pill, 3.5, 3.5);
+    } else if (pressed) {
+      QColor fill = fg;
+      fill.setAlpha(24);
+      p.setBrush(fill);
+      p.setPen(Qt::NoPen);
+      p.drawRoundedRect(pill, 3.5, 3.5);
+    } else if (hovered) {
+      QColor fill = fg;
+      fill.setAlpha(14);
+      p.setBrush(fill);
+      p.setPen(Qt::NoPen);
+      p.drawRoundedRect(pill, 3.5, 3.5);
+    }
+
+    const bool showText =
+        toolButtonStyle() != Qt::ToolButtonIconOnly && !text().isEmpty();
+    const QSize iconSz = icon().isNull() ? QSize(0, 0) : iconSize();
+    const QFontMetrics fm = fontMetrics();
+    const int textW = showText ? fm.horizontalAdvance(text()) : 0;
+    const int gap = (!icon().isNull() && showText) ? 5 : 0;
+    const int contentW = iconSz.width() + gap + textW;
+    const int startX = (width() - contentW) / 2;
+
+    if (!icon().isNull()) {
+      const QRect iconRect(startX, (height() - iconSz.height()) / 2,
+                           iconSz.width(), iconSz.height());
+      const QIcon::Mode mode =
+          !isEnabled() ? QIcon::Disabled : QIcon::Normal;
+      const QIcon::State iconState = checked ? QIcon::On : QIcon::Off;
+      icon().paint(&p, iconRect, Qt::AlignCenter, mode, iconState);
+    }
+    if (showText) {
+      const QRect textRect(startX + iconSz.width() + gap, 0, textW + 2,
+                           height());
+      p.setPen(fg);
+      p.drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, text());
+    }
+  }
+};
+
 class Swatch : public QPushButton {
   QColor c;
   QPoint start;
@@ -810,40 +899,9 @@ class Frontend : public QWidget {
     return QStringLiteral("%1 swatches in palette").arg(count);
   }
   void updateNavButtonStyles() {
-    if (!mainToolbar || navButtons.isEmpty())
-      return;
-    const QColor hi = mainToolbar->palette().color(QPalette::Highlight);
-    const auto rgba = [](const QColor &c, int alpha) {
-      return QStringLiteral("rgba(%1, %2, %3, %4)")
-          .arg(c.red())
-          .arg(c.green())
-          .arg(c.blue())
-          .arg(alpha);
-    };
-    const QString css = QStringLiteral(
-                            "QToolButton {"
-                            "  background-color: transparent;"
-                            "  border: 1px solid transparent;"
-                            "  border-radius: 3px;"
-                            "  padding: 3px 6px;"
-                            "}"
-                            "QToolButton:hover {"
-                            "  background-color: %1;"
-                            "  border: 1px solid %2;"
-                            "}"
-                            "QToolButton:checked {"
-                            "  background-color: %3;"
-                            "  border: 1px solid %4;"
-                            "}"
-                            "QToolButton:checked:hover {"
-                            "  background-color: %5;"
-                            "  border: 1px solid %6;"
-                            "}")
-                            .arg(rgba(hi, 24), rgba(hi, 115), rgba(hi, 46),
-                                 rgba(hi, 191), rgba(hi, 64), rgba(hi, 215));
     for (const auto &btn : navButtons)
       if (btn)
-        btn->setStyleSheet(css);
+        btn->update();
   }
   void updateHistoryEmptyState(int panelW) {
     if (historyEmptyPrimary)
@@ -1164,7 +1222,8 @@ class Frontend : public QWidget {
       };
       for (const auto &entry : QList<NavEntry>{
                {"Mixer",
-                {"color-gradient-symbolic", "color-gradient"},
+                {"color-mode-black-white-symbolic", "color-mode-black-white",
+                 "dialog-fill-and-stroke-symbolic", "color-gradient"},
                 QStyle::SP_ComputerIcon,
                 Qt::Key_1},
                {"Palette",
@@ -1179,8 +1238,8 @@ class Frontend : public QWidget {
                 Qt::Key_3}}) {
         int index = pages.size();
         const QKeySequence shortcutSeq(Qt::CTRL | entry.key);
-        auto action = toolbar->addAction(
-            themedIcon(entry.icons, entry.fallback), entry.label);
+        auto *action = new QAction(themedIcon(entry.icons, entry.fallback),
+                                   entry.label, nav);
         action->setCheckable(true);
         action->setToolTip(entry.label + " (" +
                            shortcutSeq.toString(QKeySequence::NativeText) + ")");
@@ -1194,9 +1253,16 @@ class Frontend : public QWidget {
           if (tabs)
             tabs->setCurrentIndex(index);
         });
-        if (auto *btn =
-                qobject_cast<QToolButton *>(toolbar->widgetForAction(action)))
-          navButtons.append(btn);
+        auto *btn = new NavToolButton(toolbar);
+        btn->setDefaultAction(action);
+        btn->setIconSize(toolbar->iconSize());
+        btn->setToolButtonStyle(toolbar->toolButtonStyle());
+        connect(toolbar, &QToolBar::iconSizeChanged, btn,
+                &QToolButton::setIconSize);
+        connect(toolbar, &QToolBar::toolButtonStyleChanged, btn,
+                &QToolButton::setToolButtonStyle);
+        toolbar->addWidget(btn);
+        navButtons.append(btn);
         pages.append(action);
       }
       updateNavButtonStyles();
@@ -1250,6 +1316,8 @@ class Frontend : public QWidget {
           QStyle::SP_FileDialogDetailedView,
           [this] { send({{"op", "configure"}}); });
       settingsAction->setToolTip("Open Swatch Board settings");
+      for (auto *btn : toolbar->findChildren<QToolButton *>())
+        btn->setFocusPolicy(Qt::NoFocus);
       layout->addWidget(toolbar);
       layout->addWidget(new Hairline(outer));
       splitter = new QSplitter(Qt::Horizontal, outer);
@@ -1330,6 +1398,7 @@ class Frontend : public QWidget {
                 pinnedCurrent->setVisible(i == 0);
                 sizePinnedPalette();
                 pages[i]->setChecked(true);
+                updateNavButtonStyles();
                 clearToolbarFocus();
               });
       splitter->addWidget(content);
