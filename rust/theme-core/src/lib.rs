@@ -238,6 +238,27 @@ fn json_at<T: for<'de> Deserialize<'de>>(
 ) -> Result<T, String> {
     serde_json::from_slice(&read_at(root, path, limit)?).map_err(|e| format!("{path}: {e}"))
 }
+fn check_output_path_conflicts<'a>(paths: impl IntoIterator<Item = &'a str>) -> Result<(), String> {
+    let mut file_paths: BTreeSet<Vec<&'a OsStr>> = BTreeSet::new();
+    let mut dir_prefixes: BTreeSet<Vec<&'a OsStr>> = BTreeSet::new();
+    for path in paths {
+        let comps = parts(path)?;
+        if !file_paths.insert(comps.clone()) {
+            return Err(format!("duplicate output path: {path}"));
+        }
+        if dir_prefixes.contains(&comps) {
+            return Err(format!("conflicting output path: {path}"));
+        }
+        for len in 1..comps.len() {
+            let prefix = comps[..len].to_vec();
+            if file_paths.contains(&prefix) {
+                return Err(format!("conflicting output path: {path}"));
+            }
+            dir_prefixes.insert(prefix);
+        }
+    }
+    Ok(())
+}
 fn validate_manifest(m: &Manifest) -> Result<(), String> {
     if !ident(&m.id)
         || m.name.trim().is_empty()
@@ -252,18 +273,17 @@ fn validate_manifest(m: &Manifest) -> Result<(), String> {
     if m.outputs.is_empty() || m.outputs.len() > MAX_OUTPUTS {
         return Err("invalid output count".into());
     }
-    let mut paths = BTreeSet::new();
     for o in &m.outputs {
         parts(&o.path)?;
         parts(&o.template)?;
         if !o.template.starts_with("templates/")
             || !o.template.ends_with(".j2")
             || !matches!(o.format.as_str(), "ghostty" | "json" | "kde" | "text")
-            || !paths.insert(&o.path)
         {
             return Err(format!("invalid output declaration: {}", o.path));
         }
     }
+    check_output_path_conflicts(m.outputs.iter().map(|o| o.path.as_str()))?;
     Ok(())
 }
 fn discovery_roots() -> Vec<PathBuf> {
@@ -642,13 +662,12 @@ pub fn export(destination: &Path, files: &[RenderedFile], overwrite: bool) -> Re
     if files.is_empty() || files.len() > MAX_OUTPUTS {
         return Err("invalid output count".into());
     }
-    let mut seen = BTreeSet::new();
     for file in files {
-        if file.content.len() > OUTPUT_LIMIT || !seen.insert(&file.path) {
-            return Err("duplicate or oversized output".into());
+        if file.content.len() > OUTPUT_LIMIT {
+            return Err("oversized output".into());
         }
-        parts(&file.path)?;
     }
+    check_output_path_conflicts(files.iter().map(|f| f.path.as_str()))?;
     let root = open_root(destination)?;
     let mut staged: Vec<(File, String, String)> = Vec::new();
     let mut created_dirs: Vec<(File, CString)> = Vec::new();
@@ -1015,5 +1034,92 @@ mod tests {
             fs::read_to_string(t.0.join("existing.conf")).unwrap(),
             "keep"
         );
+    }
+
+    #[test]
+    fn rejects_conflicting_output_path_prefixes_in_manifest_and_export() {
+        // 1. load() rejects plugin manifests with directory-prefix output conflicts in either order.
+        for pair in [
+            ("a", "a/b"),
+            ("a/b", "a"),
+            ("sub/a", "sub/a/b"),
+            ("sub/a/b", "sub/a"),
+        ] {
+            let t = Temp::new();
+            t.fixture("background = {{ roles.background }}\n");
+            let mut manifest: serde_json::Value =
+                serde_json::from_slice(&fs::read(t.0.join("manifest.json")).unwrap()).unwrap();
+            manifest["outputs"] = serde_json::json!([
+                {"path": pair.0, "template": "templates/theme.j2", "format": "ghostty"},
+                {"path": pair.1, "template": "templates/theme.j2", "format": "ghostty"}
+            ]);
+            t.put("manifest.json", &serde_json::to_string(&manifest).unwrap());
+            assert!(
+                load(&t.0).is_err(),
+                "expected conflicting output paths {:?} to be rejected",
+                pair
+            );
+        }
+
+        // Non-conflicting sibling and string-prefix paths remain accepted.
+        let t = Temp::new();
+        t.fixture("background = {{ roles.background }}\n");
+        let mut manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(t.0.join("manifest.json")).unwrap()).unwrap();
+        manifest["outputs"] = serde_json::json!([
+            {"path": "sub/a", "template": "templates/theme.j2", "format": "ghostty"},
+            {"path": "sub/ab", "template": "templates/theme.j2", "format": "ghostty"},
+            {"path": "sub/b", "template": "templates/theme.j2", "format": "ghostty"}
+        ]);
+        t.put("manifest.json", &serde_json::to_string(&manifest).unwrap());
+        assert!(load(&t.0).is_ok());
+
+        // 2. export(dest, files, false) with ["sub/ok.conf", "a", "a/b"] fails upfront
+        //    and leaves dest completely empty (no leaked sub/ok.conf or sub/).
+        for conflict in [
+            ["sub/ok.conf", "a", "a/b"],
+            ["sub/ok.conf", "a/b", "a"],
+            ["sub/ok.conf", "nested/x", "nested/x/y"],
+        ] {
+            let t = Temp::new();
+            let dest = t.0.join("dest");
+            fs::create_dir(&dest).unwrap();
+            let files: Vec<RenderedFile> = conflict
+                .iter()
+                .map(|p| RenderedFile {
+                    path: (*p).into(),
+                    content: "background = #123456\n".into(),
+                })
+                .collect();
+            assert!(export(&dest, &files, false).is_err());
+            assert_eq!(
+                fs::read_dir(&dest).unwrap().count(),
+                0,
+                "export leaked files or directories for {:?}",
+                conflict
+            );
+        }
+
+        // 3. export(dest, files, true) with existing dest/existing.conf = "ORIGINAL" and
+        //    ["existing.conf", "a", "a/b"] fails upfront and leaves existing.conf untouched.
+        for conflict in [["existing.conf", "a", "a/b"], ["existing.conf", "a/b", "a"]] {
+            let t = Temp::new();
+            let dest = t.0.join("dest");
+            fs::create_dir(&dest).unwrap();
+            fs::write(dest.join("existing.conf"), "ORIGINAL").unwrap();
+            let files: Vec<RenderedFile> = conflict
+                .iter()
+                .map(|p| RenderedFile {
+                    path: (*p).into(),
+                    content: "CLOBBERED".into(),
+                })
+                .collect();
+            assert!(export(&dest, &files, true).is_err());
+            assert_eq!(
+                fs::read_to_string(dest.join("existing.conf")).unwrap(),
+                "ORIGINAL"
+            );
+            assert_eq!(fs::read_dir(&dest).unwrap().count(), 1);
+        }
     }
 }

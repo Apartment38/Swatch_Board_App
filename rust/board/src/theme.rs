@@ -99,19 +99,7 @@ impl ThemeEditor {
         }
         this.reload();
         this.refresh();
-        if let Some(project) = &this.project {
-            if !project.id.is_empty() {
-                if let Some(record) = this.saved.iter().find(|r| r.id == project.id) {
-                    if let Ok(mut saved) = serde_json::from_str::<Project>(&record.payload) {
-                        if saved.version == 1 {
-                            saved.id = record.id.clone();
-                            saved.dirty = false;
-                            this.saved_state = Some(saved);
-                        }
-                    }
-                }
-            }
-        }
+        this.sync_saved_state();
         this
     }
 
@@ -130,6 +118,28 @@ impl ThemeEditor {
                 .saved_state
                 .as_ref()
                 .is_none_or(|saved| !project.same_content(saved));
+        }
+    }
+    fn sync_saved_state(&mut self) {
+        let previous_dirty = self.project.as_ref().map(|p| p.dirty);
+        self.saved_state = self
+            .project
+            .as_ref()
+            .filter(|project| !project.id.is_empty())
+            .and_then(|project| self.saved.iter().find(|r| r.id == project.id))
+            .and_then(|record| {
+                serde_json::from_str::<Project>(&record.payload)
+                    .ok()
+                    .filter(|saved| saved.version == 1)
+                    .map(|mut saved| {
+                        saved.id = record.id.clone();
+                        saved.dirty = false;
+                        saved
+                    })
+            });
+        self.update_dirty();
+        if self.project.as_ref().map(|p| p.dirty) != previous_dirty {
+            self.persist();
         }
     }
     fn refresh(&mut self) {
@@ -171,6 +181,7 @@ impl ThemeEditor {
             }
         }
         if scene_updated {
+            self.update_dirty();
             self.persist();
         }
         if let Some(e) = load_error {
@@ -483,6 +494,7 @@ impl ThemeEditor {
             "theme_reload" => {
                 self.reload();
                 self.refresh();
+                self.sync_saved_state();
             }
             "theme_choose" | "theme_open" => {
                 let id = field("id")?;
@@ -1459,5 +1471,271 @@ mod tests {
                 .unwrap_err();
             assert_eq!(storage_err, "Theme storage unavailable");
         });
+    }
+
+    #[test]
+    fn draft_restore_and_reload_reconcile_saved_state_and_dirty() {
+        isolated(
+            "draft_restore_and_reload_reconcile_saved_state_and_dirty",
+            |root| {
+                install_package(root);
+                let palette = PaletteEditor::new();
+                let mut editor = ThemeEditor::new();
+                editor
+                    .command(
+                        &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                        &palette,
+                    )
+                    .unwrap();
+                editor
+                    .command(&json!({"op":"theme_save"}), &palette)
+                    .unwrap();
+                let saved_id = editor.project.as_ref().unwrap().id.clone();
+                assert!(!editor.project.as_ref().unwrap().dirty);
+
+                // Simulate deleted DB row + restart: keep the clean draft (dirty: false)
+                // while removing the corresponding theme_projects row.
+                let clean_draft = ThemeRepository::open_default()
+                    .unwrap()
+                    .load_draft()
+                    .unwrap()
+                    .unwrap();
+                assert!(!serde_json::from_str::<Project>(&clean_draft).unwrap().dirty);
+                drop(editor);
+                let db_dir = root.join("data/swatch-board");
+                for name in [
+                    "library.sqlite3",
+                    "library.sqlite3-wal",
+                    "library.sqlite3-shm",
+                ] {
+                    let path = db_dir.join(name);
+                    if path.exists() {
+                        fs::remove_file(path).unwrap();
+                    }
+                }
+                ThemeRepository::open_default()
+                    .unwrap()
+                    .save_draft(&clean_draft)
+                    .unwrap();
+
+                let mut restored = ThemeEditor::new();
+                assert_eq!(restored.project.as_ref().unwrap().id, saved_id);
+                assert!(restored.saved_state.is_none());
+                assert!(restored.project.as_ref().unwrap().dirty);
+                let persisted_draft: Project = serde_json::from_str(
+                    &ThemeRepository::open_default()
+                        .unwrap()
+                        .load_draft()
+                        .unwrap()
+                        .unwrap(),
+                )
+                .unwrap();
+                assert!(persisted_draft.dirty);
+                assert!(
+                    restored
+                        .command(
+                            &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                            &palette,
+                        )
+                        .is_err()
+                );
+
+                // Re-save to establish a clean saved record, then externally modify the DB row.
+                restored
+                    .command(&json!({"op":"theme_save"}), &palette)
+                    .unwrap();
+                let saved_id = restored.project.as_ref().unwrap().id.clone();
+                assert!(!restored.project.as_ref().unwrap().dirty);
+
+                let mut external_repo = ThemeRepository::open_default().unwrap();
+                let mut modified_project = restored.project.as_ref().unwrap().clone();
+                modified_project.name = "Externally Renamed".into();
+                modified_project.dirty = false;
+                external_repo
+                    .save(&SavedTheme {
+                        id: saved_id.clone(),
+                        name: modified_project.name.clone(),
+                        plugin_id: modified_project.plugin_id.clone(),
+                        plugin_version: modified_project.plugin_version.clone(),
+                        palette_id: modified_project.palette_id.clone(),
+                        scene: modified_project.scene.clone(),
+                        payload: serde_json::to_string(&modified_project).unwrap(),
+                        dirty: false,
+                    })
+                    .unwrap();
+
+                restored
+                    .command(&json!({"op":"theme_reload"}), &palette)
+                    .unwrap();
+                assert_eq!(
+                    restored.saved_state.as_ref().unwrap().name,
+                    "Externally Renamed"
+                );
+                assert!(restored.project.as_ref().unwrap().dirty);
+                assert!(
+                    restored
+                        .command(
+                            &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                            &palette,
+                        )
+                        .is_err()
+                );
+
+                // Externally restore DB row to match the open project -> dirty becomes false.
+                let mut identical_project = restored.project.as_ref().unwrap().clone();
+                identical_project.dirty = false;
+                external_repo
+                    .save(&SavedTheme {
+                        id: saved_id,
+                        name: identical_project.name.clone(),
+                        plugin_id: identical_project.plugin_id.clone(),
+                        plugin_version: identical_project.plugin_version.clone(),
+                        palette_id: identical_project.palette_id.clone(),
+                        scene: identical_project.scene.clone(),
+                        payload: serde_json::to_string(&identical_project).unwrap(),
+                        dirty: false,
+                    })
+                    .unwrap();
+
+                restored
+                    .command(&json!({"op":"theme_reload"}), &palette)
+                    .unwrap();
+                assert!(!restored.project.as_ref().unwrap().dirty);
+                restored
+                    .command(
+                        &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                        &palette,
+                    )
+                    .unwrap();
+            },
+        );
+    }
+
+    #[test]
+    fn scene_fallback_updates_dirty_across_reload_open_and_restart() {
+        isolated(
+            "scene_fallback_updates_dirty_across_reload_open_and_restart",
+            |root| {
+                install_package(root);
+                let palette = PaletteEditor::new();
+                let mut editor = ThemeEditor::new();
+                editor
+                    .command(
+                        &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                        &palette,
+                    )
+                    .unwrap();
+                editor
+                    .command(&json!({"op":"theme_scene","id":"drawer"}), &palette)
+                    .unwrap();
+                editor
+                    .command(&json!({"op":"theme_save"}), &palette)
+                    .unwrap();
+                let saved_id = editor.project.as_ref().unwrap().id.clone();
+                assert!(!editor.project.as_ref().unwrap().dirty);
+                let clean_drawer_draft = ThemeRepository::open_default()
+                    .unwrap()
+                    .load_draft()
+                    .unwrap()
+                    .unwrap();
+
+                // Remove the saved "drawer" scene from scenes.json on disk.
+                let package = root.join("data/swatch-board/plugins/runtime-fixture");
+                fs::write(
+                    package.join("scenes.json"),
+                    serde_json::to_vec_pretty(&json!([
+                        {"id":"home", "title":"Home", "width":400, "height":200, "nodes":[
+                            {"id":"background", "kind":"window", "rect":[0,0,400,200], "role":"surface"}
+                        ]}
+                    ]))
+                    .unwrap(),
+                )
+                .unwrap();
+
+                // 1. theme_reload fallback marks project dirty and stays consistent across edit + undo.
+                editor
+                    .command(&json!({"op":"theme_reload"}), &palette)
+                    .unwrap();
+                assert_eq!(editor.project.as_ref().unwrap().scene, "home");
+                assert!(editor.project.as_ref().unwrap().dirty);
+                assert!(
+                    editor
+                        .command(
+                            &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                            &palette,
+                        )
+                        .is_err()
+                );
+                editor
+                    .command(
+                        &json!({"op":"theme_assign","role":"ink","color":"#abcdef"}),
+                        &palette,
+                    )
+                    .unwrap();
+                assert!(editor.project.as_ref().unwrap().dirty);
+                editor
+                    .command(&json!({"op":"theme_undo"}), &palette)
+                    .unwrap();
+                assert_eq!(editor.project.as_ref().unwrap().scene, "home");
+                assert!(editor.project.as_ref().unwrap().dirty);
+
+                // 2. theme_open fallback marks project dirty and stays consistent across edit + undo.
+                editor
+                    .command(
+                        &json!({"op":"theme_open","id":saved_id,"discard":true}),
+                        &palette,
+                    )
+                    .unwrap();
+                assert_eq!(editor.project.as_ref().unwrap().scene, "home");
+                assert!(editor.project.as_ref().unwrap().dirty);
+                assert!(
+                    editor
+                        .command(
+                            &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                            &palette,
+                        )
+                        .is_err()
+                );
+                editor
+                    .command(
+                        &json!({"op":"theme_assign","role":"ink","color":"#abcdef"}),
+                        &palette,
+                    )
+                    .unwrap();
+                editor
+                    .command(&json!({"op":"theme_undo"}), &palette)
+                    .unwrap();
+                assert_eq!(editor.project.as_ref().unwrap().scene, "home");
+                assert!(editor.project.as_ref().unwrap().dirty);
+
+                // 3. ThemeEditor::new() draft restore fallback marks project dirty and stays consistent across edit + undo.
+                ThemeRepository::open_default()
+                    .unwrap()
+                    .save_draft(&clean_drawer_draft)
+                    .unwrap();
+                let mut restarted = ThemeEditor::new();
+                assert_eq!(restarted.project.as_ref().unwrap().scene, "home");
+                assert!(restarted.project.as_ref().unwrap().dirty);
+                assert!(
+                    restarted
+                        .command(
+                            &json!({"op":"theme_choose","id":"runtime-fixture"}),
+                            &palette,
+                        )
+                        .is_err()
+                );
+                restarted
+                    .command(
+                        &json!({"op":"theme_assign","role":"ink","color":"#abcdef"}),
+                        &palette,
+                    )
+                    .unwrap();
+                restarted
+                    .command(&json!({"op":"theme_undo"}), &palette)
+                    .unwrap();
+                assert_eq!(restarted.project.as_ref().unwrap().scene, "home");
+                assert!(restarted.project.as_ref().unwrap().dirty);
+            },
+        );
     }
 }
