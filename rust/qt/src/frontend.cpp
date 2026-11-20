@@ -2,6 +2,7 @@
 #include <QtGui>
 #include <QtWidgets>
 #include <functional>
+#include <limits>
 #include "generator_wheel.h"
 
 extern "C" void swatch_qt_free(char *);
@@ -163,6 +164,82 @@ protected:
     p.setBrush(fill);
     p.setPen(QPen(border, 1.0));
     p.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 4.0, 4.0);
+  }
+};
+
+class HistoryLimitSpinBox : public QAbstractSpinBox {
+  bool invalid = false;
+
+public:
+  explicit HistoryLimitSpinBox(const QString &initialValue,
+                               QWidget *parent = nullptr)
+      : QAbstractSpinBox(parent) {
+    setAccessibleName("Stored history limit");
+    setButtonSymbols(QAbstractSpinBox::UpDownArrows);
+    setKeyboardTracking(true);
+    lineEdit()->setAccessibleName("Stored history limit");
+    lineEdit()->setAutoFillBackground(false);
+    lineEdit()->setAttribute(Qt::WA_OpaquePaintEvent, false);
+    QPalette editPal = lineEdit()->palette();
+    editPal.setColor(QPalette::Base, Qt::transparent);
+    lineEdit()->setPalette(editPal);
+    lineEdit()->setValidator(new QRegularExpressionValidator(
+        QRegularExpression("[0-9]{1,20}"), this));
+    lineEdit()->setText(initialValue);
+    connect(lineEdit(), &QLineEdit::textChanged, this,
+            [this](const QString &) { update(); });
+  }
+  using QAbstractSpinBox::lineEdit;
+  void setInvalid(bool bad) {
+    if (invalid != bad) {
+      invalid = bad;
+      update();
+    }
+  }
+  void stepBy(int steps) override {
+    if (isReadOnly() || steps == 0)
+      return;
+    bool ok = false;
+    quint64 v = lineEdit()->text().toULongLong(&ok);
+    if (!ok)
+      v = 0;
+    quint64 next = v;
+    if (steps > 0) {
+      const quint64 delta = static_cast<quint64>(steps);
+      next = (v > std::numeric_limits<quint64>::max() - delta)
+                 ? std::numeric_limits<quint64>::max()
+                 : v + delta;
+      if (next < 1)
+        next = 1;
+    } else {
+      const quint64 delta = static_cast<quint64>(-static_cast<qint64>(steps));
+      next = (v > delta && v - delta >= 1) ? (v - delta) : 1;
+    }
+    lineEdit()->setText(QString::number(next));
+    update();
+  }
+
+protected:
+  StepEnabled stepEnabled() const override {
+    if (isReadOnly())
+      return StepNone;
+    StepEnabled flags = StepUpEnabled;
+    bool ok = false;
+    const quint64 v = lineEdit()->text().toULongLong(&ok);
+    if (ok && v > 1)
+      flags |= StepDownEnabled;
+    return flags;
+  }
+  void paintEvent(QPaintEvent *e) override {
+    QAbstractSpinBox::paintEvent(e);
+    if (!invalid)
+      return;
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setBrush(QColor(218, 68, 83, 14));
+    p.setPen(QPen(QColor(218, 68, 83, 215), 1.5));
+    p.drawRoundedRect(QRectF(rect()).adjusted(0.75, 0.75, -0.75, -0.75), 4.0,
+                      4.0);
   }
 };
 
@@ -1666,7 +1743,7 @@ class Frontend : public QWidget {
   QWidget *limitErrorBox = nullptr, *configStatusBox = nullptr,
           *shortcutStatusBox = nullptr;
   StatusDot *shortcutDot = nullptr;
-  QLineEdit *configLimit = nullptr;
+  HistoryLimitSpinBox *configLimit = nullptr;
   QScrollArea *configScroll = nullptr;
   QList<QPushButton *> historyButtons;
   bool hiddenForPick = false, spectrumDragging = false;
@@ -5495,24 +5572,8 @@ void Frontend::renderConfig() {
       shortcutDot->setColor(palette().color(QPalette::Mid));
   };
   auto applyLimitErrorStyle = [this](bool invalid) {
-    if (!configLimit)
-      return;
-    if (invalid) {
-      const QColor base = configLimit->palette().color(QPalette::Base);
-      const QColor err(0xDA, 0x44, 0x53);
-      const qreal a = 14.0 / 255.0;
-      const QColor tinted = QColor::fromRgbF(
-          err.redF() * a + base.redF() * (1.0 - a),
-          err.greenF() * a + base.greenF() * (1.0 - a),
-          err.blueF() * a + base.blueF() * (1.0 - a));
-      const QColor fg = configLimit->palette().color(QPalette::Text);
-      configLimit->setStyleSheet(QStringLiteral(
-          "QLineEdit { border: 1.5px solid #da4453; border-radius: 3px; "
-          "background-color: %1; color: %2; padding: 3px 6px; }")
-                                     .arg(tinted.name(), fg.name()));
-    } else {
-      configLimit->setStyleSheet(QString());
-    }
+    if (configLimit)
+      configLimit->setInvalid(invalid);
   };
   if (configSave) {
     limitInvalid = !limitErrorDismissed &&
@@ -5636,13 +5697,10 @@ void Frontend::renderConfig() {
   limitFieldLayout->setSpacing(4);
 
   auto limit =
-      line("Stored history limit", str(configDraft, "history_limit"),
-           limitFieldBox);
+      new HistoryLimitSpinBox(str(configDraft, "history_limit"), limitFieldBox);
   limit->setFixedWidth(140);
   const int limitFieldH = limit->sizeHint().height();
   limit->setMinimumHeight(limitFieldH);
-  limit->setValidator(new QRegularExpressionValidator(
-      QRegularExpression("[0-9]{1,20}"), limit));
   configLimit = limit;
   limitFieldLayout->addWidget(limit, 0, Qt::AlignLeft);
 
@@ -5680,20 +5738,21 @@ void Frontend::renderConfig() {
   applyLimitErrorStyle(limitInvalid);
   limitFieldLayout->addWidget(limitErrorBox);
 
-  connect(limit, &QLineEdit::textChanged, this, [this](const QString &v) {
-    configDraft["history_limit"] = v;
-    if (limitInvalid) {
-      limitInvalid = false;
-      limitErrorDismissed = true;
-      if (configLimit)
-        configLimit->setStyleSheet(QString());
-      if (limitErrorBox)
-        limitErrorBox->setVisible(false);
-      if (configSave)
-        configSave->setEnabled(state.value("load_error").isNull() &&
-                               !state.value("busy").toBool());
-    }
-  });
+  connect(limit->lineEdit(), &QLineEdit::textChanged, this,
+          [this](const QString &v) {
+            configDraft["history_limit"] = v;
+            if (limitInvalid) {
+              limitInvalid = false;
+              limitErrorDismissed = true;
+              if (configLimit)
+                configLimit->setInvalid(false);
+              if (limitErrorBox)
+                limitErrorBox->setVisible(false);
+              if (configSave)
+                configSave->setEnabled(state.value("load_error").isNull() &&
+                                       !state.value("busy").toBool());
+            }
+          });
   addFormRow(historySection, "Stored history limit:", limitFieldBox, limit,
              true, limitFieldH);
 
@@ -5791,7 +5850,6 @@ void Frontend::renderConfig() {
   };
   addShortcutField("pick_shortcut", "Pick shortcut", "Pick shortcut:");
   addShortcutField("history_shortcut", "History shortcut", "History shortcut:");
-  addCheck(shortcutSection, "autostart", "Start automatically");
 
   auto rebindRow = new QWidget(w);
   auto rebindRowLayout = new QHBoxLayout(rebindRow);
@@ -5813,29 +5871,31 @@ void Frontend::renderConfig() {
           [this] { send({{"op", "rebind"}}); });
   rebindRowLayout->addWidget(configRebind, 0, Qt::AlignLeft | Qt::AlignVCenter);
 
-  auto scBanner =
-      new InlineBanner(palette().color(QPalette::Mid), 18, 95, rebindRow);
-  scBanner->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-  auto scBannerLayout = new QHBoxLayout(scBanner);
-  scBannerLayout->setContentsMargins(8, 4, 8, 4);
-  scBannerLayout->setSpacing(6);
-  shortcutDot = new StatusDot(scBanner);
+  auto scStatusContainer = new QWidget(rebindRow);
+  scStatusContainer->setSizePolicy(QSizePolicy::Expanding,
+                                   QSizePolicy::Preferred);
+  auto scStatusLayout = new QHBoxLayout(scStatusContainer);
+  scStatusLayout->setContentsMargins(0, 0, 0, 0);
+  scStatusLayout->setSpacing(6);
+  shortcutDot = new StatusDot(scStatusContainer);
   shortcutDot->setToolTip(str(state, "shortcut_status_detail"));
-  scBannerLayout->addWidget(shortcutDot, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  shortcutStatus = new QLabel(str(state, "shortcut_status"), scBanner);
+  scStatusLayout->addWidget(shortcutDot, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  shortcutStatus = new QLabel(str(state, "shortcut_status"), scStatusContainer);
   shortcutStatus->setToolTip(str(state, "shortcut_status_detail"));
   shortcutStatus->setAccessibleDescription(
       str(state, "shortcut_status_detail"));
   shortcutStatus->setWordWrap(true);
   shortcutStatus->setTextFormat(Qt::PlainText);
-  applyMuted(shortcutStatus, 200);
-  scBannerLayout->addWidget(shortcutStatus, 1);
-  shortcutStatusBox = scBanner;
+  applyMuted(shortcutStatus, 170);
+  scStatusLayout->addWidget(shortcutStatus, 1);
+  shortcutStatusBox = scStatusContainer;
   updateShortcutDot(shortcutStatus->text());
   shortcutStatusBox->setVisible(!shortcutStatus->text().isEmpty());
   rebindRowLayout->addWidget(shortcutStatusBox, 1, Qt::AlignVCenter);
 
   addFormRow(shortcutSection, QString(), rebindRow, configRebind, true);
+  shortcutSection->addSpacing(4);
+  addCheck(shortcutSection, "autostart", "Start automatically");
 
   l->addLayout(shortcutSection);
   l->addStretch(1);
