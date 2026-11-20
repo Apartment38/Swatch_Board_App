@@ -1678,6 +1678,8 @@ class Frontend : public QWidget {
   bool compactThemePreview = false;
   bool themeProjectVisible = false;
   bool configInitialized = false;
+  bool limitInvalid = false;
+  bool limitErrorDismissed = false;
   QJsonValue request(QJsonObject req) {
     auto bytes = QJsonDocument(req).toJson(QJsonDocument::Compact);
     char *answer = callback(context, bytes.constData());
@@ -4007,9 +4009,24 @@ public:
         if (afterFile.open(QIODevice::ReadOnly))
           after = afterFile.readAll();
         check(before == after, "Invalid settings unchanged on disk");
+        check(configSave && !configSave->isEnabled(),
+              "Save disabled on validation error");
+        check(limitErrorBox && limitErrorBox->isVisible(),
+              "Limit validation banner visible");
         shot("settings");
+        check(configScroll &&
+                  configScroll->verticalScrollBar()->maximum() == 0,
+              "Settings fits without vertical scrolling at default size");
         resize(540, 360);
         shot("settings-small");
+        check(configScroll &&
+                  configScroll->horizontalScrollBar()->maximum() == 0,
+              "Compact settings has no horizontal overflow");
+        edit(this, "Stored history limit", "200");
+        check(configSave && configSave->isEnabled(),
+              "Save re-enabled after editing invalid limit");
+        check(limitErrorBox && !limitErrorBox->isVisible(),
+              "Limit validation banner hides after edit");
       } else {
         check(state.contains("entries"), "History entries");
         shot("history");
@@ -4039,7 +4056,7 @@ public:
       setWindowFlags(Qt::Popup);
       setAttribute(Qt::WA_NoMouseReplay);
     } else {
-      resize(m == "config" ? QSize(580, 560) : QSize(900, 700));
+      resize(m == "config" ? QSize(580, 620) : QSize(900, 700));
       restoreGeometry(settings.value(m + "/geometry").toByteArray());
     }
     auto initial = request({{"op", "init"}});
@@ -5477,9 +5494,31 @@ void Frontend::renderConfig() {
     else
       shortcutDot->setColor(palette().color(QPalette::Mid));
   };
+  auto applyLimitErrorStyle = [this](bool invalid) {
+    if (!configLimit)
+      return;
+    if (invalid) {
+      const QColor base = configLimit->palette().color(QPalette::Base);
+      const QColor err(0xDA, 0x44, 0x53);
+      const qreal a = 14.0 / 255.0;
+      const QColor tinted = QColor::fromRgbF(
+          err.redF() * a + base.redF() * (1.0 - a),
+          err.greenF() * a + base.greenF() * (1.0 - a),
+          err.blueF() * a + base.blueF() * (1.0 - a));
+      const QColor fg = configLimit->palette().color(QPalette::Text);
+      configLimit->setStyleSheet(QStringLiteral(
+          "QLineEdit { border: 1.5px solid #da4453; border-radius: 3px; "
+          "background-color: %1; color: %2; padding: 3px 6px; }")
+                                     .arg(tinted.name(), fg.name()));
+    } else {
+      configLimit->setStyleSheet(QString());
+    }
+  };
   if (configSave) {
+    limitInvalid = !limitErrorDismissed &&
+                   str(state, "validation_field") == "history_limit";
     configSave->setEnabled(state.value("load_error").isNull() &&
-                           !state.value("busy").toBool());
+                           !state.value("busy").toBool() && !limitInvalid);
     configRebind->setEnabled(!state.value("busy").toBool());
     const QString statusMsg =
         str(state, "validation_field").isEmpty() ? message() : QString();
@@ -5499,9 +5538,9 @@ void Frontend::renderConfig() {
     if (shortcutStatusBox)
       shortcutStatusBox->setVisible(!scStatus.isEmpty());
     limitError->setText(str(state, "message"));
+    applyLimitErrorStyle(limitInvalid);
     if (limitErrorBox)
-      limitErrorBox->setVisible(str(state, "validation_field") ==
-                                "history_limit");
+      limitErrorBox->setVisible(limitInvalid);
     return;
   }
   if (!configInitialized && state.value("config").isObject()) {
@@ -5516,8 +5555,8 @@ void Frontend::renderConfig() {
 
   auto w = new QWidget;
   auto l = new QVBoxLayout(w);
-  l->setContentsMargins(16, 10, 16, 10);
-  l->setSpacing(9);
+  l->setContentsMargins(16, 12, 16, 12);
+  l->setSpacing(10);
 
   const QFontMetrics fm = w->fontMetrics();
   int labelW = 0;
@@ -5558,7 +5597,7 @@ void Frontend::renderConfig() {
   auto addFormRow = [w, labelW, makeLabelSpacer](
                         QVBoxLayout *section, const QString &labelText,
                         QWidget *field, QWidget *buddy = nullptr,
-                        bool stretchField = false) {
+                        bool stretchField = false, int alignLabelHeight = 0) {
     auto *row = new QHBoxLayout;
     row->setContentsMargins(0, 0, 0, 0);
     row->setSpacing(10);
@@ -5567,7 +5606,12 @@ void Frontend::renderConfig() {
       lbl->setFixedWidth(labelW);
       lbl->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
       lbl->setBuddy(buddy ? buddy : field);
-      row->addWidget(lbl, 0, Qt::AlignVCenter);
+      if (alignLabelHeight > 0) {
+        lbl->setFixedHeight(alignLabelHeight);
+        row->addWidget(lbl, 0, Qt::AlignTop);
+      } else {
+        row->addWidget(lbl, 0, Qt::AlignVCenter);
+      }
     } else {
       row->addWidget(makeLabelSpacer(w), 0, Qt::AlignVCenter);
     }
@@ -5580,34 +5624,33 @@ void Frontend::renderConfig() {
     section->addLayout(row);
   };
 
-  const int uniformSpinW = qMax(100, fm.horizontalAdvance("10000") + 44);
-  const int compactSpinW = qMax(62, fm.horizontalAdvance("12") + 38);
-
   // Section 1: History
   auto historySection = new QVBoxLayout;
   historySection->setContentsMargins(0, 0, 0, 0);
   historySection->setSpacing(6);
   historySection->addWidget(makeSectionHeading("History"));
 
+  auto limitFieldBox = new QWidget(w);
+  auto limitFieldLayout = new QVBoxLayout(limitFieldBox);
+  limitFieldLayout->setContentsMargins(0, 0, 0, 0);
+  limitFieldLayout->setSpacing(4);
+
   auto limit =
-      line("Stored history limit", str(configDraft, "history_limit"), w);
+      line("Stored history limit", str(configDraft, "history_limit"),
+           limitFieldBox);
   limit->setFixedWidth(140);
+  const int limitFieldH = limit->sizeHint().height();
+  limit->setMinimumHeight(limitFieldH);
   limit->setValidator(new QRegularExpressionValidator(
       QRegularExpression("[0-9]{1,20}"), limit));
   configLimit = limit;
-  connect(limit, &QLineEdit::textChanged, this,
-          [this](const QString &v) { configDraft["history_limit"] = v; });
-  addFormRow(historySection, "Stored history limit:", limit);
+  limitFieldLayout->addWidget(limit, 0, Qt::AlignLeft);
 
-  limitErrorBox = new QWidget(w);
-  auto limitErrorRow = new QHBoxLayout(limitErrorBox);
-  limitErrorRow->setContentsMargins(0, 0, 0, 0);
-  limitErrorRow->setSpacing(10);
-  limitErrorRow->addWidget(makeLabelSpacer(limitErrorBox), 0, Qt::AlignVCenter);
-  auto limitBanner = new InlineBanner(QColor(218, 68, 83), 24, 145, limitErrorBox);
+  auto limitBanner =
+      new InlineBanner(QColor(218, 68, 83), 24, 145, limitFieldBox);
   auto bannerLayout = new QHBoxLayout(limitBanner);
   bannerLayout->setContentsMargins(8, 5, 8, 5);
-  bannerLayout->setSpacing(8);
+  bannerLayout->setSpacing(7);
   auto errIconLabel = new QLabel(limitBanner);
   QIcon errIcon = themedIcon(
       {"dialog-error", "dialog-error-symbolic", "data-error"},
@@ -5616,8 +5659,10 @@ void Frontend::renderConfig() {
   errIconLabel->setFixedSize(16, 16);
   errIconLabel->setAlignment(Qt::AlignCenter);
   bannerLayout->addWidget(errIconLabel, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  limitInvalid = !limitErrorDismissed &&
+                 str(state, "validation_field") == "history_limit";
   const QString initialLimitMsg =
-      str(state, "validation_field") == "history_limit"
+      limitInvalid
           ? str(state, "message")
           : QStringLiteral("Stored history limit must be greater than zero.");
   limitError = new QLabel(initialLimitMsg, limitBanner);
@@ -5630,14 +5675,32 @@ void Frontend::renderConfig() {
     limitError->setPalette(errPal);
   }
   bannerLayout->addWidget(limitError, 1);
-  limitErrorRow->addWidget(limitBanner, 1);
-  limitErrorBox->setVisible(str(state, "validation_field") == "history_limit");
-  historySection->addWidget(limitErrorBox);
+  limitErrorBox = limitBanner;
+  limitErrorBox->setVisible(limitInvalid);
+  applyLimitErrorStyle(limitInvalid);
+  limitFieldLayout->addWidget(limitErrorBox);
+
+  connect(limit, &QLineEdit::textChanged, this, [this](const QString &v) {
+    configDraft["history_limit"] = v;
+    if (limitInvalid) {
+      limitInvalid = false;
+      limitErrorDismissed = true;
+      if (configLimit)
+        configLimit->setStyleSheet(QString());
+      if (limitErrorBox)
+        limitErrorBox->setVisible(false);
+      if (configSave)
+        configSave->setEnabled(state.value("load_error").isNull() &&
+                               !state.value("busy").toBool());
+    }
+  });
+  addFormRow(historySection, "Stored history limit:", limitFieldBox, limit,
+             true, limitFieldH);
 
   auto displayLimit =
       spin("Displayed history limit",
            configDraft.value("history_display_limit").toInt(), 1, 10000, w);
-  displayLimit->setFixedWidth(uniformSpinW);
+  displayLimit->setFixedWidth(140);
   connect(displayLimit, &QSpinBox::valueChanged, this, [this](int v) {
     configDraft["history_display_limit"] = v;
   });
@@ -5649,14 +5712,14 @@ void Frontend::renderConfig() {
   gridLayout->setSpacing(6);
   auto cols = spin("History columns",
                    configDraft.value("history_columns").toInt(), 1, 12, gridRow);
-  cols->setFixedWidth(compactSpinW);
+  cols->setFixedWidth(60);
   connect(cols, &QSpinBox::valueChanged, this,
           [this](int v) { configDraft["history_columns"] = v; });
   auto timesLabel = new QLabel(QString::fromUtf8("\u00D7"), gridRow);
   applyMuted(timesLabel, 160);
   auto rows = spin("History rows", configDraft.value("history_rows").toInt(), 1,
                    12, gridRow);
-  rows->setFixedWidth(compactSpinW);
+  rows->setFixedWidth(60);
   connect(rows, &QSpinBox::valueChanged, this,
           [this](int v) { configDraft["history_rows"] = v; });
   auto gridHint =
@@ -5680,15 +5743,14 @@ void Frontend::renderConfig() {
   auto zoom = spin("Picker zoom", configDraft.value("picker_zoom").toInt(), 1,
                    32, w);
   zoom->setSuffix(QString::fromUtf8("\u00D7"));
-  zoom->setFixedWidth(uniformSpinW);
+  zoom->setFixedWidth(140);
   connect(zoom, &QSpinBox::valueChanged, this,
           [this](int v) { configDraft["picker_zoom"] = v; });
   addFormRow(pickerSection, "Picker zoom:", zoom);
 
   auto format = new QComboBox(w);
   format->setAccessibleName("Clipboard format");
-  format->setSizeAdjustPolicy(QComboBox::AdjustToContents);
-  format->setMinimumWidth(140);
+  format->setFixedWidth(140);
   for (auto value : {"hex", "hex-rgba", "rgb", "rgba", "hsl", "hsv", "cmyk"})
     format->addItem(QString(value).toUpper(), value);
   format->setCurrentIndex(
@@ -5731,16 +5793,32 @@ void Frontend::renderConfig() {
   addShortcutField("history_shortcut", "History shortcut", "History shortcut:");
   addCheck(shortcutSection, "autostart", "Start automatically");
 
-  shortcutStatusBox = new QWidget(w);
-  auto scRow = new QHBoxLayout(shortcutStatusBox);
-  scRow->setContentsMargins(0, 0, 0, 0);
-  scRow->setSpacing(10);
-  scRow->addWidget(makeLabelSpacer(shortcutStatusBox), 0, Qt::AlignVCenter);
+  auto rebindRow = new QWidget(w);
+  auto rebindRowLayout = new QHBoxLayout(rebindRow);
+  rebindRowLayout->setContentsMargins(0, 0, 0, 0);
+  rebindRowLayout->setSpacing(10);
+  rebindRowLayout->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+  configRebind =
+      new QPushButton(themedIcon({"configure-shortcuts-symbolic",
+                                  "configure-shortcuts", "view-refresh-symbolic",
+                                  "view-refresh"},
+                                 QStyle::SP_BrowserReload),
+                      "Rebind shortcuts", rebindRow);
+  configRebind->setAccessibleName("Rebind shortcuts");
+  configRebind->setIconSize(QSize(16, 16));
+  configRebind->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  configRebind->setEnabled(!state.value("busy").toBool());
+  connect(configRebind, &QPushButton::clicked, this,
+          [this] { send({{"op", "rebind"}}); });
+  rebindRowLayout->addWidget(configRebind, 0, Qt::AlignLeft | Qt::AlignVCenter);
+
   auto scBanner =
-      new InlineBanner(palette().color(QPalette::Mid), 18, 95, shortcutStatusBox);
+      new InlineBanner(palette().color(QPalette::Mid), 18, 95, rebindRow);
+  scBanner->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
   auto scBannerLayout = new QHBoxLayout(scBanner);
   scBannerLayout->setContentsMargins(8, 4, 8, 4);
-  scBannerLayout->setSpacing(7);
+  scBannerLayout->setSpacing(6);
   shortcutDot = new StatusDot(scBanner);
   shortcutDot->setToolTip(str(state, "shortcut_status_detail"));
   scBannerLayout->addWidget(shortcutDot, 0, Qt::AlignLeft | Qt::AlignVCenter);
@@ -5752,10 +5830,12 @@ void Frontend::renderConfig() {
   shortcutStatus->setTextFormat(Qt::PlainText);
   applyMuted(shortcutStatus, 200);
   scBannerLayout->addWidget(shortcutStatus, 1);
-  scRow->addWidget(scBanner, 1);
+  shortcutStatusBox = scBanner;
   updateShortcutDot(shortcutStatus->text());
   shortcutStatusBox->setVisible(!shortcutStatus->text().isEmpty());
-  shortcutSection->addWidget(shortcutStatusBox);
+  rebindRowLayout->addWidget(shortcutStatusBox, 1, Qt::AlignVCenter);
+
+  addFormRow(shortcutSection, QString(), rebindRow, configRebind, true);
 
   l->addLayout(shortcutSection);
   l->addStretch(1);
@@ -5795,33 +5875,20 @@ void Frontend::renderConfig() {
   rootLayout->addWidget(new Hairline(configRoot));
   auto footer = new QWidget(configRoot);
   auto footerLayout = new QHBoxLayout(footer);
-  footerLayout->setContentsMargins(14, 9, 14, 9);
+  footerLayout->setContentsMargins(14, 10, 14, 10);
   footerLayout->setSpacing(8);
-
-  configRebind =
-      new QPushButton(themedIcon({"configure-shortcuts-symbolic",
-                                  "configure-shortcuts", "view-refresh-symbolic",
-                                  "view-refresh"},
-                                 QStyle::SP_BrowserReload),
-                      "Rebind shortcuts", footer);
-  configRebind->setAccessibleName("Rebind shortcuts");
-  configRebind->setIconSize(QSize(16, 16));
-  configRebind->setEnabled(!state.value("busy").toBool());
-  connect(configRebind, &QPushButton::clicked, this,
-          [this] { send({{"op", "rebind"}}); });
-  footerLayout->addWidget(configRebind);
-
   footerLayout->addStretch(1);
 
-  auto saveBtn = new PrimaryActionButton("Save settings", footer);
+  auto saveBtn = new QPushButton(
+      themedIcon({"dialog-ok-apply-symbolic", "dialog-ok-apply"},
+                 QStyle::SP_DialogApplyButton),
+      "Save", footer);
   saveBtn->setAccessibleName("Save settings");
-  saveBtn->setIcon(themedIcon({"document-save-symbolic", "document-save"},
-                              QStyle::SP_DialogSaveButton));
   saveBtn->setIconSize(QSize(16, 16));
-  saveBtn->setPrimary(true);
   saveBtn->setEnabled(state.value("load_error").isNull() &&
-                      !state.value("busy").toBool());
+                      !state.value("busy").toBool() && !limitInvalid);
   connect(saveBtn, &QPushButton::clicked, this, [this] {
+    limitErrorDismissed = false;
     send({{"op", "save"}, {"config", configDraft}});
     if (str(state, "validation_field") == "history_limit") {
       configLimit->setFocus();
