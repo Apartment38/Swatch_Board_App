@@ -15,10 +15,22 @@ struct Draft {
     locked: Vec<bool>,
     names: Vec<String>,
     id: Option<String>,
+    lineage: u64,
+}
+
+impl Draft {
+    fn same_content(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.colors == other.colors
+            && self.locked == other.locked
+            && self.names == other.names
+            && self.id == other.id
+    }
 }
 
 pub struct PaletteEditor {
     draft: Draft,
+    next_lineage: u64,
     undo: Vec<Draft>,
     redo: Vec<Draft>,
     repository: Option<PaletteRepository>,
@@ -53,7 +65,9 @@ impl PaletteEditor {
                 locked: vec![],
                 names: vec![],
                 id: None,
+                lineage: 0,
             },
+            next_lineage: 1,
             undo: vec![],
             redo: vec![],
             repository,
@@ -65,6 +79,11 @@ impl PaletteEditor {
         };
         p.refresh();
         p
+    }
+    fn next_lineage(&mut self) -> u64 {
+        let lineage = self.next_lineage;
+        self.next_lineage += 1;
+        lineage
     }
     fn refresh(&mut self) {
         if let Some(repo) = &self.repository {
@@ -96,7 +115,7 @@ impl PaletteEditor {
         )
     }
     fn commit(&mut self, previous: Draft, mixer: &mut Mixer) {
-        if self.draft != previous {
+        if !self.draft.same_content(&previous) {
             if self.undo.len() == 100 {
                 self.undo.remove(0);
             }
@@ -135,17 +154,56 @@ impl PaletteEditor {
     }
     fn open_palette(&mut self, palette: &SavedPalette, mixer: &mut Mixer, saved: bool) {
         let previous = self.draft.clone();
+        let name = if palette.name.trim().is_empty() {
+            let existing = self.draft.name.trim();
+            if !existing.is_empty() && existing.chars().count() <= 256 {
+                self.draft.name.clone()
+            } else {
+                "Untitled".into()
+            }
+        } else {
+            palette.name.clone()
+        };
+        let colors: Vec<_> = palette.colors.iter().copied().map(from_rgba).collect();
+        let mut locked = palette.locked.clone();
+        locked.resize(colors.len(), false);
+        let mut names = palette.swatch_names.clone();
+        names.truncate(colors.len());
+        while names.len() < colors.len() {
+            names.push(Self::fresh_name(&names));
+        }
         self.draft = Draft {
-            name: palette.name.clone(),
-            colors: palette.colors.iter().copied().map(from_rgba).collect(),
-            locked: palette.locked.clone(),
-            names: palette.swatch_names.clone(),
+            name,
+            colors,
+            locked,
+            names,
             id: saved.then(|| palette.id.clone()),
+            lineage: self.next_lineage(),
         };
         self.commit(previous, mixer);
     }
     pub fn snapshot(&self) -> Value {
-        json!({"name":self.draft.name,"id":self.draft.id,"swatches":self.draft.colors.iter().enumerate().map(|(i,c)| json!({"color":c.format(Format::HexRgba),"name":self.draft.names[i],"locked":self.draft.locked[i]})).collect::<Vec<_>>(),"saved":self.saved.iter().map(|p|json!({"id":p.id,"name":p.name})).collect::<Vec<_>>(),"generations":self.generations.iter().map(|g|json!({"id":g.id,"label":format!("{} · {} colors",g.description,g.palette.colors.len())})).collect::<Vec<_>>(),"can_undo":!self.undo.is_empty(),"can_redo":!self.redo.is_empty(),"lock_history":self.lock_history,"error":self.error,"status":self.status})
+        json!({
+            "name": self.draft.name,
+            "id": self.draft.id,
+            "swatches": self.draft.colors.iter().enumerate().map(|(i, c)| {
+                let fallback = format!("Swatch {}", i + 1);
+                let name = self.draft.names.get(i).map(String::as_str).unwrap_or(&fallback);
+                let locked = self.draft.locked.get(i).copied().unwrap_or(false);
+                json!({
+                    "color": c.format(Format::HexRgba),
+                    "name": name,
+                    "locked": locked,
+                })
+            }).collect::<Vec<_>>(),
+            "saved": self.saved.iter().map(|p| json!({"id": p.id, "name": p.name})).collect::<Vec<_>>(),
+            "generations": self.generations.iter().map(|g| json!({"id": g.id, "label": format!("{} · {} colors", g.description, g.palette.colors.len())})).collect::<Vec<_>>(),
+            "can_undo": !self.undo.is_empty(),
+            "can_redo": !self.redo.is_empty(),
+            "lock_history": self.lock_history,
+            "error": self.error,
+            "status": self.status,
+        })
     }
     pub fn command(&mut self, r: &Value, mixer: &mut Mixer) -> Result<(), String> {
         self.error = None;
@@ -262,6 +320,7 @@ impl PaletteEditor {
                     locked: vec![],
                     names: vec![],
                     id: None,
+                    lineage: self.next_lineage(),
                 };
                 self.commit(p, mixer);
             }
@@ -280,14 +339,21 @@ impl PaletteEditor {
                         &self.draft.names,
                     )
                     .map_err(|e| e.to_string())?;
-                self.draft.id = Some(saved.id);
+                let lineage = self.draft.lineage;
+                self.draft.id = Some(saved.id.clone());
                 self.draft.name = saved.name;
+                for snapshot in self.undo.iter_mut().chain(self.redo.iter_mut()) {
+                    if snapshot.lineage == lineage && snapshot.id.is_none() {
+                        snapshot.id = Some(saved.id.clone());
+                    }
+                }
                 self.refresh();
             }
             "palette_duplicate" => {
                 let p = self.draft.clone();
                 self.draft.id = None;
                 self.draft.name.push_str(" copy");
+                self.draft.lineage = self.next_lineage();
                 self.commit(p, mixer);
             }
             "palette_open" => {
@@ -309,6 +375,11 @@ impl PaletteEditor {
                     .map_err(|e| e.to_string())?;
                 if self.draft.id.as_deref() == Some(id) {
                     self.draft.id = None;
+                }
+                for snapshot in self.undo.iter_mut().chain(self.redo.iter_mut()) {
+                    if snapshot.id.as_deref() == Some(id) {
+                        snapshot.id = None;
+                    }
                 }
                 self.refresh();
             }
@@ -337,10 +408,21 @@ impl PaletteEditor {
     }
 
     fn generated_colors(&self, options: &GenerationOptions) -> Result<GeneratedColors, String> {
-        let mut colors = generate(options)?;
-        if self.draft.locked.iter().filter(|&&x| x).count() > options.count {
+        let locked_count = self
+            .draft
+            .colors
+            .iter()
+            .zip(&self.draft.locked)
+            .filter(|(_, locked)| **locked)
+            .count();
+        if locked_count > options.count {
             return Err("Palette size is smaller than the number of locked swatches.".into());
         }
+        let mut colors = if locked_count == options.count {
+            vec![Color::new(0, 0, 0, 255); options.count]
+        } else {
+            generate(options)?
+        };
         let mut locks = vec![false; options.count];
         let mut names: Vec<_> = self
             .draft
@@ -353,20 +435,22 @@ impl PaletteEditor {
             names.push(Self::fresh_name(&names));
         }
         for i in 0..self.draft.colors.len().min(options.count) {
-            if self.draft.locked[i] {
+            if self.draft.locked.get(i).copied().unwrap_or(false) {
                 colors[i] = self.draft.colors[i];
                 locks[i] = true;
             }
         }
         for i in options.count..self.draft.colors.len() {
-            if self.draft.locked[i] {
+            if self.draft.locked.get(i).copied().unwrap_or(false) {
                 let j = locks
                     .iter()
                     .position(|x| !x)
                     .ok_or("Too many locked swatches")?;
                 colors[j] = self.draft.colors[i];
                 locks[j] = true;
-                names[j] = self.draft.names[i].clone();
+                if let Some(name) = self.draft.names.get(i) {
+                    names[j] = name.clone();
+                }
             }
         }
         Ok((colors, locks, names))
@@ -374,6 +458,9 @@ impl PaletteEditor {
 
     fn generate(&mut self, options: GenerationOptions, mixer: &mut Mixer) -> Result<(), String> {
         let (colors, locks, names) = self.generated_colors(&options)?;
+        if colors == self.draft.colors && locks == self.draft.locked && names == self.draft.names {
+            return Ok(());
+        }
         let values: Vec<_> = colors.iter().copied().map(to_rgba).collect();
         self.repository
             .as_mut()
@@ -472,6 +559,58 @@ fn options(r: &Value) -> Result<GenerationOptions, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    struct TempDb {
+        root: PathBuf,
+    }
+
+    impl TempDb {
+        fn new() -> Self {
+            static COUNTER: AtomicU64 = AtomicU64::new(0);
+            let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let root = std::env::temp_dir().join(format!(
+                "swatch-board-palette-test-{}-{id}",
+                std::process::id()
+            ));
+            let _ = std::fs::remove_dir_all(&root);
+            std::fs::create_dir_all(&root).unwrap();
+            Self { root }
+        }
+
+        fn editor(&self) -> PaletteEditor {
+            let repo = PaletteRepository::open(self.root.join("library.sqlite3")).unwrap();
+            let mut p = PaletteEditor {
+                draft: Draft {
+                    name: "Untitled".into(),
+                    colors: vec![],
+                    locked: vec![],
+                    names: vec![],
+                    id: None,
+                    lineage: 0,
+                },
+                next_lineage: 1,
+                undo: vec![],
+                redo: vec![],
+                repository: Some(repo),
+                saved: vec![],
+                generations: vec![],
+                error: None,
+                lock_history: false,
+                status: None,
+            };
+            p.refresh();
+            p
+        }
+    }
+
+    impl Drop for TempDb {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.root);
+        }
+    }
+
     fn editor() -> PaletteEditor {
         PaletteEditor {
             draft: Draft {
@@ -480,7 +619,9 @@ mod tests {
                 locked: vec![],
                 names: vec![],
                 id: None,
+                lineage: 0,
             },
+            next_lineage: 1,
             undo: vec![],
             redo: vec![],
             repository: None,
@@ -545,5 +686,234 @@ mod tests {
             p.command(&json!({"op":"palette_move","from":100,"to":0}), &mut m)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn palette_edits_do_not_wipe_mixer_undo_or_clobber_palette_on_mixer_undo() {
+        let mut p = editor();
+        let mut m = Mixer::default();
+        let red = Color::new(255, 0, 0, 255);
+        let green = Color::new(0, 255, 0, 255);
+        m.select(red);
+        m.select(green);
+        m.command(&json!({"op":"mixer_undo"})).unwrap();
+        assert_eq!(m.current(), red);
+        assert_eq!(m.snapshot(Format::HexRgba)["can_undo"], json!(true));
+        assert_eq!(m.snapshot(Format::HexRgba)["can_redo"], json!(true));
+
+        p.command(&json!({"op":"palette_add_current"}), &mut m)
+            .unwrap();
+        p.add_history(Color::new(0, 0, 255, 255), &mut m);
+        p.command(&json!({"op":"palette_undo"}), &mut m).unwrap();
+        p.command(&json!({"op":"palette_redo"}), &mut m).unwrap();
+
+        assert_eq!(m.snapshot(Format::HexRgba)["can_undo"], json!(true));
+        assert_eq!(m.snapshot(Format::HexRgba)["can_redo"], json!(true));
+
+        m.command(&json!({"op":"mixer_redo"})).unwrap();
+        p.sync_from_mixer(&m);
+        assert_eq!(m.current(), green);
+        assert_eq!(p.draft.colors, vec![red, Color::new(0, 0, 255, 255)]);
+    }
+
+    #[test]
+    fn loading_generation_keeps_valid_draft_name_and_allows_save() {
+        let db = TempDb::new();
+        let mut p = db.editor();
+        let mut m = Mixer::default();
+
+        let request = json!({
+            "op": "palette_generate",
+            "mode": "triadic",
+            "count": 3,
+            "seed": "7",
+            "base": "#3388CCFF",
+            "hue_min": 0.0,
+            "hue_max": 360.0,
+            "lightness_min": 0.0,
+            "lightness_max": 1.0,
+            "chroma_min": 0.0,
+            "chroma_max": 0.4,
+            "contrast": null
+        });
+        p.command(&request, &mut m).unwrap();
+        let gen_id = p.generations[0].id.clone();
+
+        // With an existing valid draft name, loading a generation preserves it.
+        p.command(&json!({"op":"palette_name","name":"Ocean"}), &mut m)
+            .unwrap();
+        p.command(&json!({"op":"palette_generation","id":gen_id}), &mut m)
+            .unwrap();
+        assert_eq!(p.draft.name, "Ocean");
+        p.command(&json!({"op":"palette_save"}), &mut m).unwrap();
+        assert_eq!(p.saved.len(), 1);
+        assert_eq!(p.saved[0].name, "Ocean");
+
+        // With an empty draft name, loading a generation falls back to "Untitled".
+        p.command(&json!({"op":"palette_name","name":"   "}), &mut m)
+            .unwrap();
+        p.command(&json!({"op":"palette_generation","id":gen_id}), &mut m)
+            .unwrap();
+        assert_eq!(p.draft.name, "Untitled");
+        p.command(&json!({"op":"palette_save"}), &mut m).unwrap();
+        assert_eq!(p.saved.len(), 2);
+        assert_eq!(p.saved[0].name, "Untitled");
+    }
+
+    #[test]
+    fn palette_delete_clears_id_from_undo_and_redo() {
+        let db = TempDb::new();
+        let mut p = db.editor();
+        let mut m = Mixer::default();
+
+        p.add_history(Color::new(10, 20, 30, 255), &mut m);
+        p.command(&json!({"op":"palette_name","name":"One"}), &mut m)
+            .unwrap();
+        p.command(&json!({"op":"palette_save"}), &mut m).unwrap();
+        let saved_id = p.draft.id.clone().unwrap();
+
+        p.add_history(Color::new(40, 50, 60, 255), &mut m);
+        p.add_history(Color::new(70, 80, 90, 255), &mut m);
+        // Undo once so both undo and redo contain snapshots referencing saved_id.
+        p.command(&json!({"op":"palette_undo"}), &mut m).unwrap();
+        assert!(!p.undo.is_empty());
+        assert!(!p.redo.is_empty());
+
+        p.command(&json!({"op":"palette_delete","id":saved_id}), &mut m)
+            .unwrap();
+        assert_eq!(p.draft.id, None);
+        assert!(p.undo.iter().all(|d| d.id.is_none()));
+        assert!(p.redo.iter().all(|d| d.id.is_none()));
+
+        // Undoing and saving should succeed as a new saved palette, not fail with NotFound.
+        p.command(&json!({"op":"palette_undo"}), &mut m).unwrap();
+        p.command(&json!({"op":"palette_save"}), &mut m).unwrap();
+        assert_eq!(p.saved.len(), 1);
+
+        // Redoing and saving updates the newly saved palette cleanly.
+        p.command(&json!({"op":"palette_redo"}), &mut m).unwrap();
+        p.command(&json!({"op":"palette_save"}), &mut m).unwrap();
+        assert_eq!(p.saved.len(), 1);
+    }
+
+    #[test]
+    fn palette_save_undo_save_updates_single_palette_and_new_starts_fresh_lineage() {
+        let db = TempDb::new();
+        let mut p = db.editor();
+        let mut m = Mixer::default();
+
+        p.add_history(Color::new(1, 2, 3, 255), &mut m);
+        p.add_history(Color::new(4, 5, 6, 255), &mut m);
+        p.command(&json!({"op":"palette_name","name":"Brand"}), &mut m)
+            .unwrap();
+        p.command(&json!({"op":"palette_save"}), &mut m).unwrap();
+        let first_id = p.draft.id.clone().unwrap();
+        assert_eq!(p.saved.len(), 1);
+
+        // Undoing back to before the rename/second swatch keeps the bound palette ID.
+        p.command(&json!({"op":"palette_undo"}), &mut m).unwrap();
+        assert_eq!(p.draft.id.as_deref(), Some(first_id.as_str()));
+        p.command(&json!({"op":"palette_save"}), &mut m).unwrap();
+        assert_eq!(p.saved.len(), 1);
+        assert_eq!(p.saved[0].id, first_id);
+
+        // Starting a new palette creates a fresh lineage that does not overwrite the first.
+        p.command(&json!({"op":"palette_new"}), &mut m).unwrap();
+        assert_eq!(p.draft.id, None);
+        p.add_history(Color::new(9, 8, 7, 255), &mut m);
+        p.command(&json!({"op":"palette_name","name":"Second"}), &mut m)
+            .unwrap();
+        p.command(&json!({"op":"palette_save"}), &mut m).unwrap();
+        assert_eq!(p.saved.len(), 2);
+        let second_id = p.draft.id.clone().unwrap();
+        assert_ne!(second_id, first_id);
+
+        // Duplicate also starts a fresh lineage.
+        p.command(&json!({"op":"palette_duplicate"}), &mut m)
+            .unwrap();
+        assert_eq!(p.draft.id, None);
+        p.command(&json!({"op":"palette_save"}), &mut m).unwrap();
+        assert_eq!(p.saved.len(), 3);
+    }
+
+    #[test]
+    fn snapshot_does_not_panic_on_mismatched_names_or_locks() {
+        let mut p = editor();
+        p.draft.colors = vec![Color::new(1, 2, 3, 255), Color::new(4, 5, 6, 255)];
+        p.draft.names = vec!["Only one".into()];
+        p.draft.locked = vec![true];
+        let snap = p.snapshot();
+        let swatches = snap["swatches"].as_array().unwrap();
+        assert_eq!(swatches.len(), 2);
+        assert_eq!(swatches[0]["name"], json!("Only one"));
+        assert_eq!(swatches[0]["locked"], json!(true));
+        assert_eq!(swatches[1]["name"], json!("Swatch 2"));
+        assert_eq!(swatches[1]["locked"], json!(false));
+    }
+
+    #[test]
+    fn generation_checks_locked_count_first_and_skips_noop_records() {
+        let db = TempDb::new();
+        let mut p = db.editor();
+        let mut m = Mixer::default();
+
+        p.add_history(Color::new(10, 20, 30, 255), &mut m);
+        p.add_history(Color::new(40, 50, 60, 255), &mut m);
+        p.command(
+            &json!({"op":"palette_lock","index":0,"locked":true}),
+            &mut m,
+        )
+        .unwrap();
+        p.command(
+            &json!({"op":"palette_lock","index":1,"locked":true}),
+            &mut m,
+        )
+        .unwrap();
+
+        // Even with invalid OKLCH bounds, locked_count > count returns the lock error first.
+        let too_small = json!({
+            "op": "palette_generate",
+            "mode": "triadic",
+            "count": 1,
+            "seed": "1",
+            "base": "#3388CCFF",
+            "hue_min": 300.0,
+            "hue_max": 100.0,
+            "lightness_min": 0.9,
+            "lightness_max": 0.1,
+            "chroma_min": 0.0,
+            "chroma_max": 0.4,
+            "contrast": null
+        });
+        let err = p.command(&too_small, &mut m).unwrap_err();
+        assert_eq!(
+            err,
+            "Palette size is smaller than the number of locked swatches."
+        );
+        assert!(p.generations.is_empty());
+
+        // When locked_count == count, unused bounds do not fail and no spurious generation is written.
+        let all_locked = json!({
+            "op": "palette_generate",
+            "mode": "triadic",
+            "count": 2,
+            "seed": "1",
+            "base": "#808080FF",
+            "hue_min": 300.0,
+            "hue_max": 100.0,
+            "lightness_min": 0.9,
+            "lightness_max": 0.1,
+            "chroma_min": 0.0,
+            "chroma_max": 0.4,
+            "contrast": 21.0
+        });
+        let preview = p.preview_generation(&all_locked).unwrap();
+        assert_eq!(preview, vec!["#0A141EFF", "#28323CFF"]);
+        p.command(&all_locked, &mut m).unwrap();
+        assert_eq!(
+            p.draft.colors,
+            vec![Color::new(10, 20, 30, 255), Color::new(40, 50, 60, 255)]
+        );
+        assert!(p.generations.is_empty());
     }
 }

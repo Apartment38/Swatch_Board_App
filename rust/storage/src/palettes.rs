@@ -49,6 +49,14 @@ impl PaletteRepository {
             let name: String = row.get(1)?;
             let (colors, locked) = read_colors(&self.connection, false, &id)?;
             let swatch_names = read_swatch_names(&self.connection, &id)?;
+            if !(1..=64).contains(&colors.len())
+                || colors.len() != locked.len()
+                || colors.len() != swatch_names.len()
+            {
+                return Err(Error::Malformed(format!(
+                    "palette {id} has invalid color, lock, or swatch name count"
+                )));
+            }
             palettes.push(SavedPalette {
                 id,
                 name,
@@ -170,6 +178,11 @@ impl PaletteRepository {
             let id: String = row.get(0)?;
             let description: String = row.get(1)?;
             let (colors, locked) = read_colors(&self.connection, true, &id)?;
+            if !(1..=64).contains(&colors.len()) || colors.len() != locked.len() {
+                return Err(Error::Malformed(format!(
+                    "generation {id} has invalid color or lock count"
+                )));
+            }
             let swatch_names = (1..=colors.len()).map(|i| format!("Swatch {i}")).collect();
             records.push(GenerationRecord {
                 id,
@@ -372,5 +385,50 @@ mod tests {
                 .is_err()
         );
         assert_eq!(repo.list().unwrap(), vec![original]);
+    }
+
+    #[test]
+    fn list_rejects_corrupt_palette_counts_and_missing_swatch_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("corrupt.db");
+        let mut repo = PaletteRepository::open(&path).unwrap();
+        let saved = repo
+            .save(None, "Two", &[color(1), color(2)], &[false, true])
+            .unwrap();
+
+        // Missing palette_swatches row causes swatch_names.len() != colors.len().
+        repo.connection
+            .execute(
+                "DELETE FROM palette_swatches WHERE palette_id = ?1 AND position = 1",
+                [&saved.id],
+            )
+            .unwrap();
+        assert!(matches!(repo.list(), Err(Error::Malformed(_))));
+
+        // Restore swatch name, then delete all colors so colors.len() == 0.
+        repo.connection
+            .execute(
+                "DELETE FROM palette_colors WHERE palette_id = ?1",
+                [&saved.id],
+            )
+            .unwrap();
+        assert!(matches!(repo.list(), Err(Error::Malformed(_))));
+
+        // Insert 65 colors and 65 swatch names (> 64 limit).
+        for pos in 0..65_i64 {
+            repo.connection
+                .execute(
+                    "INSERT INTO palette_colors (palette_id, position, red, green, blue, alpha, locked) VALUES (?1, ?2, 1, 2, 3, 255, 0)",
+                    params![&saved.id, pos],
+                )
+                .unwrap();
+            repo.connection
+                .execute(
+                    "INSERT INTO palette_swatches (palette_id, position, name) VALUES (?1, ?2, ?3)",
+                    params![&saved.id, pos, format!("Swatch {}", pos + 1)],
+                )
+                .unwrap();
+        }
+        assert!(matches!(repo.list(), Err(Error::Malformed(_))));
     }
 }

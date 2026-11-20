@@ -18,11 +18,11 @@ struct State {
     hsv: [f32; 3],
     sources: Vec<(Color, f64)>,
     space: MixingSpace,
-    palette: Vec<Color>,
 }
 
 pub struct Mixer {
     state: State,
+    palette: Vec<Color>,
     undo: Vec<State>,
     redo: Vec<State>,
     error: Option<String>,
@@ -40,8 +40,8 @@ impl Default for Mixer {
                     (Color::new(0, 0, 255, 255), 1.0),
                 ],
                 space: MixingSpace::Srgb,
-                palette: Vec::new(),
             },
+            palette: Vec::new(),
             undo: Vec::new(),
             redo: Vec::new(),
             error: None,
@@ -51,17 +51,13 @@ impl Default for Mixer {
 
 impl Mixer {
     pub fn colors(&self) -> &[Color] {
-        &self.state.palette
+        &self.palette
     }
     pub fn current(&self) -> Color {
         self.state.current
     }
     pub fn replace_palette(&mut self, colors: Vec<Color>) {
-        if self.state.palette != colors {
-            self.state.palette = colors;
-            self.undo.clear();
-            self.redo.clear();
-        }
+        self.palette = colors;
     }
     fn commit(&mut self, previous: State) {
         if self.state != previous {
@@ -142,7 +138,11 @@ impl Mixer {
                 let c = Color::new(channel("r")?, channel("g")?, channel("b")?, channel("a")?);
                 let previous = self.state.clone();
                 if (c.r, c.g, c.b) != (self.current().r, self.current().g, self.current().b) {
-                    self.state.hsv = hsv(c);
+                    let mut channels = hsv(c);
+                    if channels[1] == 0.0 {
+                        channels[0] = self.state.hsv[0];
+                    }
+                    self.state.hsv = channels;
                 }
                 self.state.current = c;
                 self.commit(previous);
@@ -177,8 +177,11 @@ impl Mixer {
             }
             "mixer_source" => {
                 let i = index(r, "index", self.state.sources.len())?;
-                let c = color(r, "color")?;
+                let c = color(r, "color").map_err(|_| "Invalid source color".to_string())?;
                 let w = number(r, "weight", 1.0)?;
+                if self.state.sources[i] == (c, w) {
+                    return Ok(());
+                }
                 let p = self.state.clone();
                 self.state.sources[i] = (c, w);
                 let result = self.blend();
@@ -220,9 +223,13 @@ fn string<'a>(r: &'a Value, key: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("Invalid {key}"))
 }
 fn color(r: &Value, key: &str) -> Result<Color, String> {
-    string(r, key)?
-        .parse()
-        .map_err(|_| format!("Invalid {key} color"))
+    string(r, key)?.parse().map_err(|_| {
+        if key == "color" {
+            "Invalid color".to_string()
+        } else {
+            format!("Invalid {key} color")
+        }
+    })
 }
 fn index(r: &Value, key: &str, len: usize) -> Result<usize, String> {
     r.get(key)
@@ -294,5 +301,103 @@ mod tests {
             m.command(&json!({"op":"mixer_apply","index":99,"text":"#fff"}))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn replace_palette_preserves_mixer_undo_redo_and_palette_survives_undo() {
+        let mut m = Mixer::default();
+        let first = Color::new(255, 0, 0, 255);
+        let second = Color::new(0, 255, 0, 255);
+        m.select(first);
+        m.select(second);
+        m.command(&json!({"op":"mixer_undo"})).unwrap();
+        assert_eq!(m.current(), first);
+        assert_eq!(m.snapshot(Format::HexRgba)["can_undo"], json!(true));
+        assert_eq!(m.snapshot(Format::HexRgba)["can_redo"], json!(true));
+
+        let palette = vec![Color::new(10, 20, 30, 255), Color::new(40, 50, 60, 255)];
+        m.replace_palette(palette.clone());
+        assert_eq!(m.colors(), palette.as_slice());
+        assert_eq!(m.snapshot(Format::HexRgba)["can_undo"], json!(true));
+        assert_eq!(m.snapshot(Format::HexRgba)["can_redo"], json!(true));
+
+        m.command(&json!({"op":"mixer_redo"})).unwrap();
+        assert_eq!(m.current(), second);
+        assert_eq!(m.colors(), palette.as_slice());
+
+        m.command(&json!({"op":"mixer_undo"})).unwrap();
+        assert_eq!(m.current(), first);
+        assert_eq!(m.colors(), palette.as_slice());
+    }
+
+    #[test]
+    fn unchanged_mixer_source_is_noop() {
+        let mut m = Mixer::default();
+        let chosen = Color::new(12, 34, 56, 255);
+        m.select(chosen);
+        let undo_len = m.undo.len();
+        m.command(&json!({
+            "op": "mixer_source",
+            "index": 0,
+            "color": "#FF0000FF",
+            "weight": 1.0,
+        }))
+        .unwrap();
+        assert_eq!(m.current(), chosen);
+        assert_eq!(m.undo.len(), undo_len);
+
+        // Changing either color or weight still blends and pushes undo.
+        m.command(&json!({
+            "op": "mixer_source",
+            "index": 0,
+            "color": "#FF0000FF",
+            "weight": 0.5,
+        }))
+        .unwrap();
+        assert_ne!(m.current(), chosen);
+        assert_eq!(m.undo.len(), undo_len + 1);
+    }
+
+    #[test]
+    fn invalid_color_error_message_is_well_formed() {
+        let mut m = Mixer::default();
+        let source_err = m
+            .command(&json!({
+                "op": "mixer_source",
+                "index": 0,
+                "color": "not-a-color",
+                "weight": 1.0,
+            }))
+            .unwrap_err();
+        assert_eq!(source_err, "Invalid source color");
+
+        let select_err = m
+            .command(&json!({
+                "op": "mixer_select",
+                "color": "not-a-color",
+            }))
+            .unwrap_err();
+        assert_eq!(select_err, "Invalid color");
+    }
+
+    #[test]
+    fn mixer_rgba_preserves_hue_for_achromatic_colors() {
+        let mut m = Mixer::default();
+        m.command(&json!({"op":"mixer_hsv","h":240,"s":100,"v":100}))
+            .unwrap();
+        let hue_before = m.snapshot(Format::HexRgba)["hsv"][0].as_f64().unwrap();
+        assert!((hue_before - 240.0).abs() < 1e-3);
+
+        for (r, g, b) in [(128, 128, 128), (0, 0, 0), (255, 255, 255)] {
+            m.command(&json!({"op":"mixer_rgba","r":r,"g":g,"b":b,"a":255}))
+                .unwrap();
+            let hsv_snap = &m.snapshot(Format::HexRgba)["hsv"];
+            let hue_after = hsv_snap[0].as_f64().unwrap();
+            assert!(
+                (hue_after - 240.0).abs() < 1e-3,
+                "expected hue 240 for rgb({r},{g},{b}), got {hue_after}"
+            );
+            assert_eq!(hsv_snap[1].as_f64().unwrap(), 0.0);
+        }
     }
 }

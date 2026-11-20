@@ -80,7 +80,17 @@ impl ThemeRepository {
         tx.execute("DELETE FROM theme_assignments WHERE project_id = ?1", [&id])?;
         tx.execute(
             "INSERT INTO theme_assignments (project_id, role_id, assignment_json)
-             SELECT ?1, key, value FROM json_each(?2, '$.assignments')
+             SELECT ?1, key,
+               CASE type
+                 WHEN 'null' THEN 'null'
+                 WHEN 'true' THEN 'true'
+                 WHEN 'false' THEN 'false'
+                 WHEN 'text' THEN json_quote(value)
+                 WHEN 'integer' THEN json_quote(value)
+                 WHEN 'real' THEN json_quote(value)
+                 ELSE json(value)
+               END
+             FROM json_each(?2, '$.assignments')
              WHERE json_valid(?2) AND json_type(?2, '$.assignments') = 'object'",
             params![id, project.payload],
         )?;
@@ -205,6 +215,53 @@ mod tests {
             )
             .unwrap();
         assert_eq!(role, "accent");
+    }
+
+    #[test]
+    fn assignment_index_preserves_valid_json_for_all_value_types() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut repo = ThemeRepository::open(dir.path().join("types.db")).unwrap();
+        let mut project = SavedTheme {
+            id: String::new(),
+            name: "All JSON types".into(),
+            plugin_id: "fixture".into(),
+            plugin_version: "1".into(),
+            palette_id: None,
+            scene: "main".into(),
+            payload: r##"{"assignments":{"n":null,"t":true,"f":false,"i":42,"neg":-7,"r":3.5,"s":"#123456","q":"a \"quote\"\nline","e":"","arr":[1,"a",null,true],"obj":{"kind":"Override","value":"#123456"}}}"##
+                .into(),
+            dirty: false,
+        };
+        project.id = repo.save(&project).unwrap();
+
+        let expected = [
+            ("n", "null"),
+            ("t", "true"),
+            ("f", "false"),
+            ("i", "42"),
+            ("neg", "-7"),
+            ("r", "3.5"),
+            ("s", r##""#123456""##),
+            ("q", r#""a \"quote\"\nline""#),
+            ("e", r#""""#),
+            ("arr", r#"[1,"a",null,true]"#),
+            ("obj", r##"{"kind":"Override","value":"#123456"}"##),
+        ];
+        for (role, expected_json) in expected {
+            let (stored, valid): (String, bool) = repo
+                .connection
+                .query_row(
+                    "SELECT assignment_json, json_valid(assignment_json) FROM theme_assignments WHERE project_id=?1 AND role_id=?2",
+                    params![&project.id, role],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            assert!(
+                valid,
+                "stored assignment_json for {role} is not valid JSON: {stored}"
+            );
+            assert_eq!(stored, expected_json, "mismatch for role {role}");
+        }
     }
 
     #[test]
